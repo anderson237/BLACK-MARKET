@@ -1,1 +1,363 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BLACK MARKET - SOURCING EXCLUSIF CHINE</title>
 
+  <!-- SEO Optimization -->
+  <meta name="description" content="BLACK MARKET - SOURCING EXCLUSIF CHINE. Découvrez notre catalogue exclusif de produits tendance importés directement d'usines chinoises avec prix d'usine et livraison sécurisée.">
+  <meta name="keywords" content="sourcing chine, import chine, streetwear coréen, techwear, black market, grossiste chine, précommande chine, cdiscount, aliexpress, make webhook">
+  <meta name="robots" content="index, follow">
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://blackmarket.sourcing/">
+  <meta property="og:title" content="BLACK MARKET - SOURCING EXCLUSIF CHINE">
+  <meta property="og:description" content="Découvrez nos drops de sourcing exclusifs depuis la Chine. Commandez directement d'usine via WhatsApp en toute sécurité.">
+  <meta property="og:image" content="https://images.unsplash.com/photo-1548883354-7622d03aca27?auto=format&fit=crop&q=80&w=1200">
+
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:title" content="BLACK MARKET - SOURCING EXCLUSIF CHINE">
+  <meta property="twitter:description" content="Découvrez nos drops de sourcing exclusifs depuis la Chine. Commandez directement d'usine via WhatsApp.">
+  
+  <!-- Favicon Logo (White Flame in Red rounded box) -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='32' height='32'%3E%3Crect width='24' height='24' rx='6' fill='%23ff2a2a'/%3E%3Cpath d='M12 2C12 2 15 5.5 15 8.5C15 11.5 12 14 12 14C12 14 9 11.5 9 8.5C9 5.5 12 2 12 2Z' fill='white'/%3E%3Cpath d='M12 6C12 6 13.5 8.5 13.5 10.5C13.5 12.5 12 14 12 14C12 14 10.5 12.5 10.5 10.5C10.5 8.5 12 6 12 6Z' fill='%23ffbfbf'/%3E%3C/svg%3E" />
+
+  <!-- Tailwind CSS Play CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Quicksand (Rounded Style) & Share Tech Mono -->
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght=400;600;700;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Quicksand', 'sans-serif'],
+            mono: ['Share Tech Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              red: '#ff2a2a',
+              dark: '#08080c',
+              card: '#15151e'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #08080c;
+      color: #f3f4f6;
+    }
+    .watermark-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      user-select: none;
+      opacity: 0.15;
+    }
+    /* Hide scrollbars */
+    .scrollbar-none::-webkit-scrollbar {
+      display: none;
+    }
+    .scrollbar-none {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans">
+
+  <!-- Header -->
+  <header class="bg-[#0d0d14] border-b border-brand-red/30 py-4 shadow-md sticky top-0 z-30">
+    <div class="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+      <div class="flex items-center gap-2">
+        <span class="text-xl font-black tracking-widest text-white font-mono">BLACK MARKET</span>
+        <span class="text-[9px] bg-brand-red/20 text-brand-red px-1.5 py-0.5 rounded border border-brand-red/35 font-mono font-bold">K-STREET</span>
+      </div>
+      <div>
+        <a id="wa-link" href="https://wa.me/2376589997555" target="_blank" class="bg-brand-red hover:bg-red-600 text-white text-xs px-4 py-2 rounded-xl font-bold font-mono transition-all">
+          💬 WHATSAPP DIRECT
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Marquee Header -->
+  <div class="bg-black py-1.5 border-b border-brand-red/20 overflow-hidden relative">
+    <div class="whitespace-nowrap flex text-[10px] font-mono tracking-widest text-brand-red uppercase">
+      <span class="px-4">● DROP DE SOURCING CHINOIS EN COURS ● EXCLUSIVITÉS BLACK MARKET ● FILIGRANE INCRUSTÉ DE SÉCURITÉ</span>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <main class="max-w-6xl mx-auto px-4 py-8 flex-1 space-y-6">
+    <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+      <span class="text-xs font-bold text-zinc-500 font-mono">CATALOGUE DE PRÉCOMMANDE</span>
+      <span id="counter" class="bg-brand-red/10 text-brand-red border border-brand-red/35 text-[10px] px-2 py-0.5 rounded font-mono font-bold">Chargement...</span>
+    </div>
+
+    <!-- Barre de recherche -->
+    <div class="relative">
+      <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+        </svg>
+      </div>
+      <input type="text" id="search-input" oninput="handleSearch(event)" placeholder="Rechercher un drop (ex: masque, veste...)" class="w-full bg-[#12121a] text-xs text-slate-100 pl-10 pr-4 py-3 rounded-2xl border border-zinc-800 focus:outline-none focus:border-brand-red/60 placeholder-zinc-500 font-mono transition-all">
+    </div>
+
+    <!-- Navigation par Catégories -->
+    <div class="pb-2 border-b border-zinc-900/60 overflow-x-auto scrollbar-none">
+      <div id="category-tabs" class="flex flex-wrap gap-2 py-1">
+        <!-- Les onglets de catégorie seront insérés ici par JS -->
+      </div>
+    </div>
+
+    <!-- Target Grid -->
+    <div id="grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <!-- Cards will be populated here -->
+    </div>
+  </main>
+
+  <!-- Modal Popup for Product Details -->
+  <div id="details-modal" class="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center p-4 z-50 hidden overflow-y-auto">
+    <div class="bg-[#15151e] rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden border border-brand-red/30 text-slate-200 flex flex-col my-8">
+      <!-- Modal Header -->
+      <div class="bg-gradient-to-r from-black via-[#15151e] to-black px-6 py-4 flex items-center justify-between border-b border-zinc-800">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-[#ff2a2a] animate-ping"></span>
+          <span class="text-xs font-mono text-zinc-500 uppercase tracking-widest">FICHE PRODUIT EXCLUSIVE</span>
+        </div>
+        <h3 class="text-sm font-extrabold text-brand-red font-mono tracking-widest uppercase">BLACK MARKET</h3>
+        <button onclick="closeDetailsModal()" class="bg-zinc-900 hover:bg-brand-red/20 text-zinc-400 hover:text-brand-red p-1.5 rounded-full transition-all border border-zinc-800">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+
+      <!-- Modal Content (Scrollable) -->
+      <div class="p-6 overflow-y-auto max-h-[75vh] grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Image & Watermark overlay -->
+        <div class="relative aspect-square rounded-2xl overflow-hidden bg-zinc-950 border border-zinc-800 flex items-center justify-center">
+          <img id="modal-image" src="" alt="" class="w-full h-full object-cover">
+          <div class="watermark-overlay opacity-30">
+            <span class="text-white font-extrabold text-3xl font-mono border-2 border-white/50 px-4 py-2 rotate-12 tracking-widest uppercase">
+              BLACK MARKET
+            </span>
+          </div>
+        </div>
+
+        <!-- Info details -->
+        <div class="space-y-4 flex flex-col justify-between">
+          <div class="space-y-3">
+            <div>
+              <span id="modal-category" class="inline-block bg-brand-red/10 text-brand-red text-[10px] font-bold tracking-widest uppercase px-2.5 py-0.5 rounded border border-brand-red/25 mb-1.5"></span>
+              <h2 id="modal-title" class="text-lg sm:text-xl font-extrabold text-slate-100 leading-snug"></h2>
+            </div>
+
+            <!-- Price -->
+            <div class="bg-gradient-to-r from-brand-red/10 to-transparent p-3 rounded-xl border-l-4 border-brand-red">
+              <p class="text-[8px] text-zinc-400 uppercase font-mono font-bold tracking-widest">PRIX DE VENTE SPECIAL</p>
+              <p id="modal-price" class="text-xl font-extrabold text-brand-red font-mono"></p>
+            </div>
+
+            <!-- Description -->
+            <div class="space-y-1">
+              <p class="text-[9px] text-brand-red font-mono uppercase font-bold tracking-wider">DESCRIPTION & SPECIFICATIONS</p>
+              <p id="modal-description" class="text-xs text-zinc-300 leading-relaxed bg-black/40 p-3 rounded-lg border border-zinc-900 max-h-[150px] overflow-y-auto"></p>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="pt-3 border-t border-zinc-900 flex gap-2">
+            <a id="modal-wa-btn" href="" target="_blank" class="flex-1 bg-brand-red hover:bg-red-600 text-white font-extrabold text-xs py-3 px-4 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-md shadow-brand-red/10 font-mono text-center">
+              💬 COMMANDER VIA WHATSAPP
+            </a>
+            <button onclick="closeDetailsModal()" class="bg-zinc-800 hover:bg-zinc-700 text-slate-300 font-bold text-xs px-4 rounded-xl transition-all border border-zinc-700/50">
+              Retour
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="bg-black py-6 text-center border-t border-zinc-900 text-xs text-zinc-600 font-mono">
+    <p>© 2026 BLACK MARKET CO. ALL VISUALS SECURED UNDER AUTOMATIC WATERMARK</p>
+  </footer>
+
+  <script>
+    // Config boutique No-Code
+    const CONFIG = {
+      phoneNumber: "2250707070707",
+      currency: "XOF" // ou EUR
+    };
+
+    // Fichier de données synchronisées par votre webhook Make.com
+    const PRODUCTS = [
+      {
+        id: "1",
+        title: "Masque Cyberpunk LED avec Affichage Interactif",
+        description: "Le summum du style Techwear urbain coréen ! Ce masque d'inspiration cyberpunk dispose d'un écran LED ultra-dense contrôlable par application smartphone. Conçu en matériaux robustes, idéal pour compléter vos tenues techno-futuristes.",
+        priceEur: 69,
+        priceXof: 45000,
+        imageUrl: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&q=80&w=600",
+        category: "Techwear"
+      },
+      {
+        id: "2",
+        title: "Veste Coupe-Wind Tactique Imperméable K-Street",
+        description: "Affrontez la ville avec un style streetwear authentique. Conçue à partir de textile technique déperlant, coupe-vent et anti-abrasion avec de nombreuses poches tactiques.",
+        priceEur: 55,
+        priceXof: 36000,
+        imageUrl: "https://images.unsplash.com/photo-1548883354-7622d03aca27?auto=format&fit=crop&q=80&w=600",
+        category: "Streetwear"
+      }
+    ];
+
+    document.getElementById("wa-link").href = `https://wa.me/${CONFIG.phoneNumber}`;
+
+    let selectedCategory = "Tous";
+    let searchQuery = "";
+
+    // Dynamic Category rendering
+    function renderCategories() {
+      const container = document.getElementById("category-tabs");
+      if (!container) return;
+
+      // Extract unique categories from actual products dynamically
+      const uniqueCats = ["Tous", ...new Set(PRODUCTS.map(p => p.category).filter(Boolean))];
+
+      container.innerHTML = uniqueCats.map(cat => {
+        const isActive = cat === selectedCategory;
+        if (isActive) {
+          return `<button onclick="filterCategory('${cat}')" class="bg-[#ff2a2a] text-white border border-[#ff2a2a] text-[10px] px-4 py-1.5 rounded-full font-extrabold font-mono transition-all uppercase tracking-widest">${cat}</button>`;
+        } else {
+          return `<button onclick="filterCategory('${cat}')" class="bg-[#15151e] text-zinc-400 border border-zinc-800 hover:border-brand-red/40 hover:text-slate-100 text-[10px] px-4 py-1.5 rounded-full font-extrabold font-mono transition-all uppercase tracking-widest cursor-pointer">${cat}</button>`;
+        }
+      }).join("");
+    }
+
+    // Filter dynamic helper
+    function filterCategory(category) {
+      selectedCategory = category;
+      renderCategories();
+      applyFilters();
+    }
+
+    function handleSearch(event) {
+      searchQuery = event.target.value.toLowerCase();
+      applyFilters();
+    }
+
+    function applyFilters() {
+      const filtered = PRODUCTS.filter(p => {
+        const matchesCategory = selectedCategory === "Tous" || p.category === selectedCategory;
+        const matchesSearch = p.title.toLowerCase().includes(searchQuery) || 
+                              p.description.toLowerCase().includes(searchQuery) ||
+                              (p.category && p.category.toLowerCase().includes(searchQuery));
+        return matchesCategory && matchesSearch;
+      });
+      renderGrid(filtered);
+    }
+
+    function renderGrid(itemsToRender) {
+      let filterText = selectedCategory.toUpperCase();
+      if (searchQuery) {
+        filterText += " & RECHERCHE";
+      }
+      document.getElementById("counter").innerText = `${itemsToRender.length} DROPS DISPONIBLES (${filterText})`;
+      const grid = document.getElementById("grid");
+      grid.innerHTML = "";
+
+      if (itemsToRender.length === 0) {
+        grid.innerHTML = `<div class="col-span-full py-12 text-center text-zinc-500 font-mono text-xs">AUCUN DROP POUR LE MOMENT</div>`;
+        return;
+      }
+
+      itemsToRender.forEach((p) => {
+        const priceStr = CONFIG.currency === "EUR" ? `${p.priceEur} €` : `${p.priceXof.toLocaleString('fr-FR')} F CFA`;
+        
+        // Find index of this product in master array to pass correct index to modal helper
+        const masterIndex = PRODUCTS.findIndex(orig => orig.id === p.id);
+
+        // WhatsApp dynamic link construction
+        const message = `Bonjour, je souhaite commander le produit [${p.title.toUpperCase()}] au prix de [${priceStr}]. Voici la photo : [${p.imageUrl}]`;
+        const waUrl = `https://wa.me/${CONFIG.phoneNumber}?text=${encodeURIComponent(message)}`;
+
+        grid.innerHTML += `
+          <div onclick="openDetailsModal(${masterIndex})" class="bg-brand-card rounded-3xl overflow-hidden border border-zinc-800 flex flex-col h-full relative group hover:border-brand-red/40 transition-all duration-300 cursor-pointer">
+            <div class="relative aspect-video overflow-hidden">
+              <img src="${p.imageUrl}" alt="${p.title}" class="w-full h-full object-cover opacity-85 group-hover:scale-105 transition-transform duration-500">
+              <!-- Filigrane BLACK MARKET incrusté -->
+              <div class="watermark-overlay">
+                <span class="text-white font-extrabold text-xl font-mono border border-white/50 px-2 py-0.5 rotate-12 tracking-widest">
+                  BLACK MARKET
+                </span>
+              </div>
+              <span class="absolute top-3 left-3 bg-brand-red text-white text-[9px] uppercase font-bold tracking-widest px-2.5 py-1 rounded">
+                ${p.category || 'EXCLUSIF'}
+              </span>
+            </div>
+            <div class="p-6 flex flex-col flex-1 justify-between gap-4">
+              <div class="space-y-1.5">
+                <h3 class="font-extrabold text-sm text-slate-100 group-hover:text-brand-red transition-colors">${p.title}</h3>
+                <p class="text-xs text-zinc-400 leading-relaxed line-clamp-3">${p.description}</p>
+              </div>
+              <div class="flex items-center justify-between pt-2 border-t border-zinc-900">
+                <div class="flex flex-col">
+                  <span class="text-[8px] text-zinc-500 font-mono">PRIX FACTORY</span>
+                  <span class="font-extrabold text-slate-100 text-sm font-mono">${priceStr}</span>
+                </div>
+                <a href="${waUrl}" target="_blank" onclick="event.stopPropagation();" class="bg-brand-red text-white font-bold text-[11px] px-3.5 py-2 rounded-xl transition-all font-mono">
+                  COMMANDER
+                </a>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    function openDetailsModal(index) {
+      const p = PRODUCTS[index];
+      if (!p) return;
+      
+      const priceStr = CONFIG.currency === "EUR" ? `${p.priceEur} €` : `${p.priceXof.toLocaleString('fr-FR')} F CFA`;
+      const message = `Bonjour, je souhaite commander le produit [${p.title.toUpperCase()}] au prix de [${priceStr}]. Voici la photo : [${p.imageUrl}]`;
+      const waUrl = `https://wa.me/${CONFIG.phoneNumber}?text=${encodeURIComponent(message)}`;
+
+      document.getElementById("modal-image").src = p.imageUrl;
+      document.getElementById("modal-category").innerText = p.category || "EXCLUSIF";
+      document.getElementById("modal-title").innerText = p.title;
+      document.getElementById("modal-price").innerText = priceStr;
+      document.getElementById("modal-description").innerText = p.description;
+      document.getElementById("modal-wa-btn").href = waUrl;
+
+      const modal = document.getElementById("details-modal");
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+      document.body.style.overflow = "hidden"; // Block body scroll
+    }
+
+    function closeDetailsModal() {
+      const modal = document.getElementById("details-modal");
+      modal.classList.remove("flex");
+      modal.classList.add("hidden");
+      document.body.style.overflow = ""; // Restore scroll
+    }
+
+    // Initial render
+    renderCategories();
+    renderGrid(PRODUCTS);
+  </script>
+</body>
+</html>
