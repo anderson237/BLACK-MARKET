@@ -1,11 +1,11 @@
 import sharp from "sharp";
-import { writeFileSync, mkdirSync, copyFileSync } from "fs";
+import { writeFileSync, mkdirSync, copyFileSync, existsSync } from "fs";
 import path from "path";
 import { INITIAL_PRODUCTS } from "../src/data";
 import { getProductPageHtml } from "../src/lib/productPage";
 import { getHtmlTemplateCode } from "../src/lib/template";
 
-const BASE_URL = "https://anderson237.github.io/BLACK-MARKET/";
+const BASE_URL = "https://blackmarket-import-export.netlify.app/";
 const PHONE_NUMBER = "237683963007";
 const ROOT = path.join(process.cwd(), "client-site");
 const IMG_DIR = path.join(ROOT, "img");
@@ -31,6 +31,7 @@ function watermarkSvg(w: number, h: number): Buffer {
 }
 
 async function watermarkImage(src: string, out: string): Promise<void> {
+  if (existsSync(out)) return;
   const res = await fetch(src, { signal: AbortSignal.timeout(30000) });
   if (!res.ok) throw new Error("HTTP " + res.status + " pour " + src);
   const buffer = Buffer.from(await res.arrayBuffer());

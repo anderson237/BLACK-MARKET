@@ -1,5 +1,5 @@
 import React from "react";
-import { Flame, LogOut } from "lucide-react";
+import { Flame, LogOut, Store } from "lucide-react";
 import { WebhookConfig } from "../types";
 
 interface HeaderProps {
@@ -63,13 +63,22 @@ export default function Header({ config, onConfigChange, onLogout }: HeaderProps
             />
           </div>
 
+          <a
+            href="/"
+            className="bg-zinc-900 hover:bg-brand-red/20 text-zinc-400 hover:text-brand-red border border-zinc-800 px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+            title="Retour à la boutique client"
+          >
+            <Store className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">BOUTIQUE</span>
+          </a>
+
           <button
             onClick={onLogout}
-            className="bg-zinc-900 hover:bg-brand-red/20 text-zinc-400 hover:text-brand-red border border-zinc-800 px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+            className="bg-brand-red hover:bg-red-600 text-white px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer"
             title="Déconnexion sécurisée"
           >
             <LogOut className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">SORTIE</span>
+            <span>DÉCONNEXION</span>
           </button>
         </div>
       </div>

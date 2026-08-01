@@ -12,24 +12,29 @@
 
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://anderson237.github.io/BLACK-MARKET/">
+  <meta property="og:url" content="https://blackmarket-import-export.netlify.app/">
   <meta property="og:title" content="BLACK MARKET - SOURCING EXCLUSIF CHINE">
   <meta property="og:description" content="Découvrez nos drops de sourcing exclusifs depuis la Chine (Taobao, 1688). Commandez directement d'usine via WhatsApp en toute sécurité.">
-  <meta property="og:image" content="https://anderson237.github.io/BLACK-MARKET/img/brand.jpg">
+  <meta property="og:image" content="https://blackmarket-import-export.netlify.app/img/brand.jpg">
 
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
   <meta property="twitter:title" content="BLACK MARKET - SOURCING EXCLUSIF CHINE">
   <meta property="twitter:description" content="Découvrez nos drops de sourcing exclusifs depuis la Chine. Commandez directement d'usine via WhatsApp.">
-  <meta property="twitter:image" content="https://anderson237.github.io/BLACK-MARKET/img/brand.jpg">
+  <meta property="twitter:image" content="https://blackmarket-import-export.netlify.app/img/brand.jpg">
 
   <!-- Favicon Logo (White Flame in Red rounded box) -->
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='32' height='32'%3E%3Crect width='24' height='24' rx='6' fill='%23ff2a2a'/%3E%3Cpath d='M12 2C12 2 15 5.5 15 8.5C15 11.5 12 14 12 14C12 14 9 11.5 9 8.5C9 5.5 12 2 12 2Z' fill='white'/%3E%3Cpath d='M12 6C12 6 13.5 8.5 13.5 10.5C13.5 12.5 12 14 12 14C12 14 10.5 12.5 10.5 10.5C10.5 8.5 12 6 12 6Z' fill='%23ffbfbf'/%3E%3C/svg%3E" />
 
   <!-- Tailwind CSS Play CDN -->
+  <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin>
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Google Fonts: Quicksand (Rounded Style) & Share Tech Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <!-- Google Identity Services (Sign in with Google) -->
+  <script src="https://accounts.google.com/gsi/client"></script>
   <script>
     tailwind.config = {
       theme: {
@@ -60,9 +65,14 @@
         <span class="text-xl font-black tracking-widest text-white font-mono">BLACK MARKET</span>
         <span class="text-[9px] bg-brand-red/20 text-brand-red px-1.5 py-0.5 rounded border border-brand-red/35 font-mono font-bold">K-STREET</span>
       </div>
-      <a id="wa-link" href="https://wa.me/237683963007" target="_blank" rel="noopener noreferrer" class="bg-brand-red hover:bg-red-600 text-white text-xs px-4 py-2 rounded-xl font-bold font-mono transition-all">
-        💬 WHATSAPP DIRECT
-      </a>
+      <div class="flex items-center gap-2">
+        <a id="dash-btn" href="/admin" class="hidden bg-[#ff2a2a] hover:bg-red-600 text-white text-xs px-4 py-2 rounded-xl font-bold font-mono transition-all shadow-md shadow-brand-red/10">🛠 DASHBOARD ADMIN</a>
+        <button id="logout-btn" class="hidden text-zinc-400 hover:text-brand-red text-xs px-3 py-2 rounded-xl font-bold font-mono border border-zinc-800 hover:border-brand-red/40 transition-all cursor-pointer" aria-label="Déconnexion">DÉCONNEXION</button>
+        <button id="login-btn" class="text-zinc-400 hover:text-brand-red text-xs px-3 py-2 rounded-xl font-bold font-mono border border-zinc-800 hover:border-brand-red/40 transition-all cursor-pointer">◆ CONNEXION</button>
+        <a id="wa-link" href="https://wa.me/237683963007" target="_blank" rel="noopener noreferrer" class="bg-brand-red hover:bg-red-600 text-white text-xs px-4 py-2 rounded-xl font-bold font-mono transition-all">
+          💬 WHATSAPP DIRECT
+        </a>
+      </div>
     </div>
   </header>
 
@@ -128,13 +138,13 @@
             </div>
             <div class="space-y-1">
               <p class="text-[9px] text-brand-red font-mono uppercase font-bold tracking-wider">DESCRIPTION & SPECIFICATIONS</p>
-              <p id="modal-description" class="text-xs text-zinc-300 leading-relaxed bg-black/40 p-3 rounded-lg border border-zinc-900 max-h-[150px] overflow-y-auto"></p>
+              <div id="modal-description" class="text-xs text-zinc-300 leading-relaxed bg-black/40 p-3 rounded-lg border border-zinc-900 max-h-[150px] overflow-y-auto space-y-2"></div>
             </div>
           </div>
 
           <div class="pt-3 border-t border-zinc-900 flex gap-2">
             <a id="modal-wa-btn" href="" target="_blank" rel="noopener noreferrer" class="flex-1 bg-brand-red hover:bg-red-600 text-white font-extrabold text-xs py-3 px-4 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-md shadow-brand-red/10 font-mono text-center">
-              💬 COMMANDER VIA WHATSAPP
+              💬 PRÉCOMMANDER VIA WHATSAPP
             </a>
             <button onclick="closeDetailsModal()" class="bg-zinc-800 hover:bg-zinc-700 text-slate-300 font-bold text-xs px-4 rounded-xl transition-all border border-zinc-700/50">Retour</button>
           </div>
@@ -147,6 +157,23 @@
   <footer class="bg-black py-6 text-center border-t border-zinc-900 text-xs text-zinc-600 font-mono">
     <p>© 2026 BLACK MARKET CO. ALL VISUALS SECURED UNDER AUTOMATIC WATERMARK</p>
   </footer>
+
+  <!-- Login Modal (Google) -->
+  <div id="login-modal" class="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center p-4 z-[70] hidden">
+    <div class="w-full max-w-sm bg-[#15151e] rounded-3xl p-6 border border-brand-red/30 text-slate-200 shadow-2xl relative">
+      <button onclick="closeLoginModal()" class="absolute top-3 right-3 bg-zinc-900 hover:bg-brand-red/20 text-zinc-400 hover:text-brand-red p-1.5 rounded-full transition-all border border-zinc-800" aria-label="Fermer">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+      <div class="text-center mb-5">
+        <h3 class="text-sm font-extrabold text-brand-red font-mono tracking-widest uppercase">ESPACE RÉSERVÉ</h3>
+        <p class="text-[10px] text-zinc-500 font-mono mt-1">CONNECTEZ-VOUS AVEC VOTRE EMAIL ADMIN</p>
+      </div>
+      <div class="flex flex-col items-center gap-3">
+        <div id="g-signin"></div>
+        <p id="login-error" class="hidden text-[11px] text-red-400 font-mono text-center"></p>
+      </div>
+    </div>
+  </div>
 
   <script>
     // Config boutique No-Code
@@ -161,6 +188,7 @@
       img.dataset.wm = "1";
       var src = img.getAttribute("src") || img.src;
       if (!src || src.indexOf("data:") === 0) return;
+      if (src.indexOf("/img/") !== -1 || src.indexOf("img/") === 0) return; // déjà filigrané côté serveur
       var raw = new Image();
       raw.crossOrigin = "anonymous";
       raw.onload = function () {
@@ -199,6 +227,18 @@
       };
       raw.onerror = function () {};
       raw.src = src;
+    }
+
+    // Fallback to the original (remote) image when the local watermarked copy is missing.
+    // Reads the URL from a data-attribute (no inline JS string interpolation => no XSS).
+    function handleImgError(img) {
+      if (img.dataset.fbDone === "1") return;
+      img.dataset.fbDone = "1";
+      var fb = img.getAttribute("data-fallback");
+      if (!fb) return;
+      img.src = fb;
+      img.crossOrigin = "anonymous";
+      watermarkImage(img);
     }
 
     // Fallback embedded data (used only si catalog.json indisponible)
@@ -244,7 +284,11 @@
         const base = isActive
           ? "bg-[#ff2a2a] text-white border border-[#ff2a2a]"
           : "bg-[#15151e] text-zinc-400 border border-zinc-800 hover:border-brand-red/40 hover:text-slate-100";
-        return '<button onclick="filterCategory(\'' + escapeHtml(cat) + '\')" class="' + base + ' text-[10px] px-4 py-1.5 rounded-full font-extrabold font-mono transition-all uppercase tracking-widest">' + escapeHtml(cat) + "</button>";
+        // JSON.stringify produces a JS-safe string literal (correct escaping for
+        // the onclick handler). escapeHtml alone is NOT enough here because the
+        // HTML parser decodes &#39; back to ' inside the attribute.
+        const jsCat = JSON.stringify(cat);
+        return '<button onclick="filterCategory(' + jsCat + ')" class="' + base + ' text-[10px] px-4 py-1.5 rounded-full font-extrabold font-mono transition-all uppercase tracking-widest">' + escapeHtml(cat) + "</button>";
       }).join("");
     }
 
@@ -271,6 +315,41 @@
       renderGrid(filtered);
     }
 
+    // ===== MESSAGE WHATSAPP POLI & STRUCTURÉ (partagé) =====
+    function buildWaMessage(product, priceStr, productUrl) {
+      return "Bonjour BLACK MARKET, 👋
+
+" +
+        "Je souhaite passer une PRÉCOMMANDE pour le produit suivant :
+
+" +
+        "  📦 PRODUIT : " + String(product.title || "").toUpperCase() + "
+" +
+        "  💰 PRIX : " + priceStr + "
+" +
+        "  🔗 FICHE PRODUIT : " + productUrl + "
+
+" +
+        "Merci de me confirmer la disponibilité, le délai de livraison et les modalités de paiement.
+
+" +
+        "Dans l'attente de votre retour, je vous prie d'agréer mes salutations distinguées.";
+    }
+
+    // ===== DESCRIPTION PARAGRAPHEE (formatée pour la lecture) =====
+    function paragraphizeDescription(text) {
+      var raw = String(text || "");
+      var lines = raw.split(/
+{2,}/);
+      if (lines.length <= 1) lines = raw.split(/
+/).filter(Boolean);
+      return lines
+        .map(function (block) {
+          return '<p class="text-xs text-zinc-300 leading-relaxed indent-4">' + escapeHtml(block.trim()) + "</p>";
+        })
+        .join("");
+    }
+
     function renderGrid(itemsToRender) {
       let filterText = String(selectedCategory).toUpperCase();
       if (searchQuery) filterText += " & RECHERCHE";
@@ -288,23 +367,26 @@
           ? escapeHtml(p.priceEur) + " €"
           : Number(p.priceXof || 0).toLocaleString("fr-FR") + " F CFA";
         const masterIndex = PRODUCTS.findIndex(orig => orig.id === p.id);
-        const message = "Bonjour, je souhaite commander le produit [" + String(p.title || "").toUpperCase() + "] au prix de [" + priceStr + "]. Voici le produit : " + SITE_URL + "p/" + p.id + ".html";
+        const localImg = "img/" + encodeURIComponent(p.id) + ".jpg";
+        const productUrl = SITE_URL + "p/" + p.id + ".html";
+        const message = buildWaMessage(p, priceStr, productUrl);
         const waUrl = "https://wa.me/" + CONFIG.phoneNumber + "?text=" + encodeURIComponent(message);
+        const paragraphs = paragraphizeDescription(p.description);
 
         grid.innerHTML +=
-          '<div onclick="openDetailsModal(' + masterIndex + ')" class="bg-brand-card rounded-3xl overflow-hidden border border-zinc-800 flex flex-col h-full relative group hover:border-brand-red/40 transition-all duration-300 cursor-pointer">' +
-            '<div class="relative aspect-video overflow-hidden">' +
-              '<img src="' + escapeHtml(p.imageUrl) + '" alt="' + escapeHtml(p.title) + '" loading="lazy" crossorigin="anonymous" onload="watermarkImage(this)" class="w-full h-full object-cover opacity-85 group-hover:scale-105 transition-transform duration-500">' +
-              '<span class="absolute top-3 left-3 bg-brand-red text-white text-[9px] uppercase font-bold tracking-widest px-2.5 py-1 rounded">' + escapeHtml(p.category || "EXCLUSIF") + "</span>" +
-            "</div>" +
+            '<div onclick="openDetailsModal(' + masterIndex + ')" class="bg-brand-card rounded-3xl overflow-hidden border border-zinc-800 flex flex-col h-full relative group hover:border-brand-red/40 transition-all duration-300 cursor-pointer">' +
+              '<div class="relative aspect-video overflow-hidden">' +
+                '<img src="' + escapeHtml(localImg) + '" alt="' + escapeHtml(p.title) + '" loading="lazy" crossorigin="anonymous" data-fallback="' + escapeHtml(p.imageUrl) + '" onerror="handleImgError(this)" class="w-full h-full object-cover opacity-85 group-hover:scale-105 transition-transform duration-500">' +
+                '<span class="absolute top-3 left-3 bg-brand-red text-white text-[9px] uppercase font-bold tracking-widest px-2.5 py-1 rounded">' + escapeHtml(p.category || "EXCLUSIF") + "</span>" +
+              "</div>" +
             '<div class="p-6 flex flex-col flex-1 justify-between gap-4">' +
               '<div class="space-y-1.5">' +
                 '<h3 class="font-extrabold text-sm text-slate-100 group-hover:text-brand-red transition-colors">' + escapeHtml(p.title) + "</h3>" +
-                '<p class="text-xs text-zinc-400 leading-relaxed line-clamp-3">' + escapeHtml(p.description) + "</p>" +
+                '<div class="text-xs text-zinc-400 leading-relaxed line-clamp-3">' + escapeHtml(p.description) + "</div>" +
               "</div>" +
               '<div class="flex items-center justify-between pt-2 border-t border-zinc-900">' +
                 '<div class="flex flex-col"><span class="text-[8px] text-zinc-500 font-mono">PRIX FACTORY</span><span class="font-extrabold text-slate-100 text-sm font-mono">' + priceStr + "</span></div>" +
-                '<a href="' + waUrl + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();" class="bg-brand-red text-white font-bold text-[11px] px-3.5 py-2 rounded-xl transition-all font-mono">COMMANDER</a>' +
+                '<a href="' + waUrl + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();" class="bg-brand-red text-white font-bold text-[11px] px-3.5 py-2 rounded-xl transition-all font-mono">PRÉCOMMANDER</a>' +
               "</div>" +
             "</div>" +
           "</div>";
@@ -317,16 +399,23 @@
       const priceStr = CONFIG.currency === "EUR"
         ? escapeHtml(p.priceEur) + " €"
         : Number(p.priceXof || 0).toLocaleString("fr-FR") + " F CFA";
-      const message = "Bonjour, je souhaite commander le produit [" + String(p.title || "").toUpperCase() + "] au prix de [" + priceStr + "]. Voici le produit : " + SITE_URL + "p/" + p.id + ".html";
+      const productUrl = SITE_URL + "p/" + p.id + ".html";
+      const message = buildWaMessage(p, priceStr, productUrl);
       const waUrl = "https://wa.me/" + CONFIG.phoneNumber + "?text=" + encodeURIComponent(message);
 
       var modalImg = document.getElementById("modal-image");
       delete modalImg.dataset.wm;
-      modalImg.src = p.imageUrl;
+      modalImg.onerror = function () {
+        modalImg.onerror = null;
+        modalImg.src = p.imageUrl;
+        modalImg.crossOrigin = "anonymous";
+        watermarkImage(modalImg);
+      };
+      modalImg.src = "img/" + encodeURIComponent(p.id) + ".jpg";
       document.getElementById("modal-category").innerText = p.category || "EXCLUSIF";
       document.getElementById("modal-title").innerText = p.title;
       document.getElementById("modal-price").innerText = priceStr;
-      document.getElementById("modal-description").innerText = p.description;
+      document.getElementById("modal-description").innerHTML = paragraphizeDescription(p.description);
       document.getElementById("modal-wa-btn").href = waUrl;
 
       if (history.replaceState) history.replaceState(null, "", "#" + p.id);
@@ -367,6 +456,117 @@
     }
 
     loadCatalog();
+
+    // ===== ACCÈS ADMINISTRATEUR (login via Google) =====
+    var GOOGLE_CLIENT_ID = "809279866832-16p4nguhc37v46tqtcnte0e39ss1atf2.apps.googleusercontent.com";
+    var loginModal = document.getElementById("login-modal");
+    var gRendered = false;
+
+    function openLoginModal() {
+      if (!loginModal) return;
+      loginModal.classList.remove("hidden");
+      loginModal.classList.add("flex");
+      if (!gRendered) renderGoogleButton();
+    }
+    function closeLoginModal() {
+      if (loginModal) {
+        loginModal.classList.add("hidden");
+        loginModal.classList.remove("flex");
+      }
+    }
+    function showDashboard() {
+      var btn = document.getElementById("dash-btn");
+      if (btn) btn.classList.remove("hidden");
+      var loginBtn = document.getElementById("login-btn");
+      if (loginBtn) loginBtn.classList.add("hidden");
+      var outBtn = document.getElementById("logout-btn");
+      if (outBtn) outBtn.classList.remove("hidden");
+    }
+    function logoutAdmin() {
+      var token = "";
+      try {
+        token = sessionStorage.getItem("bm_admin_token") || "";
+        sessionStorage.removeItem("bm_admin_token");
+        sessionStorage.removeItem("admin_authenticated");
+        sessionStorage.removeItem("bm_admin_email");
+      } catch (e2) {}
+      if (token) {
+        fetch("/api/auth/logout", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + token },
+        }).catch(function () {});
+      }
+      var btn = document.getElementById("dash-btn");
+      if (btn) btn.classList.add("hidden");
+      var outBtn = document.getElementById("logout-btn");
+      if (outBtn) outBtn.classList.add("hidden");
+      var loginBtn = document.getElementById("login-btn");
+      if (loginBtn) loginBtn.classList.remove("hidden");
+    }
+    function renderGoogleButton() {
+      if (typeof google === "undefined" || !google.accounts) return;
+      gRendered = true;
+      google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        auto_select: false,
+        callback: function (resp) {
+          if (resp && resp.credential) handleGoogleCredential(resp.credential);
+        },
+      });
+      google.accounts.id.renderButton(document.getElementById("g-signin"), {
+        theme: "outline",
+        size: "large",
+        shape: "pill",
+        width: 280,
+        text: "continue_with",
+      });
+    }
+    function handleGoogleCredential(credential) {
+      var errEl = document.getElementById("login-error");
+      fetch("/api/auth/google", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ credential: credential }),
+      })
+        .then(function (res) {
+          return res.json().then(function (data) { return { ok: res.ok, data: data }; });
+        })
+        .then(function (r) {
+          if (r.ok && r.data.token) {
+            try {
+              sessionStorage.setItem("bm_admin_token", r.data.token);
+              sessionStorage.setItem("admin_authenticated", "true");
+              sessionStorage.setItem("bm_admin_email", r.data.email || "");
+            } catch (e2) {}
+            closeLoginModal();
+            showDashboard();
+          } else {
+            errEl.textContent = r.data.error || "Accès refusé.";
+            errEl.classList.remove("hidden");
+          }
+        })
+        .catch(function () {
+          errEl.textContent = "Erreur réseau. Réessayez.";
+          errEl.classList.remove("hidden");
+        });
+    }
+
+    var loginBtn = document.getElementById("login-btn");
+    if (loginBtn) loginBtn.addEventListener("click", openLoginModal);
+    var logoutBtn = document.getElementById("logout-btn");
+    if (logoutBtn) logoutBtn.addEventListener("click", logoutAdmin);
+    if (loginModal) {
+      loginModal.addEventListener("click", function (ev) {
+        if (ev.target === loginModal) closeLoginModal();
+      });
+      document.addEventListener("keydown", function (ev) {
+        if (ev.key === "Escape" && !loginModal.classList.contains("hidden")) closeLoginModal();
+      });
+    }
+    // Déjà connecté (session en cours) -> bouton Dashboard visible
+    try {
+      if (sessionStorage.getItem("bm_admin_token")) showDashboard();
+    } catch (e2) {}
   </script>
 </body>
 </html>

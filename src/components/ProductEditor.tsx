@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import { X, Save, Trash2, Plus, Image as ImageIcon } from "lucide-react";
+import { X, Save, Trash2, Plus, Image as ImageIcon, Upload } from "lucide-react";
 import { Product } from "../types";
 import RichEditor from "./RichEditor";
 import { motion, AnimatePresence } from "motion/react";
+import { getToken } from "../lib/api";
 
 interface ProductEditorProps {
   product: Product;
@@ -14,8 +15,91 @@ interface ProductEditorProps {
 
 export default function ProductEditor({ product, categories, onClose, onSave, onDelete }: ProductEditorProps) {
   const [draft, setDraft] = useState<Product>({ ...product, features: [...product.features] });
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
 
   const set = (patch: Partial<Product>) => setDraft((d) => ({ ...d, ...patch }));
+
+  const watermarkFile = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const raw = new Image();
+      raw.onload = () => {
+        try {
+          const w = raw.naturalWidth || 1200;
+          const h = raw.naturalHeight || 800;
+          const scale = Math.min(1, 1200 / w);
+          const cw = Math.round(w * scale);
+          const ch = Math.round(h * scale);
+          const canvas = document.createElement("canvas");
+          canvas.width = cw;
+          canvas.height = ch;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) throw new Error("canvas");
+          ctx.drawImage(raw, 0, 0, cw, ch);
+          ctx.save();
+          ctx.translate(cw / 2, ch / 2);
+          ctx.rotate(-Math.PI / 6);
+          const fs = Math.max(16, Math.round(cw * 0.055));
+          ctx.font = "bold " + fs + "px monospace";
+          ctx.fillStyle = "rgba(255,255,255,0.32)";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.shadowColor = "rgba(0,0,0,0.75)";
+          ctx.shadowBlur = 5;
+          const spacingY = Math.max(90, Math.round(ch * 0.30));
+          const spacingX = Math.max(200, Math.round(cw * 0.72));
+          for (let dy = -ch; dy <= ch * 2; dy += spacingY) {
+            for (let dx = -cw; dx <= cw * 2; dx += spacingX) {
+              ctx.fillText("BLACK MARKET © 2026", dx, dy);
+            }
+          }
+          ctx.restore();
+          resolve(canvas.toDataURL("image/jpeg", 0.88));
+        } catch (e) {
+          reject(e);
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      };
+      raw.onerror = reject;
+      raw.src = url;
+    });
+  };
+
+  const handleImageFile = (file: File | undefined) => {
+    if (!file) return;
+    setUploading(true);
+    setUploadError("");
+    watermarkFile(file)
+      .then(async (watermarkedBase64) => {
+        try {
+          const token = getToken();
+          const res = await fetch("/api/upload-image", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({ imageBase64: watermarkedBase64 }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.url) {
+            setUploadError(data.error || "Erreur lors de l'upload.");
+          } else {
+            set({ imageUrl: data.url });
+          }
+        } catch {
+          setUploadError("Erreur réseau lors de l'upload de l'image.");
+        } finally {
+          setUploading(false);
+        }
+      })
+      .catch(() => {
+        setUploadError("Impossible de lire l'image (fichier invalide).");
+        setUploading(false);
+      });
+  };
 
   const setFeature = (idx: number, value: string) =>
     setDraft((d) => ({ ...d, features: d.features.map((f, i) => (i === idx ? value : f)) }));
@@ -102,7 +186,7 @@ export default function ProductEditor({ product, categories, onClose, onSave, on
 
             {/* Image */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider font-mono block">URL de l'image produit</label>
+              <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider font-mono block">Image produit (upload direct, filigrane automatique)</label>
               <div className="flex items-center gap-3">
                 <div className="w-20 h-20 rounded-xl overflow-hidden border border-zinc-800 bg-zinc-950 flex items-center justify-center shrink-0">
                   {draft.imageUrl ? (
@@ -111,8 +195,30 @@ export default function ProductEditor({ product, categories, onClose, onSave, on
                     <ImageIcon className="w-6 h-6 text-zinc-700" />
                   )}
                 </div>
-                <input className={inputCls} value={draft.imageUrl} onChange={(e) => set({ imageUrl: e.target.value })} placeholder="https://..." />
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <label className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-slate-300 px-3 py-2 rounded-lg text-[11px] font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-all">
+                      <Upload className="w-3.5 h-3.5 text-brand-red" />
+                      {uploading ? "FILIGRANE EN COURS..." : "UPLOADER UNE IMAGE"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploading}
+                        onChange={(e) => handleImageFile(e.target.files?.[0])}
+                      />
+                    </label>
+                    {draft.imageUrl && draft.imageUrl.startsWith("/api/img/") && (
+                      <span className="text-[9px] text-green-500 font-mono">FILIGRANÉE ✔</span>
+                    )}
+                  </div>
+                  <p className="text-[9px] text-zinc-600 font-mono leading-relaxed">
+                    Le filigrane est appliqué automatiquement avant l'envoi au serveur — aucun logiciel externe requis.
+                  </p>
+                  {uploadError && <p className="text-[10px] text-red-400 font-mono">{uploadError}</p>}
+                </div>
               </div>
+              <input className={inputCls} value={draft.imageUrl} onChange={(e) => set({ imageUrl: e.target.value })} placeholder="https://... (ou /api/img/xxx.jpg)" />
             </div>
 
             {/* WYSIWYG: sales pitch */}

@@ -1,0 +1,599 @@
+import express from "express";
+import path from "path";
+import fs from "fs";
+import crypto from "crypto";
+import dotenv from "dotenv";
+import { getStore } from "@netlify/blobs";
+import { GoogleGenAI, Type } from "@google/genai";
+import { INITIAL_PRODUCTS } from "./data";
+
+dotenv.config();
+
+export function createApp() {
+  const app = express();
+
+  // Enable JSON bodies with higher limits for base64 image uploads
+  app.use(express.json({ limit: "15mb" }));
+
+  // Trust Netlify's proxy headers so req.ip reflects the real client IP
+  // (required for accurate per-IP rate limiting behind the CDN / load balancer).
+  app.set("trust proxy", true);
+  app.disable("x-powered-by");
+
+  // ---------------------------------------------------------------------------
+  // SECURITY HEADERS (defense in depth: harden every response)
+  // ---------------------------------------------------------------------------
+  app.use((_req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    res.setHeader("X-XSS-Protection", "1; mode=block");
+    res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    // A permissive-but-safe CSP. Inline styles/scripts are allowed because the
+    // generated client pages and React bundles rely on them; we still block
+    // third-party framing, plugin-src and object-src (flash/java).
+    res.setHeader(
+      "Content-Security-Policy",
+      "default-src 'self'; img-src 'self' data: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; connect-src 'self' https:; font-src 'self' data: https:; frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
+    );
+    next();
+  });
+
+  // CORS / CSRF defense-in-depth: only same-origin callers may use the API.
+  // Bearer tokens already make cross-origin calls harmless (Authorization is a
+  // non-simple header => browsers block it without preflight), but we also
+  // reject requests whose Origin does not match our own host.
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin) {
+      let originHost = origin;
+      try {
+        originHost = new URL(origin).host;
+      } catch {
+        // invalid origin -> treat as untrusted
+        return res.status(403).json({ error: "Origine non autorisée." });
+      }
+      const host = req.headers.host || "";
+      if (originHost !== host) {
+        return res.status(403).json({ error: "Origine non autorisée." });
+      }
+    }
+    next();
+  });
+
+  // ---------------------------------------------------------------------------
+  // CONFIG (env-driven, safe defaults)
+  // ---------------------------------------------------------------------------
+  const apiKey = process.env.GEMINI_API_KEY;
+  const adminPassword = process.env.ADMIN_PASSWORD || "ADMIN99";
+  const adminEmails = (process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || "elomopatrick.pn@gmail.com")
+    .toLowerCase()
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const googleClientId = process.env.GOOGLE_CLIENT_ID || "";
+  const geminiModel = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+  const geminiFallbackModel = process.env.GEMINI_FALLBACK_MODEL || "gemini-2.5-flash-lite";
+
+  if (!process.env.ADMIN_PASSWORD) {
+    console.warn(
+      "[SECURITY] ADMIN_PASSWORD non défini -> mot de passe de démo 'ADMIN99' actif. Définissez-le dans .env avant toute mise en production."
+    );
+  }
+  if (!apiKey) {
+    console.warn("[WARN] GEMINI_API_KEY non définie -> l'endpoint IA renverra 503 tant qu'elle n'est pas configurée.");
+  }
+
+  // Initialize GoogleGenAI client (only if key exists to prevent crash on startup)
+  const ai: GoogleGenAI | null = apiKey
+    ? new GoogleGenAI({
+        apiKey,
+        httpOptions: { headers: { "User-Agent": "aistudio-build" } },
+      })
+    : null;
+
+  // ---------------------------------------------------------------------------
+  // DATA PERSISTENCE (Netlify Blobs in production, JSON file on disk locally)
+  // ---------------------------------------------------------------------------
+  const DATA_DIR = path.join(process.cwd(), "data");
+  const PRODUCTS_FILE = path.join(DATA_DIR, "products.json");
+  const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
+  const BLOBS_STORE_NAME = "bm-products";
+  const BLOBS_KEY = "products.json";
+  const BLOBS_IMG_STORE = "bm-images";
+
+  async function saveImage(id: string, buffer: Buffer): Promise<void> {
+    if (isNetlifyRuntime()) {
+      const store = getStore({ name: BLOBS_IMG_STORE });
+      await store.set(id + ".jpg", buffer);
+      return;
+    }
+    await fs.promises.mkdir(UPLOADS_DIR, { recursive: true });
+    await fs.promises.writeFile(path.join(UPLOADS_DIR, id + ".jpg"), buffer);
+  }
+
+  async function loadImage(id: string): Promise<Buffer | null> {
+    if (isNetlifyRuntime()) {
+      try {
+        const store = getStore({ name: BLOBS_IMG_STORE });
+        const data = await store.get(id + ".jpg", { type: "arrayBuffer" });
+        if (data) return Buffer.from(data);
+      } catch (err) {
+        console.error("[BLOBS] image read failed:", err);
+      }
+      return null;
+    }
+    try {
+      return await fs.promises.readFile(path.join(UPLOADS_DIR, id + ".jpg"));
+    } catch {
+      return null;
+    }
+  }
+
+  function isNetlifyRuntime(): boolean {
+    return Boolean(process.env.NETLIFY) || Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
+  }
+
+  async function loadProducts(): Promise<any[]> {
+    if (isNetlifyRuntime()) {
+      try {
+        const store = getStore({ name: BLOBS_STORE_NAME });
+        const raw = await store.get(BLOBS_KEY, { type: "text" });
+        if (raw != null) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) return parsed;
+        }
+        const seed = JSON.parse(JSON.stringify(INITIAL_PRODUCTS));
+        await store.set(BLOBS_KEY, JSON.stringify(seed, null, 2));
+        return seed;
+      } catch (err) {
+        console.error("[BLOBS] load failed, falling back to seed:", err);
+        return JSON.parse(JSON.stringify(INITIAL_PRODUCTS));
+      }
+    }
+    try {
+      const raw = await fs.promises.readFile(PRODUCTS_FILE, "utf-8");
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  async function saveProducts(products: any[]): Promise<void> {
+    if (isNetlifyRuntime()) {
+      const store = getStore({ name: BLOBS_STORE_NAME });
+      await store.set(BLOBS_KEY, JSON.stringify(products, null, 2));
+      return;
+    }
+    await fs.promises.mkdir(DATA_DIR, { recursive: true });
+    await fs.promises.writeFile(PRODUCTS_FILE, JSON.stringify(products, null, 2), "utf-8");
+  }
+
+  function sanitizeProduct(body: any): any {
+    const clean = (v: unknown) => String(v ?? "").slice(0, 4000);
+    const id = clean(body?.id);
+    // Restrict IDs to a safe charset to avoid path/HTML injection via IDs.
+    const safeId = /^[a-zA-Z0-9_-]+$/.test(id) ? id : "";
+    return {
+      ...body,
+      id: safeId,
+      title: clean(body?.title),
+      description: clean(body?.description),
+      originalDescription: clean(body?.originalDescription),
+      chineseDescription: clean(body?.chineseDescription),
+      chineseTitle: clean(body?.chineseTitle),
+      imageUrl: clean(body?.imageUrl),
+      videoUrl: body?.videoUrl ? clean(body.videoUrl) : undefined,
+      category: clean(body?.category),
+      features: Array.isArray(body?.features)
+        ? body.features.slice(0, 12).map((f: unknown) => clean(f))
+        : [],
+      priceEur: Number(body?.priceEur) || 0,
+      priceXof: Number(body?.priceXof) || 0,
+      sourceRmb: body?.sourceRmb ? Number(body.sourceRmb) : undefined,
+      whatsappClicks: Number(body?.whatsappClicks) || 0,
+      createdAt: clean(body?.createdAt) || new Date().toISOString(),
+    };
+  }
+
+  // Validate the magic bytes so we never store arbitrary binary content
+  // (prevents using the upload endpoint as a free hosting/malware proxy).
+  const IMAGE_SIGNATURES: { magic: number[]; offset: number }[] = [
+    { magic: [0xff, 0xd8, 0xff], offset: 0 }, // JPEG
+    { magic: [0x89, 0x50, 0x4e, 0x47], offset: 0 }, // PNG
+    { magic: [0x47, 0x49, 0x46, 0x38], offset: 0 }, // GIF
+    { magic: [0x52, 0x49, 0x46, 0x46], offset: 0 }, // WEBP (RIFF....WEBP)
+    { magic: [0x42, 0x4d], offset: 0 }, // BMP
+  ];
+  function looksLikeImage(buffer: Buffer): boolean {
+    for (const { magic, offset } of IMAGE_SIGNATURES) {
+      if (buffer.length >= offset + magic.length) {
+        let ok = true;
+        for (let i = 0; i < magic.length; i++) {
+          if (buffer[offset + i] !== magic[i]) { ok = false; break; }
+        }
+        if (ok) return true;
+      }
+    }
+    return false;
+  }
+
+  // ---------------------------------------------------------------------------
+  // AUTH (in-memory bearer tokens)
+  // ---------------------------------------------------------------------------
+  const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
+  const sessions = new Map<string, number>(); // token -> expiry
+
+  // Constant-time comparison to avoid leaking password length/timing via timing attacks.
+  function safeEqual(a: string, b: string): boolean {
+    const bufA = Buffer.from(String(a));
+    const bufB = Buffer.from(String(b));
+    if (bufA.length !== bufB.length) return false;
+    return crypto.timingSafeEqual(bufA, bufB);
+  }
+
+  function extractToken(req: express.Request): string {
+    const header = req.headers.authorization || "";
+    return header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+  }
+
+  function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+    const token = extractToken(req);
+    const expiry = sessions.get(token);
+    if (!expiry || expiry < Date.now()) {
+      if (expiry) sessions.delete(token);
+      return res.status(401).json({ error: "Session invalide ou expirée. Veuillez vous reconnecter." });
+    }
+    next();
+  }
+
+  // ---------------------------------------------------------------------------
+  // RATE LIMITING (simple in-memory, per IP)
+  // ---------------------------------------------------------------------------
+  const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+
+  function rateLimit(maxRequests: number, windowMs: number) {
+    return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      const ip = req.ip || req.socket.remoteAddress || "unknown";
+      const now = Date.now();
+      let bucket = rateBuckets.get(ip);
+      if (!bucket || bucket.resetAt < now) {
+        bucket = { count: 0, resetAt: now + windowMs };
+        rateBuckets.set(ip, bucket);
+      }
+      bucket.count += 1;
+      if (bucket.count > maxRequests) {
+        return res.status(429).json({ error: "Trop de requêtes. Veuillez patienter quelques secondes." });
+      }
+      next();
+    };
+  }
+
+  // Periodically flush expired rate buckets
+  setInterval(() => {
+    const now = Date.now();
+    for (const [ip, bucket] of rateBuckets) {
+      if (bucket.resetAt < now) rateBuckets.delete(ip);
+    }
+  }, 60_000).unref?.();
+
+  // ---------------------------------------------------------------------------
+  // AUTH ENDPOINTS
+  // ---------------------------------------------------------------------------
+  app.post("/api/auth/login", rateLimit(6, 60_000), (req, res) => {
+    const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+    const password = typeof req.body?.password === "string" ? req.body.password.trim() : "";
+    if (!password) {
+      return res.status(400).json({ error: "Veuillez saisir la clé d'accès." });
+    }
+    if (email && !adminEmails.includes(email)) {
+      return res.status(401).json({ error: "Email administrateur non reconnu." });
+    }
+    if (safeEqual(password, adminPassword)) {
+      const token = crypto.randomBytes(32).toString("hex");
+      sessions.set(token, Date.now() + SESSION_TTL_MS);
+      return res.json({ success: true, token, expiresIn: SESSION_TTL_MS });
+    }
+    return res.status(401).json({ error: "Clé d'accès incorrecte." });
+  });
+
+  app.post("/api/auth/google", rateLimit(10, 60_000), async (req, res) => {
+    try {
+      const credential = typeof req.body?.credential === "string" ? req.body.credential.trim() : "";
+      if (!credential) {
+        return res.status(400).json({ error: "Jeton Google manquant." });
+      }
+      const infoRes = await fetch(
+        `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`,
+        { signal: AbortSignal.timeout(15000) }
+      );
+      if (!infoRes.ok) {
+        return res.status(401).json({ error: "Jeton Google invalide." });
+      }
+      const info: any = await infoRes.json();
+      if (!info || info.error) {
+        return res.status(401).json({ error: "Jeton Google invalide." });
+      }
+      if (googleClientId && info.aud && info.aud !== googleClientId) {
+        return res.status(401).json({ error: "Jeton émis pour une autre application." });
+      }
+      if (info.email_verified !== "true" && info.email_verified !== true) {
+        return res.status(401).json({ error: "Email non vérifié." });
+      }
+      const email = String(info.email || "").toLowerCase();
+      if (!adminEmails.includes(email)) {
+        return res.status(401).json({ error: "Email non reconnu comme administrateur." });
+      }
+      const token = crypto.randomBytes(32).toString("hex");
+      sessions.set(token, Date.now() + SESSION_TTL_MS);
+      return res.json({ success: true, token, email, expiresIn: SESSION_TTL_MS });
+    } catch (err: any) {
+      console.error("Google auth error:", err);
+      return res.status(500).json({ error: "Erreur lors de la vérification Google." });
+    }
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    const token = extractToken(req);
+    if (token) sessions.delete(token);
+    res.json({ success: true });
+  });
+
+  // ---------------------------------------------------------------------------
+  // PRODUCTS CRUD (protected)
+  // ---------------------------------------------------------------------------
+  app.get("/api/products", requireAuth, async (_req, res) => {
+    const products = await loadProducts();
+    res.json({ success: true, products });
+  });
+
+  app.post("/api/products", requireAuth, rateLimit(60, 60_000), async (req, res) => {
+    const product = sanitizeProduct(req.body);
+    if (!product.title) {
+      return res.status(400).json({ error: "Le produit doit avoir un titre." });
+    }
+    if (!product.id) {
+      return res.status(400).json({ error: "Identifiant produit manquant ou invalide (alphanumérique, tirets et underscores uniquement)." });
+    }
+    const products = await loadProducts();
+    const idx = products.findIndex((p) => p.id === product.id);
+    if (idx >= 0) products[idx] = product;
+    else products.unshift(product);
+    await saveProducts(products);
+    res.json({ success: true });
+  });
+
+  app.put("/api/products", requireAuth, rateLimit(30, 60_000), async (req, res) => {
+    if (!Array.isArray(req.body)) {
+      return res.status(400).json({ error: "Le corps doit être un tableau de produits." });
+    }
+    if (req.body.length > 500) {
+      return res.status(400).json({ error: "Trop de produits dans une seule requête (max 500)." });
+    }
+    const products = req.body.map(sanitizeProduct);
+    await saveProducts(products);
+    res.json({ success: true });
+  });
+
+  app.delete("/api/products/:id", requireAuth, async (req, res) => {
+    const products = await loadProducts();
+    const next = products.filter((p) => p.id !== req.params.id);
+    if (next.length === products.length) {
+      return res.status(404).json({ error: "Produit introuvable." });
+    }
+    await saveProducts(next);
+    res.json({ success: true });
+  });
+
+  app.post("/api/products/:id/clicks", rateLimit(120, 60_000), async (req, res) => {
+    const products = await loadProducts();
+    const idx = products.findIndex((p) => p.id === req.params.id);
+    if (idx < 0) {
+      return res.status(404).json({ error: "Produit introuvable." });
+    }
+    products[idx] = { ...products[idx], whatsappClicks: (Number(products[idx].whatsappClicks) || 0) + 1 };
+    await saveProducts(products);
+    res.json({ success: true, whatsappClicks: products[idx].whatsappClicks });
+  });
+
+  // Public catalog JSON consumed by the static client template (GitHub Pages flow)
+  app.get("/catalog.json", async (_req, res) => {
+    const products = await loadProducts();
+    res.setHeader("Cache-Control", "no-store");
+    res.json(products.length ? products : []);
+  });
+
+  // ---------------------------------------------------------------------------
+  // IMAGE UPLOAD (already watermarked client-side) + SERVING
+  // ---------------------------------------------------------------------------
+  app.post("/api/upload-image", requireAuth, rateLimit(30, 60_000), async (req, res) => {
+    try {
+      const { imageBase64 } = req.body || {};
+      if (!imageBase64 || typeof imageBase64 !== "string") {
+        return res.status(400).json({ error: "Aucune image reçue (base64 manquant)." });
+      }
+      const base64Data = imageBase64.split(",").pop() || "";
+      const input = Buffer.from(base64Data, "base64");
+      if (!input.length || input.length > 15 * 1024 * 1024) {
+        return res.status(400).json({ error: "Image invalide ou trop volumineuse (max 15 Mo)." });
+      }
+      if (!looksLikeImage(input)) {
+        return res.status(400).json({ error: "Le fichier n'est pas une image valide (JPEG/PNG/GIF/WebP/BMP)." });
+      }
+      const id = crypto.randomBytes(8).toString("hex");
+      await saveImage(id, input);
+      res.json({ success: true, url: `/api/img/${id}.jpg` });
+    } catch (err: any) {
+      console.error("Upload image error:", err);
+      return res.status(500).json({ error: "Erreur lors de l'upload de l'image." });
+    }
+  });
+
+  app.get("/api/img/:id", async (req, res) => {
+    const id = String(req.params.id || "").replace(/\.jpg$/i, "");
+    if (!id || !/^[a-f0-9]{16}$/i.test(id)) {
+      return res.status(404).json({ error: "Image introuvable." });
+    }
+    const buffer = await loadImage(id);
+    if (!buffer) {
+      return res.status(404).json({ error: "Image introuvable." });
+    }
+    res.setHeader("Content-Type", "image/jpeg");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.send(buffer);
+  });
+
+  // ---------------------------------------------------------------------------
+  // GEMINI AI: translate / copywriting / pricing
+  // ---------------------------------------------------------------------------
+  async function generateContentWithRetry(
+    ai: GoogleGenAI,
+    params: { model: string; contents: any; config?: any },
+    fallbackModel: string,
+    retries = 3,
+    delayMs = 1500
+  ): Promise<any> {
+    let lastError: any = null;
+    const modelsToTry = [params.model, fallbackModel];
+
+    for (const model of modelsToTry) {
+      let currentDelay = delayMs;
+      const attemptParams = { ...params, model };
+
+      for (let attempt = 0; attempt < retries; attempt++) {
+        try {
+          console.log(`Calling Gemini API using model: ${model} (Attempt ${attempt + 1}/${retries})...`);
+          return await ai.models.generateContent(attemptParams);
+        } catch (error: any) {
+          lastError = error;
+          const errorString = JSON.stringify(error) + " " + (error.message || "");
+          const isTemporary =
+            errorString.includes("503") ||
+            errorString.includes("UNAVAILABLE") ||
+            errorString.includes("demand") ||
+            error.status === 503;
+
+          if (isTemporary && attempt < retries - 1) {
+            console.warn(`Gemini API returned 503 (temporary high demand) for model ${model}. Retrying in ${currentDelay}ms...`);
+            await new Promise((resolve) => setTimeout(resolve, currentDelay));
+            currentDelay *= 2; // Exponential backoff
+            continue;
+          }
+
+          // Non-temporary error, or retries exhausted: try the next model
+          break;
+        }
+      }
+    }
+
+    throw lastError || new Error("Failed to generate content after trying multiple models and retries.");
+  }
+
+  app.post("/api/translate-product", rateLimit(10, 60_000), async (req, res) => {
+    try {
+      if (!apiKey || !ai) {
+        return res.status(503).json({
+          error: "Le service d'IA n'est pas configuré. Veuillez ajouter votre clé API GEMINI_API_KEY dans le fichier .env / Secrets.",
+        });
+      }
+
+      const { chineseDescription, imageBase64, imageMimeType, customMarkup, basePriceRmb } = req.body;
+
+      if (!chineseDescription && !imageBase64) {
+        return res.status(400).json({
+          error: "Veuillez fournir une description en chinois ou une image de produit.",
+        });
+      }
+
+      const contents: any[] = [];
+
+      if (imageBase64) {
+        const mime = imageMimeType || "image/jpeg";
+        contents.push({
+          inlineData: { mimeType: mime, data: String(imageBase64) },
+        });
+      }
+
+      const markup = Number(customMarkup) > 0 ? Number(customMarkup) : 60;
+      const rmb = Number(basePriceRmb) > 0 ? Number(basePriceRmb) : null;
+
+      let textPrompt = "Analyse ce produit chinois.";
+      if (chineseDescription) {
+        textPrompt += ` Voici la description textuelle fournie : "${String(chineseDescription)}".`;
+      }
+
+      textPrompt += `
+Tu es un copywriter d'élite et expert en sourcing de produits en Chine.
+Fais le travail suivant :
+1. Extrais et traduis tout texte écrit sur l'image (le cas échéant) et traduis la description de chinois à français de manière claire et précise.
+2. Crée un Titre produit accrocheur en français, adapté au marché francophone.
+3. Rédige un Argumentaire de vente premium en français (Copywriting captivant, orienté bénéfices clients, ton enthousiaste mais crédible).
+4. Extrais 3 à 5 caractéristiques techniques ou points forts clés (Features).
+5. Suggère un prix de vente en EUR et XOF. ${rmb ? `Prix d'achat de base en RMB fourni : ${rmb} yuan. Convertis-le (taux 1 RMB ≈ 85 XOF ≈ 0.13 EUR) et applique un multiplicateur d'importation réaliste (marge de ${markup}% + frais d'envoi 5-10€ / 3000-6000 XOF).` : "Aucun prix d'achat fourni : estime un prix de détail réaliste pour ce produit importé sur le marché francophone/africain."}
+
+Tu dois impérativement renvoyer la réponse au format JSON conforme au schéma demandé.
+`;
+
+      contents.push({ text: textPrompt });
+
+      const response = await generateContentWithRetry(
+        ai,
+        {
+          model: geminiModel,
+          contents,
+          config: {
+            systemInstruction:
+              "Tu es un assistant de commerce international No-Code spécialisé dans le sourcing de produits en Chine (Taobao, 1688, WeChat) et le copywriting e-commerce de précommande.",
+            temperature: 0.7,
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                translatedTitle: { type: Type.STRING, description: "Titre commercial accrocheur et élégant en Français." },
+                translatedDescription: { type: Type.STRING, description: "Traduction claire et fidèle des détails/spécificités d'origine en Français." },
+                salesPitch: { type: Type.STRING, description: "Argumentaire de vente captivant et structuré en Français (Copywriting e-commerce)." },
+                features: { type: Type.ARRAY, items: { type: Type.STRING }, description: "3 à 5 caractéristiques clés ou bénéfices majeurs du produit." },
+                priceEur: { type: Type.NUMBER, description: "Prix de vente public suggéré en Euros (EUR)." },
+                priceXof: { type: Type.NUMBER, description: "Prix de vente public suggéré en Francs CFA (XOF)." },
+                priceExplanation: { type: Type.STRING, description: "Explication courte du calcul de prix (conversion, marge, frais d'envoi)." },
+              },
+              required: ["translatedTitle", "translatedDescription", "salesPitch", "features", "priceEur", "priceXof"],
+            },
+          },
+        },
+        geminiFallbackModel
+      );
+
+      const resultText = response.text || "{}";
+      let resultJson: any;
+      try {
+        resultJson = JSON.parse(resultText);
+      } catch {
+        return res.status(502).json({ error: "Réponse de l'IA au format invalide. Veuillez réessayer." });
+      }
+
+      // Coerce types defensively before returning
+      const data = {
+        ...resultJson,
+        translatedTitle: String(resultJson.translatedTitle || "").slice(0, 200),
+        translatedDescription: String(resultJson.translatedDescription || ""),
+        salesPitch: String(resultJson.salesPitch || ""),
+        features: Array.isArray(resultJson.features) ? resultJson.features.slice(0, 8).map((f: unknown) => String(f)) : [],
+        priceEur: Number(resultJson.priceEur) || 0,
+        priceXof: Number(resultJson.priceXof) || 0,
+        priceExplanation: String(resultJson.priceExplanation || ""),
+      };
+
+      return res.json({ success: true, data });
+    } catch (error: any) {
+      console.error("Gemini Translation Error:", error);
+      return res.status(500).json({
+        error: error.message || "Une erreur est survenue lors de la traduction par l'IA.",
+      });
+    }
+  });
+
+  return app;
+}

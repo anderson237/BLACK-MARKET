@@ -7,4 +7,5 @@ export const DEFAULT_MARKUP = 60;
 export const SESSION_STORAGE_KEY = "admin_authenticated";
 export const TOKEN_STORAGE_KEY = "bm_admin_token";
 export const CONFIG_STORAGE_KEY = "bm_admin_config";
-export const DEMO_PASSWORDS = ["ADMIN99", "2026SINO"];
+
+export const GOOGLE_CLIENT_ID = "809279866832-16p4nguhc37v46tqtcnte0e39ss1atf2.apps.googleusercontent.com";

@@ -9,7 +9,6 @@ import TabNav from "./components/TabNav";
 import AIGenerator from "./components/AIGenerator";
 import MakeGuide from "./components/MakeGuide";
 import WhatsAppScriptPanel from "./components/WhatsAppScriptPanel";
-import DeploymentPanel from "./components/DeploymentPanel";
 import {
   loginRequest,
   logoutRequest,
@@ -23,7 +22,7 @@ import {
   setAuthenticated,
   isAuthenticated,
 } from "./lib/api";
-import { DEFAULT_MARKUP, DEMO_PASSWORDS } from "./lib/constants";
+import { DEFAULT_MARKUP } from "./lib/constants";
 import { estimatePrices } from "./lib/pricing";
 
 export default function App() {
@@ -125,20 +124,17 @@ export default function App() {
     };
 
     try {
-      // Prefer real server-side authentication
+      // Server-side authentication is the ONLY valid path.
+      // The legacy local fallback (DEMO_PASSWORDS) has been removed for security.
       await loginRequest(sanitizedPassword);
       onLoginSuccess();
     } catch (err: any) {
       if (err?.status) {
-        // Server responded: credentials rejected (no local fallback)
+        // Server responded: credentials rejected
         fail("Clé d'accès incorrecte.");
       } else {
-        // Server unreachable (offline / static hosting): legacy local check only
-        if (DEMO_PASSWORDS.includes(sanitizedPassword)) {
-          onLoginSuccess();
-        } else {
-          fail("Clé d'accès incorrecte.");
-        }
+        // Server unreachable (offline / static hosting): refuse access.
+        fail("Serveur d'authentification injoignable. Réessayez.");
       }
     }
   };
@@ -319,18 +315,6 @@ export default function App() {
     incrementClicks(product.id);
   }, []);
 
-  const handleExportCatalog = () => {
-    const blob = new Blob([JSON.stringify(products, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "catalog.json";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  };
-
   if (!isLoggedIn) {
     return (
       <Login
@@ -390,10 +374,6 @@ export default function App() {
 
           {activeTab === "whatsapp_script" && (
             <WhatsAppScriptPanel copiedStates={copiedStates} onCopy={handleCopyText} />
-          )}
-
-          {activeTab === "deployment" && (
-            <DeploymentPanel products={products} onExportCatalog={handleExportCatalog} />
           )}
         </div>
       </main>

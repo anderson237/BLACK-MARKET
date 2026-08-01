@@ -2,8 +2,12 @@ node_modules/
 build/
 dist/
 coverage/
+.vite/
 .DS_Store
 *.log
 .env*
 !.env.example
 data/
+
+# Local Netlify folder
+.netlify

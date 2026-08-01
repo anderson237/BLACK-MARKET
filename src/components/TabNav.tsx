@@ -1,5 +1,5 @@
 import React from "react";
-import { Layers, Sparkles, Database, Code, Globe } from "lucide-react";
+import { Layers, Sparkles, Database, Code } from "lucide-react";
 import { TabId } from "../types";
 
 interface TabNavProps {
@@ -12,7 +12,6 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode; index: string }[]
   { id: "ai_generator", label: "GÉNÉRATEUR DE FICHES IA", icon: <Sparkles className="w-4 h-4 text-yellow-400 fill-yellow-400" />, index: "2" },
   { id: "make_guide", label: "WEBHOOK MAKE & SHEETS", icon: <Database className="w-4 h-4" />, index: "3" },
   { id: "whatsapp_script", label: "SCRIPT BOUTON WHATSAPP", icon: <Code className="w-4 h-4" />, index: "4" },
-  { id: "deployment", label: "DÉPLOYER EN LIVE", icon: <Globe className="w-4 h-4" />, index: "5" },
 ];
 
 export default function TabNav({ activeTab, onTabChange }: TabNavProps) {

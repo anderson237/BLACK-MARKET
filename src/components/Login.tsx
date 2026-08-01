@@ -86,10 +86,10 @@ export default function Login({
 
         <div className="text-center pt-2 border-t border-zinc-900">
           <p className="text-[9px] text-zinc-600 font-mono">
-            IP ENREGISTRÉE // CHIFFREMENT AES-256 ACTIF // SESSION AUTO-EXPIRY 15M
+            SESSION AUTO-EXPIRY 15M // CLÉ D'ACCÈS REQUISE // RATE-LIMITED
           </p>
           <p className="text-[10px] text-zinc-400 font-mono mt-1.5 bg-black/50 py-1 rounded border border-zinc-900">
-            Code de démo : <span className="text-brand-red font-bold">ADMIN99</span>
+            Accès réservé aux administrateurs habilités.
           </p>
         </div>
       </div>

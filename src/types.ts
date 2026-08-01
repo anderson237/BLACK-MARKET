@@ -31,4 +31,4 @@ export interface AIProcessingState {
   success: boolean;
 }
 
-export type TabId = "catalog" | "ai_generator" | "make_guide" | "whatsapp_script" | "deployment";
+export type TabId = "catalog" | "ai_generator" | "make_guide" | "whatsapp_script";
