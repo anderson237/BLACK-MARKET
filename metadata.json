@@ -1,0 +1,6 @@
+{
+  "name": "BLACK MARKET",
+  "description": "Plateforme No-Code de Sourcing & Précommandes d'importation Chine avec un style Cyberpunk-Streetwear Coréen noir et rouge.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
