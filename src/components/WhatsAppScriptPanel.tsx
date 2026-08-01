@@ -52,7 +52,7 @@ export default function WhatsAppScriptPanel({ copiedStates, onCopy }: WhatsAppSc
         </p>
         <div className="bg-black p-4 rounded-xl border border-zinc-950 text-[11px] font-mono text-zinc-400">
           <p className="text-brand-red font-bold">// Exemple de code JS natif utilisé pour le bouton :</p>
-          <p>{"const message = `Bonjour, je souhaite commander le produit [${product.title.toUpperCase()}] au prix de [${price}]. Voici la photo : [${product.imageUrl}]`;"}</p>
+          <p>{"const message = `Bonjour, je souhaite commander le produit [${product.title.toUpperCase()}] au prix de [${price}]. Voici le produit : ${SITE_URL}#${product.id}`;"}</p>
           <p>{"const url = `https://wa.me/${CONFIG.phoneNumber}?text=${encodeURIComponent(message)}`;"}</p>
         </div>
       </div>

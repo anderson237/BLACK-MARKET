@@ -148,9 +148,20 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
   });
 
   // Calculate WhatsApp Link according to prompt requirements
+  const getProductSiteUrl = (productId: string) => {
+    const repo = config.githubRepo && !config.githubRepo.includes("mon-pseudo")
+      ? config.githubRepo
+      : "anderson237/BLACK-MARKET";
+    const parts = repo.split("/");
+    const base = parts.length === 2
+      ? `https://${parts[0].toLowerCase()}.github.io/${parts[1].toLowerCase()}/`
+      : "https://anderson237.github.io/BLACK-MARKET/";
+    return `${base}#${productId}`;
+  };
+
   const generateWhatsAppLink = (product: Product) => {
     const priceFormatted = config.currency === "EUR" ? `${product.priceEur}€` : `${product.priceXof} F CFA`;
-    const text = `Bonjour, je souhaite commander le produit [${product.title.toUpperCase()}] au prix de [${priceFormatted}]. Voici la photo : [${product.imageUrl}]`;
+    const text = `Bonjour, je souhaite commander le produit [${product.title.toUpperCase()}] au prix de [${priceFormatted}]. Voici le produit : ${getProductSiteUrl(product.id)}`;
     const encodedText = encodeURIComponent(text);
     return `https://wa.me/${whatsappSimNumber.replace(/\+/g, "").replace(/\s/g, "")}?text=${encodedText}`;
   };
@@ -709,7 +720,7 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
                   {/* Speech Bubble */}
                   <div className="bg-brand-red/10 border border-brand-red/20 text-slate-300 p-3 rounded-2xl rounded-tl-none text-xs leading-relaxed max-w-[90%] shadow-xs space-y-2">
                     <p className="font-semibold text-slate-100">
-                      Bonjour, je souhaite commander le produit <span className="text-brand-red font-bold">[{selectedProductForWa.title.toUpperCase()}]</span> au prix de <span className="text-brand-red font-bold">[{config.currency === "EUR" ? `${selectedProductForWa.priceEur}€` : `${selectedProductForWa.priceXof} F CFA`}]</span>. Voici la photo : [{selectedProductForWa.imageUrl}]
+                      Bonjour, je souhaite commander le produit <span className="text-brand-red font-bold">[{selectedProductForWa.title.toUpperCase()}]</span> au prix de <span className="text-brand-red font-bold">[{config.currency === "EUR" ? `${selectedProductForWa.priceEur}€` : `${selectedProductForWa.priceXof} F CFA`}]</span>. Voici le produit : <span className="text-brand-red font-bold">[{getProductSiteUrl(selectedProductForWa.id)}]</span>
                     </p>
                   </div>
                 </div>

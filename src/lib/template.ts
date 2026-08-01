@@ -50,10 +50,6 @@ export function getHtmlTemplateCode(): string {
   </script>
   <style>
     body { background-color: #08080c; color: #f3f4f6; }
-    .watermark-overlay {
-      position: absolute; inset: 0; display: flex; align-items: center;
-      justify-content: center; pointer-events: none; user-select: none; opacity: 0.15;
-    }
     .scrollbar-none::-webkit-scrollbar { display: none; }
     .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
@@ -120,10 +116,7 @@ export function getHtmlTemplateCode(): string {
 
       <div class="p-6 overflow-y-auto max-h-[75vh] grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="relative aspect-square rounded-2xl overflow-hidden bg-zinc-950 border border-zinc-800 flex items-center justify-center">
-          <img id="modal-image" src="" alt="" class="w-full h-full object-cover">
-          <div class="watermark-overlay opacity-30">
-            <span class="text-white font-extrabold text-3xl font-mono border-2 border-white/50 px-4 py-2 rotate-12 tracking-widest uppercase">BLACK MARKET</span>
-          </div>
+          <img id="modal-image" src="" alt="" crossorigin="anonymous" onload="watermarkImage(this)" class="w-full h-full object-cover">
         </div>
 
         <div class="space-y-4 flex flex-col justify-between">
@@ -161,6 +154,55 @@ export function getHtmlTemplateCode(): string {
   <script>
     // Config boutique No-Code
     const CONFIG = { phoneNumber: "237683963007", currency: "XOF" /* ou EUR */ };
+
+    // URL de base du site (utilisee pour les liens produits partages)
+    var SITE_URL = location.href.split("#")[0];
+
+    // ===== FILIGRANE INCRUSTE DANS L'IMAGE (canvas) =====
+    function watermarkImage(img) {
+      if (!img || img.dataset.wm === "1") return;
+      img.dataset.wm = "1";
+      var src = img.getAttribute("src") || img.src;
+      if (!src || src.indexOf("data:") === 0) return;
+      var raw = new Image();
+      raw.crossOrigin = "anonymous";
+      raw.onload = function () {
+        try {
+          var w = raw.naturalWidth || 600;
+          var h = raw.naturalHeight || 400;
+          var canvas = document.createElement("canvas");
+          canvas.width = w;
+          canvas.height = h;
+          var ctx = canvas.getContext("2d");
+          if (!ctx) return;
+          ctx.drawImage(raw, 0, 0, w, h);
+          ctx.save();
+          ctx.translate(w / 2, h / 2);
+          ctx.rotate(-Math.PI / 6);
+          var fs = Math.max(16, Math.round(w * 0.055));
+          ctx.font = "bold " + fs + "px monospace";
+          ctx.fillStyle = "rgba(255,255,255,0.30)";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.shadowColor = "rgba(0,0,0,0.75)";
+          ctx.shadowBlur = 5;
+          var text = "BLACK MARKET © 2026";
+          var spacing = Math.round(h * 0.30);
+          var step = Math.round(w * 0.75);
+          for (var dy = -h; dy <= h; dy += spacing) {
+            for (var dx = -w; dx <= w; dx += step) {
+              ctx.fillText(text, dx, dy);
+            }
+          }
+          ctx.restore();
+          img.src = canvas.toDataURL("image/jpeg", 0.85);
+        } catch (e) {
+          // Canvas tainted (source externe) : on garde l'image d'origine
+        }
+      };
+      raw.onerror = function () {};
+      raw.src = src;
+    }
 
     // Fallback embedded data (used only si catalog.json indisponible)
     const FALLBACK_PRODUCTS = [
@@ -249,14 +291,13 @@ export function getHtmlTemplateCode(): string {
           ? escapeHtml(p.priceEur) + " €"
           : Number(p.priceXof || 0).toLocaleString("fr-FR") + " F CFA";
         const masterIndex = PRODUCTS.findIndex(orig => orig.id === p.id);
-        const message = "Bonjour, je souhaite commander le produit [" + String(p.title || "").toUpperCase() + "] au prix de [" + priceStr + "]. Voici la photo : [" + p.imageUrl + "]";
+        const message = "Bonjour, je souhaite commander le produit [" + String(p.title || "").toUpperCase() + "] au prix de [" + priceStr + "]. Voici le produit : " + SITE_URL + "#" + p.id;
         const waUrl = "https://wa.me/" + CONFIG.phoneNumber + "?text=" + encodeURIComponent(message);
 
         grid.innerHTML +=
           '<div onclick="openDetailsModal(' + masterIndex + ')" class="bg-brand-card rounded-3xl overflow-hidden border border-zinc-800 flex flex-col h-full relative group hover:border-brand-red/40 transition-all duration-300 cursor-pointer">' +
             '<div class="relative aspect-video overflow-hidden">' +
-              '<img src="' + escapeHtml(p.imageUrl) + '" alt="' + escapeHtml(p.title) + '" loading="lazy" class="w-full h-full object-cover opacity-85 group-hover:scale-105 transition-transform duration-500">' +
-              '<div class="watermark-overlay"><span class="text-white font-extrabold text-xl font-mono border border-white/50 px-2 py-0.5 rotate-12 tracking-widest">BLACK MARKET</span></div>' +
+              '<img src="' + escapeHtml(p.imageUrl) + '" alt="' + escapeHtml(p.title) + '" loading="lazy" crossorigin="anonymous" onload="watermarkImage(this)" class="w-full h-full object-cover opacity-85 group-hover:scale-105 transition-transform duration-500">' +
               '<span class="absolute top-3 left-3 bg-brand-red text-white text-[9px] uppercase font-bold tracking-widest px-2.5 py-1 rounded">' + escapeHtml(p.category || "EXCLUSIF") + "</span>" +
             "</div>" +
             '<div class="p-6 flex flex-col flex-1 justify-between gap-4">' +
@@ -279,16 +320,19 @@ export function getHtmlTemplateCode(): string {
       const priceStr = CONFIG.currency === "EUR"
         ? escapeHtml(p.priceEur) + " €"
         : Number(p.priceXof || 0).toLocaleString("fr-FR") + " F CFA";
-      const message = "Bonjour, je souhaite commander le produit [" + String(p.title || "").toUpperCase() + "] au prix de [" + priceStr + "]. Voici la photo : [" + p.imageUrl + "]";
+      const message = "Bonjour, je souhaite commander le produit [" + String(p.title || "").toUpperCase() + "] au prix de [" + priceStr + "]. Voici le produit : " + SITE_URL + "#" + p.id;
       const waUrl = "https://wa.me/" + CONFIG.phoneNumber + "?text=" + encodeURIComponent(message);
 
-      document.getElementById("modal-image").src = p.imageUrl;
+      var modalImg = document.getElementById("modal-image");
+      delete modalImg.dataset.wm;
+      modalImg.src = p.imageUrl;
       document.getElementById("modal-category").innerText = p.category || "EXCLUSIF";
       document.getElementById("modal-title").innerText = p.title;
       document.getElementById("modal-price").innerText = priceStr;
       document.getElementById("modal-description").innerText = p.description;
       document.getElementById("modal-wa-btn").href = waUrl;
 
+      if (history.replaceState) history.replaceState(null, "", "#" + p.id);
       const modal = document.getElementById("details-modal");
       modal.classList.remove("hidden");
       modal.classList.add("flex");
@@ -296,6 +340,7 @@ export function getHtmlTemplateCode(): string {
     }
 
     function closeDetailsModal() {
+      if (history.replaceState) history.replaceState(null, "", location.pathname + location.search);
       const modal = document.getElementById("details-modal");
       modal.classList.remove("flex");
       modal.classList.add("hidden");
@@ -306,9 +351,22 @@ export function getHtmlTemplateCode(): string {
       if (e.key === "Escape") closeDetailsModal();
     });
 
+    // Ouvre la fiche produit si l'URL contient un #id (lien partage)
+    function handleDeepLink() {
+      var id = location.hash.replace("#", "");
+      if (!id) return;
+      for (var i = 0; i < PRODUCTS.length; i++) {
+        if (PRODUCTS[i].id === id) {
+          openDetailsModal(i);
+          return;
+        }
+      }
+    }
+
     function initApp() {
       renderCategories();
       renderGrid(PRODUCTS);
+      handleDeepLink();
     }
 
     loadCatalog();
