@@ -93,7 +93,7 @@ export default function App() {
   // Config (webhook/phone/currency) persisted in localStorage
   const [config, setConfig] = useState<WebhookConfig>(
     loadConfig() ?? {
-      phoneNumber: "2250707070707",
+      phoneNumber: "237683963007",
       currency: "XOF",
       githubRepo: "mon-pseudo/blackmarket-sheets",
       githubBranch: "main",
