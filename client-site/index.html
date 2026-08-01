@@ -12,15 +12,16 @@
 
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://blackmarket.sourcing/">
+  <meta property="og:url" content="https://anderson237.github.io/BLACK-MARKET/">
   <meta property="og:title" content="BLACK MARKET - SOURCING EXCLUSIF CHINE">
   <meta property="og:description" content="Découvrez nos drops de sourcing exclusifs depuis la Chine (Taobao, 1688). Commandez directement d'usine via WhatsApp en toute sécurité.">
-  <meta property="og:image" content="https://images.unsplash.com/photo-1548883354-7622d03aca27?auto=format&fit=crop&q=80&w=1200">
+  <meta property="og:image" content="https://anderson237.github.io/BLACK-MARKET/img/brand.jpg">
 
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
   <meta property="twitter:title" content="BLACK MARKET - SOURCING EXCLUSIF CHINE">
   <meta property="twitter:description" content="Découvrez nos drops de sourcing exclusifs depuis la Chine. Commandez directement d'usine via WhatsApp.">
+  <meta property="twitter:image" content="https://anderson237.github.io/BLACK-MARKET/img/brand.jpg">
 
   <!-- Favicon Logo (White Flame in Red rounded box) -->
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='32' height='32'%3E%3Crect width='24' height='24' rx='6' fill='%23ff2a2a'/%3E%3Cpath d='M12 2C12 2 15 5.5 15 8.5C15 11.5 12 14 12 14C12 14 9 11.5 9 8.5C9 5.5 12 2 12 2Z' fill='white'/%3E%3Cpath d='M12 6C12 6 13.5 8.5 13.5 10.5C13.5 12.5 12 14 12 14C12 14 10.5 12.5 10.5 10.5C10.5 8.5 12 6 12 6Z' fill='%23ffbfbf'/%3E%3C/svg%3E" />
@@ -287,7 +288,7 @@
           ? escapeHtml(p.priceEur) + " €"
           : Number(p.priceXof || 0).toLocaleString("fr-FR") + " F CFA";
         const masterIndex = PRODUCTS.findIndex(orig => orig.id === p.id);
-        const message = "Bonjour, je souhaite commander le produit [" + String(p.title || "").toUpperCase() + "] au prix de [" + priceStr + "]. Voici le produit : " + SITE_URL + "#" + p.id;
+        const message = "Bonjour, je souhaite commander le produit [" + String(p.title || "").toUpperCase() + "] au prix de [" + priceStr + "]. Voici le produit : " + SITE_URL + "p/" + p.id + ".html";
         const waUrl = "https://wa.me/" + CONFIG.phoneNumber + "?text=" + encodeURIComponent(message);
 
         grid.innerHTML +=
@@ -316,7 +317,7 @@
       const priceStr = CONFIG.currency === "EUR"
         ? escapeHtml(p.priceEur) + " €"
         : Number(p.priceXof || 0).toLocaleString("fr-FR") + " F CFA";
-      const message = "Bonjour, je souhaite commander le produit [" + String(p.title || "").toUpperCase() + "] au prix de [" + priceStr + "]. Voici le produit : " + SITE_URL + "#" + p.id;
+      const message = "Bonjour, je souhaite commander le produit [" + String(p.title || "").toUpperCase() + "] au prix de [" + priceStr + "]. Voici le produit : " + SITE_URL + "p/" + p.id + ".html";
       const waUrl = "https://wa.me/" + CONFIG.phoneNumber + "?text=" + encodeURIComponent(message);
 
       var modalImg = document.getElementById("modal-image");

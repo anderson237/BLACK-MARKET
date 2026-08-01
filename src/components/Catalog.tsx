@@ -156,7 +156,7 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
     const base = parts.length === 2
       ? `https://${parts[0].toLowerCase()}.github.io/${parts[1].toLowerCase()}/`
       : "https://anderson237.github.io/BLACK-MARKET/";
-    return `${base}#${productId}`;
+    return `${base}p/${productId}.html`;
   };
 
   const generateWhatsAppLink = (product: Product) => {
