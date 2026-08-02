@@ -326,10 +326,40 @@ export function createApp() {
   }
 
   // ---------------------------------------------------------------------------
-  // AUTH (in-memory bearer tokens)
+  // AUTH (signed stateless bearer tokens)
+  //
+  // The token is an HMAC-signed payload (email, name, picture, exp). Because it
+  // is self-contained, it survives the serverless cold starts that wiped the
+  // old in-memory Map and caused "Session invalide ou expirée" errors.
   // ---------------------------------------------------------------------------
   const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
-  const sessions = new Map<string, { exp: number; email?: string; name?: string; picture?: string }>(); // token -> session
+  const SESSION_SECRET = process.env.SESSION_SECRET || process.env.ADMIN_PASSWORD || "bm-dev-session-secret";
+
+  function signToken(payload: { email?: string; name?: string; picture?: string; exp: number }): string {
+    const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+    const sig = crypto.createHmac("sha256", SESSION_SECRET).update(body).digest("base64url");
+    return `${body}.${sig}`;
+  }
+
+  function verifyToken(token: string): { email?: string; name?: string; picture?: string; exp: number } | null {
+    try {
+      const [body, sig] = token.split(".");
+      if (!body || !sig) return null;
+      const expected = crypto.createHmac("sha256", SESSION_SECRET).update(body).digest("base64url");
+      const a = Buffer.from(sig);
+      const b = Buffer.from(expected);
+      if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+      const payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
+      if (!payload || typeof payload.exp !== "number") return null;
+      return payload;
+    } catch {
+      return null;
+    }
+  }
+
+  // Small in-memory denylist (best-effort) so logout still revokes the token
+  // within a single function instance; expired entries are pruned lazily.
+  const revokedTokens = new Map<string, number>(); // token -> expiresAt
 
   // Constant-time comparison to avoid leaking password length/timing via timing attacks.
   function safeEqual(a: string, b: string): boolean {
@@ -346,9 +376,13 @@ export function createApp() {
 
   function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
     const token = extractToken(req);
-    const session = sessions.get(token);
+    const revokedAt = revokedTokens.get(token);
+    if (revokedAt && revokedAt > Date.now()) {
+      return res.status(401).json({ error: "Session invalide ou expirée. Veuillez vous reconnecter." });
+    }
+    if (revokedAt) revokedTokens.delete(token);
+    const session = verifyToken(token);
     if (!session || session.exp < Date.now()) {
-      if (session) sessions.delete(token);
       return res.status(401).json({ error: "Session invalide ou expirée. Veuillez vous reconnecter." });
     }
     (res as any).locals.session = session;
@@ -398,8 +432,7 @@ export function createApp() {
       return res.status(401).json({ error: "Email administrateur non reconnu." });
     }
     if (safeEqual(password, adminPassword)) {
-      const token = crypto.randomBytes(32).toString("hex");
-      sessions.set(token, { exp: Date.now() + SESSION_TTL_MS, email: email || undefined });
+      const token = signToken({ email: email || undefined, exp: Date.now() + SESSION_TTL_MS });
       return res.json({ success: true, token, expiresIn: SESSION_TTL_MS });
     }
     return res.status(401).json({ error: "Clé d'accès incorrecte." });
@@ -440,8 +473,7 @@ export function createApp() {
         return res.status(401).json({ error: "Email non reconnu comme administrateur." });
       }
       await recordLogin(email, name, picture);
-      const token = crypto.randomBytes(32).toString("hex");
-      sessions.set(token, { exp: Date.now() + SESSION_TTL_MS, email, name, picture });
+      const token = signToken({ email, name, picture, exp: Date.now() + SESSION_TTL_MS });
       return res.json({ success: true, token, email, name, picture, expiresIn: SESSION_TTL_MS });
     } catch (err: any) {
       console.error("Google auth error:", err);
@@ -451,7 +483,7 @@ export function createApp() {
 
   app.post("/api/auth/logout", (req, res) => {
     const token = extractToken(req);
-    if (token) sessions.delete(token);
+    if (token) revokedTokens.set(token, Date.now() + SESSION_TTL_MS);
     res.json({ success: true });
   });
 
