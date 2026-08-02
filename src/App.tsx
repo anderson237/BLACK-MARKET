@@ -136,6 +136,26 @@ export default function App() {
       .catch(() => {
         // Server unreachable: keep local data
       });
+    // Load orders + stats too, so a still-active session (e.g. after a refresh)
+    // shows real KPIs instead of zeros.
+    refreshDashboard();
+  }, [isLoggedIn]);
+
+  // Live refresh: new preorders / clicks from the client site appear in the
+  // dashboard automatically without having to re-login or reload the page.
+  useEffect(() => {
+    if (!isAuthenticated()) return;
+    const timer = setInterval(() => {
+      refreshDashboard();
+      fetchProducts()
+        .then((serverProducts) => {
+          if (serverProducts.length) setProducts(serverProducts);
+        })
+        .catch(() => {
+          // ignore
+        });
+    }, 20_000);
+    return () => clearInterval(timer);
   }, [isLoggedIn]);
 
   // Config (phone/currency) persisted in localStorage
