@@ -98,10 +98,16 @@ export function createApp() {
   // ---------------------------------------------------------------------------
   const DATA_DIR = path.join(process.cwd(), "data");
   const PRODUCTS_FILE = path.join(DATA_DIR, "products.json");
+  const ORDERS_FILE = path.join(DATA_DIR, "orders.json");
+  const USERS_FILE = path.join(DATA_DIR, "users.json");
   const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
   const BLOBS_STORE_NAME = "bm-products";
   const BLOBS_KEY = "products.json";
   const BLOBS_IMG_STORE = "bm-images";
+  const BLOBS_ORDERS_STORE = "bm-orders";
+  const BLOBS_ORDERS_KEY = "orders.json";
+  const BLOBS_USERS_STORE = "bm-users";
+  const BLOBS_USERS_KEY = "users.json";
 
   async function saveImage(id: string, buffer: Buffer): Promise<void> {
     if (isNetlifyRuntime()) {
@@ -171,6 +177,101 @@ export function createApp() {
     await fs.promises.writeFile(PRODUCTS_FILE, JSON.stringify(products, null, 2), "utf-8");
   }
 
+  async function loadOrders(): Promise<any[]> {
+    if (isNetlifyRuntime()) {
+      try {
+        const store = getStore({ name: BLOBS_ORDERS_STORE });
+        const raw = await store.get(BLOBS_ORDERS_KEY, { type: "text" });
+        if (raw != null) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) return parsed;
+        }
+        return [];
+      } catch (err) {
+        console.error("[BLOBS] orders load failed:", err);
+        return [];
+      }
+    }
+    try {
+      const raw = await fs.promises.readFile(ORDERS_FILE, "utf-8");
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  async function saveOrders(orders: any[]): Promise<void> {
+    if (isNetlifyRuntime()) {
+      const store = getStore({ name: BLOBS_ORDERS_STORE });
+      await store.set(BLOBS_ORDERS_KEY, JSON.stringify(orders, null, 2));
+      return;
+    }
+    await fs.promises.mkdir(DATA_DIR, { recursive: true });
+    await fs.promises.writeFile(ORDERS_FILE, JSON.stringify(orders, null, 2), "utf-8");
+  }
+
+  // Users: { admins: string[], logins: { email, name, picture, loggedInAt }[] }
+  const OWNER_EMAIL = adminEmails[0] || "";
+
+  async function loadUsers(): Promise<{ admins: string[]; logins: any[] }> {
+    const seed = () => ({
+      admins: Array.from(new Set([...adminEmails])),
+      logins: [] as any[],
+    });
+    if (isNetlifyRuntime()) {
+      try {
+        const store = getStore({ name: BLOBS_USERS_STORE });
+        const raw = await store.get(BLOBS_USERS_KEY, { type: "text" });
+        if (raw != null) {
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.logins) && Array.isArray(parsed.admins)) {
+            return parsed;
+          }
+        }
+        const initial = seed();
+        await store.set(BLOBS_USERS_KEY, JSON.stringify(initial, null, 2));
+        return initial;
+      } catch (err) {
+        console.error("[BLOBS] users load failed:", err);
+        return seed();
+      }
+    }
+    try {
+      const raw = await fs.promises.readFile(USERS_FILE, "utf-8");
+      const parsed = JSON.parse(raw);
+      if (parsed && Array.isArray(parsed.logins) && Array.isArray(parsed.admins)) return parsed;
+      return seed();
+    } catch {
+      return seed();
+    }
+  }
+
+  async function saveUsers(users: { admins: string[]; logins: any[] }): Promise<void> {
+    if (isNetlifyRuntime()) {
+      const store = getStore({ name: BLOBS_USERS_STORE });
+      await store.set(BLOBS_USERS_KEY, JSON.stringify(users, null, 2));
+      return;
+    }
+    await fs.promises.mkdir(DATA_DIR, { recursive: true });
+    await fs.promises.writeFile(USERS_FILE, JSON.stringify(users, null, 2), "utf-8");
+  }
+
+  async function recordLogin(email: string, name: string, picture: string): Promise<void> {
+    const users = await loadUsers();
+    const existing = users.logins.find((l) => l.email === email);
+    const entry = { email, name: name || email, picture: picture || "", loggedInAt: new Date().toISOString() };
+    if (existing) {
+      existing.name = entry.name;
+      existing.picture = entry.picture;
+      existing.loggedInAt = entry.loggedInAt;
+    } else {
+      users.logins.unshift(entry);
+    }
+    users.logins = users.logins.slice(0, 200);
+    await saveUsers(users);
+  }
+
   function sanitizeProduct(body: any): any {
     const clean = (v: unknown) => String(v ?? "").slice(0, 4000);
     const id = clean(body?.id);
@@ -224,7 +325,7 @@ export function createApp() {
   // AUTH (in-memory bearer tokens)
   // ---------------------------------------------------------------------------
   const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
-  const sessions = new Map<string, number>(); // token -> expiry
+  const sessions = new Map<string, { exp: number; email?: string; name?: string; picture?: string }>(); // token -> session
 
   // Constant-time comparison to avoid leaking password length/timing via timing attacks.
   function safeEqual(a: string, b: string): boolean {
@@ -241,11 +342,12 @@ export function createApp() {
 
   function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
     const token = extractToken(req);
-    const expiry = sessions.get(token);
-    if (!expiry || expiry < Date.now()) {
-      if (expiry) sessions.delete(token);
+    const session = sessions.get(token);
+    if (!session || session.exp < Date.now()) {
+      if (session) sessions.delete(token);
       return res.status(401).json({ error: "Session invalide ou expirée. Veuillez vous reconnecter." });
     }
+    (res as any).locals.session = session;
     next();
   }
 
@@ -293,7 +395,7 @@ export function createApp() {
     }
     if (safeEqual(password, adminPassword)) {
       const token = crypto.randomBytes(32).toString("hex");
-      sessions.set(token, Date.now() + SESSION_TTL_MS);
+      sessions.set(token, { exp: Date.now() + SESSION_TTL_MS, email: email || undefined });
       return res.json({ success: true, token, expiresIn: SESSION_TTL_MS });
     }
     return res.status(401).json({ error: "Clé d'accès incorrecte." });
@@ -323,12 +425,20 @@ export function createApp() {
         return res.status(401).json({ error: "Email non vérifié." });
       }
       const email = String(info.email || "").toLowerCase();
-      if (!adminEmails.includes(email)) {
+      const name = String(info.name || email);
+      const picture = String(info.picture || "");
+
+      // Google sign-in is restricted to declared admins (env) OR admins promoted
+      // through the Users manager (persisted). Everyone else is refused.
+      const users = await loadUsers();
+      const isAllowedAdmin = users.admins.includes(email);
+      if (!isAllowedAdmin) {
         return res.status(401).json({ error: "Email non reconnu comme administrateur." });
       }
+      await recordLogin(email, name, picture);
       const token = crypto.randomBytes(32).toString("hex");
-      sessions.set(token, Date.now() + SESSION_TTL_MS);
-      return res.json({ success: true, token, email, expiresIn: SESSION_TTL_MS });
+      sessions.set(token, { exp: Date.now() + SESSION_TTL_MS, email, name, picture });
+      return res.json({ success: true, token, email, name, picture, expiresIn: SESSION_TTL_MS });
     } catch (err: any) {
       console.error("Google auth error:", err);
       return res.status(500).json({ error: "Erreur lors de la vérification Google." });
@@ -339,6 +449,40 @@ export function createApp() {
     const token = extractToken(req);
     if (token) sessions.delete(token);
     res.json({ success: true });
+  });
+
+  // ---------------------------------------------------------------------------
+  // USERS MANAGEMENT (list Gmail sign-ins, promote/demote admins)
+  // ---------------------------------------------------------------------------
+  app.get("/api/users", requireAuth, async (_req, res) => {
+    const users = await loadUsers();
+    const session = (res as any).locals.session as { email?: string } | undefined;
+    res.json({
+      success: true,
+      users: {
+        owner: OWNER_EMAIL,
+        admins: users.admins,
+        currentEmail: session?.email || "",
+        logins: users.logins,
+      },
+    });
+  });
+
+  app.put("/api/users/admins", requireAuth, rateLimit(10, 60_000), async (req, res) => {
+    const session = (res as any).locals.session as { email?: string } | undefined;
+    const caller = String(session?.email || "").toLowerCase();
+    // Only the owner may promote/demote admins.
+    if (!caller || caller !== OWNER_EMAIL) {
+      return res.status(403).json({ error: "Seul le propriétaire peut gérer les administrateurs." });
+    }
+    const emails = Array.isArray(req.body?.emails)
+      ? req.body.emails.map((e: unknown) => String(e).trim().toLowerCase()).filter(Boolean)
+      : [];
+    const next = Array.from(new Set([OWNER_EMAIL, ...emails]));
+    const users = await loadUsers();
+    users.admins = next;
+    await saveUsers(users);
+    res.json({ success: true, admins: next });
   });
 
   // ---------------------------------------------------------------------------
@@ -396,6 +540,125 @@ export function createApp() {
     products[idx] = { ...products[idx], whatsappClicks: (Number(products[idx].whatsappClicks) || 0) + 1 };
     await saveProducts(products);
     res.json({ success: true, whatsappClicks: products[idx].whatsappClicks });
+  });
+
+  // ---------------------------------------------------------------------------
+  // ORDERS (protected CRUD) + AGGREGATED STATS for the admin dashboard
+  // ---------------------------------------------------------------------------
+  app.get("/api/orders", requireAuth, async (_req, res) => {
+    const orders = await loadOrders();
+    res.json({ success: true, orders });
+  });
+
+  app.post("/api/orders", requireAuth, rateLimit(30, 60_000), async (req, res) => {
+    const body = req.body || {};
+    const id = String(body.id || `ord_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
+    const order = {
+      id,
+      productId: String(body.productId || ""),
+      productTitle: String(body.productTitle || "").slice(0, 200),
+      productImage: String(body.productImage || ""),
+      customerName: String(body.customerName || "Client WhatsApp").slice(0, 120),
+      customerPhone: String(body.customerPhone || "").slice(0, 40),
+      customerLocation: String(body.customerLocation || "—").slice(0, 120),
+      quantity: Math.max(1, Number(body.quantity) || 1),
+      priceXof: Number(body.priceXof) || 0,
+      priceEur: Number(body.priceEur) || 0,
+      status: ["pending", "processing", "completed", "shipped", "cancelled"].includes(body.status)
+        ? body.status
+        : "pending",
+      createdAt: String(body.createdAt || new Date().toISOString()),
+    };
+    const orders = await loadOrders();
+    const idx = orders.findIndex((o) => o.id === id);
+    if (idx >= 0) orders[idx] = order;
+    else orders.unshift(order);
+    await saveOrders(orders);
+    res.json({ success: true, order });
+  });
+
+  app.put("/api/orders/:id", requireAuth, rateLimit(30, 60_000), async (req, res) => {
+    const orders = await loadOrders();
+    const idx = orders.findIndex((o) => o.id === req.params.id);
+    if (idx < 0) return res.status(404).json({ error: "Commande introuvable." });
+    const body = req.body || {};
+    const next = { ...orders[idx] };
+    if (body.status && ["pending", "processing", "completed", "shipped", "cancelled"].includes(body.status)) {
+      next.status = body.status;
+    }
+    if (body.customerName) next.customerName = String(body.customerName).slice(0, 120);
+    if (body.customerPhone) next.customerPhone = String(body.customerPhone).slice(0, 40);
+    if (body.customerLocation) next.customerLocation = String(body.customerLocation).slice(0, 120);
+    if (body.quantity) next.quantity = Math.max(1, Number(body.quantity) || 1);
+    orders[idx] = next;
+    await saveOrders(orders);
+    res.json({ success: true, order: next });
+  });
+
+  app.delete("/api/orders/:id", requireAuth, async (req, res) => {
+    const orders = await loadOrders();
+    const next = orders.filter((o) => o.id !== req.params.id);
+    if (next.length === orders.length) return res.status(404).json({ error: "Commande introuvable." });
+    await saveOrders(next);
+    res.json({ success: true });
+  });
+
+  app.get("/api/stats", requireAuth, async (_req, res) => {
+    const [products, orders] = await Promise.all([loadProducts(), loadOrders()]);
+    const totalClicks = products.reduce((s: number, p: any) => s + (Number(p.whatsappClicks) || 0), 0);
+    const totalRevenueXof = orders.reduce((s: number, o: any) => s + (Number(o.priceXof) || 0) * (Number(o.quantity) || 1), 0);
+    const totalRevenueEur = orders.reduce((s: number, o: any) => s + (Number(o.priceEur) || 0) * (Number(o.quantity) || 1), 0);
+
+    const salesByCategory: Record<string, number> = {};
+    orders.forEach((o: any) => {
+      const p = products.find((pp: any) => pp.id === o.productId);
+      const cat = (p?.category || "Autres") as string;
+      salesByCategory[cat] = (salesByCategory[cat] || 0) + 1;
+    });
+
+    const revenueSeries = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      const key = d.toISOString().slice(0, 10);
+      const dayOrders = orders.filter((o: any) => (o.createdAt || "").slice(0, 10) === key);
+      const label = d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
+      return {
+        label,
+        revenueXof: dayOrders.reduce((s: number, o: any) => s + (Number(o.priceXof) || 0) * (Number(o.quantity) || 1), 0),
+        revenueEur: dayOrders.reduce((s: number, o: any) => s + (Number(o.priceEur) || 0) * (Number(o.quantity) || 1), 0),
+        orders: dayOrders.length,
+      };
+    });
+
+    const topProducts = products
+      .map((p: any) => ({
+        id: p.id,
+        title: p.title,
+        imageUrl: p.imageUrl,
+        clicks: Number(p.whatsappClicks) || 0,
+        revenueXof: orders
+          .filter((o: any) => o.productId === p.id)
+          .reduce((s: number, o: any) => s + (Number(o.priceXof) || 0) * (Number(o.quantity) || 1), 0),
+        revenueEur: orders
+          .filter((o: any) => o.productId === p.id)
+          .reduce((s: number, o: any) => s + (Number(o.priceEur) || 0) * (Number(o.quantity) || 1), 0),
+      }))
+      .sort((a: any, b: any) => b.clicks - a.clicks)
+      .slice(0, 8);
+
+    res.json({
+      success: true,
+      stats: {
+        totalProducts: products.length,
+        totalOrders: orders.length,
+        totalClicks,
+        totalRevenueXof,
+        totalRevenueEur,
+        salesByCategory: Object.entries(salesByCategory).map(([category, orders]) => ({ category, orders, revenueXof: 0 })),
+        revenueSeries,
+        topProducts,
+      },
+    });
   });
 
   // Public catalog JSON consumed by the static client template (GitHub Pages flow)

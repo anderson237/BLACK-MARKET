@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Flame, Lock } from "lucide-react";
+import { GOOGLE_CLIENT_ID } from "../lib/constants";
 
 interface LoginProps {
   password: string;
@@ -8,6 +9,21 @@ interface LoginProps {
   isLocked: boolean;
   lockoutTime: number;
   onSubmit: (e: React.FormEvent) => void;
+  onGoogleLogin: (credential: string) => void;
+  onGoogleError: (message: string) => void;
+}
+
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: any) => void;
+          renderButton: (el: HTMLElement, options: any) => void;
+        };
+      };
+    };
+  }
 }
 
 export default function Login({
@@ -17,7 +33,64 @@ export default function Login({
   isLocked,
   lockoutTime,
   onSubmit,
+  onGoogleLogin,
+  onGoogleError,
 }: LoginProps) {
+  const googleBtnRef = useRef<HTMLDivElement>(null);
+  const callbackRef = useRef(onGoogleLogin);
+  callbackRef.current = onGoogleLogin;
+  const errorRef = useRef(onGoogleError);
+  errorRef.current = onGoogleError;
+
+  useEffect(() => {
+    let script: HTMLScriptElement | null = null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const initGoogle = () => {
+      if (!window.google?.accounts || !googleBtnRef.current) return;
+      try {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          auto_select: false,
+          callback: (resp: any) => {
+            if (resp?.credential) callbackRef.current(resp.credential);
+            else errorRef.current("Jeton Google manquant. Réessayez.");
+          },
+        });
+        window.google.accounts.id.renderButton(googleBtnRef.current, {
+          theme: "outline",
+          size: "large",
+          shape: "pill",
+          text: "continue_with",
+          width: 300,
+        });
+      } catch (err) {
+        errorRef.current("Erreur lors de l'initialisation de Google Sign-In.");
+      }
+    };
+
+    if (window.google?.accounts) {
+      initGoogle();
+      return;
+    }
+
+    script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = initGoogle;
+    script.onerror = () => errorRef.current("Impossible de charger Google Sign-In. Utilisez la clé d'accès.");
+    document.body.appendChild(script);
+
+    // Poll fallback in case the script fires before React's effect (renderButton must be idempotent)
+    timer = setTimeout(initGoogle, 2500);
+
+    return () => {
+      if (script && script.parentNode) script.parentNode.removeChild(script);
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#08080c] flex items-center justify-center p-4 relative font-sans overflow-hidden">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,42,42,0.08)_0%,transparent_70%)] pointer-events-none" />
@@ -83,6 +156,14 @@ export default function Login({
             <span>DÉVERROUILLER LA CONSOLE</span>
           </button>
         </form>
+
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-px bg-zinc-800" />
+          <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest">ou</span>
+          <div className="flex-1 h-px bg-zinc-800" />
+        </div>
+
+        <div className="flex justify-center" ref={googleBtnRef} />
 
         <div className="text-center pt-2 border-t border-zinc-900">
           <p className="text-[9px] text-zinc-600 font-mono">

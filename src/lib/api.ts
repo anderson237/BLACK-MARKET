@@ -1,4 +1,4 @@
-import { Product, WebhookConfig } from "../types";
+import { Product, WebhookConfig, Order, DashboardStats, UsersData } from "../types";
 import { TOKEN_STORAGE_KEY, SESSION_STORAGE_KEY } from "./constants";
 
 export function getToken(): string | null {
@@ -51,6 +51,21 @@ export async function loginRequest(password: string): Promise<void> {
   setToken(data.token);
 }
 
+export async function googleLogin(credential: string): Promise<void> {
+  const data = await request<{ success: boolean; token: string; email?: string }>("/api/auth/google", {
+    method: "POST",
+    body: JSON.stringify({ credential }),
+  });
+  setToken(data.token);
+  if (data.email) {
+    try {
+      sessionStorage.setItem("bm_admin_email", data.email);
+    } catch {
+      // ignore
+    }
+  }
+}
+
 export async function logoutRequest(): Promise<void> {
   try {
     await request("/api/auth/logout", { method: "POST" }, true);
@@ -69,6 +84,10 @@ export async function saveProduct(product: Product): Promise<void> {
   await request("/api/products", { method: "POST", body: JSON.stringify(product) }, true);
 }
 
+export async function saveProductsBulk(products: Product[]): Promise<void> {
+  await request("/api/products", { method: "PUT", body: JSON.stringify(products) }, true);
+}
+
 export async function deleteProduct(id: string): Promise<void> {
   await request(`/api/products/${encodeURIComponent(id)}`, { method: "DELETE" }, true);
 }
@@ -79,6 +98,49 @@ export async function incrementClicks(id: string): Promise<void> {
   } catch {
     // click counter is non-critical
   }
+}
+
+export async function fetchOrders(): Promise<Order[]> {
+  const data = await request<{ success: boolean; orders: Order[] }>("/api/orders", {}, true);
+  return data.orders || [];
+}
+
+export async function saveOrder(order: Partial<Order>): Promise<Order> {
+  const data = await request<{ success: boolean; order: Order }>("/api/orders", {
+    method: "POST",
+    body: JSON.stringify(order),
+  }, true);
+  return data.order;
+}
+
+export async function updateOrder(id: string, patch: Partial<Order>): Promise<Order> {
+  const data = await request<{ success: boolean; order: Order }>(`/api/orders/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: JSON.stringify(patch),
+  }, true);
+  return data.order;
+}
+
+export async function deleteOrder(id: string): Promise<void> {
+  await request(`/api/orders/${encodeURIComponent(id)}`, { method: "DELETE" }, true);
+}
+
+export async function fetchStats(): Promise<DashboardStats> {
+  const data = await request<{ success: boolean; stats: DashboardStats }>("/api/stats", {}, true);
+  return data.stats;
+}
+
+export async function fetchUsers(): Promise<UsersData> {
+  const data = await request<{ success: boolean; users: UsersData }>("/api/users", {}, true);
+  return data.users;
+}
+
+export async function saveAdmins(emails: string[]): Promise<string[]> {
+  const data = await request<{ success: boolean; admins: string[] }>("/api/users/admins", {
+    method: "PUT",
+    body: JSON.stringify({ emails }),
+  }, true);
+  return data.admins;
 }
 
 export interface TranslatePayload {

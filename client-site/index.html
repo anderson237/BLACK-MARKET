@@ -15,13 +15,13 @@
   <meta property="og:url" content="https://blackmarket-import-export.netlify.app/">
   <meta property="og:title" content="BLACK MARKET - SOURCING EXCLUSIF CHINE">
   <meta property="og:description" content="Découvrez nos drops de sourcing exclusifs depuis la Chine (Taobao, 1688). Commandez directement d'usine via WhatsApp en toute sécurité.">
-  <meta property="og:image" content="https://blackmarket-import-export.netlify.app/img/brand.jpg">
+  <meta property="og:image" content="https://blackmarket-import-export.netlify.app/img/brand.jpg?v=2">
 
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
   <meta property="twitter:title" content="BLACK MARKET - SOURCING EXCLUSIF CHINE">
   <meta property="twitter:description" content="Découvrez nos drops de sourcing exclusifs depuis la Chine. Commandez directement d'usine via WhatsApp.">
-  <meta property="twitter:image" content="https://blackmarket-import-export.netlify.app/img/brand.jpg">
+  <meta property="twitter:image" content="https://blackmarket-import-export.netlify.app/img/brand.jpg?v=2">
 
   <!-- Favicon Logo (White Flame in Red rounded box) -->
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='32' height='32'%3E%3Crect width='24' height='24' rx='6' fill='%23ff2a2a'/%3E%3Cpath d='M12 2C12 2 15 5.5 15 8.5C15 11.5 12 14 12 14C12 14 9 11.5 9 8.5C9 5.5 12 2 12 2Z' fill='white'/%3E%3Cpath d='M12 6C12 6 13.5 8.5 13.5 10.5C13.5 12.5 12 14 12 14C12 14 10.5 12.5 10.5 10.5C10.5 8.5 12 6 12 6Z' fill='%23ffbfbf'/%3E%3C/svg%3E" />
@@ -284,10 +284,10 @@
         const base = isActive
           ? "bg-[#ff2a2a] text-white border border-[#ff2a2a]"
           : "bg-[#15151e] text-zinc-400 border border-zinc-800 hover:border-brand-red/40 hover:text-slate-100";
-        // JSON.stringify produces a JS-safe string literal (correct escaping for
-        // the onclick handler). escapeHtml alone is NOT enough here because the
-        // HTML parser decodes &#39; back to ' inside the attribute.
-        const jsCat = JSON.stringify(cat);
+        // JSON.stringify produces a JS-safe string literal, then escapeHtml
+        // encodes its double quotes as &quot; so the attribute survives HTML
+        // parsing; the parser decodes them back to " for the onclick JS.
+        const jsCat = escapeHtml(JSON.stringify(cat));
         return '<button onclick="filterCategory(' + jsCat + ')" class="' + base + ' text-[10px] px-4 py-1.5 rounded-full font-extrabold font-mono transition-all uppercase tracking-widest">' + escapeHtml(cat) + "</button>";
       }).join("");
     }
@@ -317,32 +317,20 @@
 
     // ===== MESSAGE WHATSAPP POLI & STRUCTURÉ (partagé) =====
     function buildWaMessage(product, priceStr, productUrl) {
-      return "Bonjour BLACK MARKET, 👋
-
-" +
-        "Je souhaite passer une PRÉCOMMANDE pour le produit suivant :
-
-" +
-        "  📦 PRODUIT : " + String(product.title || "").toUpperCase() + "
-" +
-        "  💰 PRIX : " + priceStr + "
-" +
-        "  🔗 FICHE PRODUIT : " + productUrl + "
-
-" +
-        "Merci de me confirmer la disponibilité, le délai de livraison et les modalités de paiement.
-
-" +
+      return "Bonjour BLACK MARKET, 👋\n\n" +
+        "Je souhaite passer une PRÉCOMMANDE pour le produit suivant :\n\n" +
+        "  📦 PRODUIT : " + String(product.title || "").toUpperCase() + "\n" +
+        "  💰 PRIX : " + priceStr + "\n" +
+        "  🔗 FICHE PRODUIT : " + productUrl + "\n\n" +
+        "Merci de me confirmer la disponibilité, le délai de livraison et les modalités de paiement.\n\n" +
         "Dans l'attente de votre retour, je vous prie d'agréer mes salutations distinguées.";
     }
 
     // ===== DESCRIPTION PARAGRAPHEE (formatée pour la lecture) =====
     function paragraphizeDescription(text) {
       var raw = String(text || "");
-      var lines = raw.split(/
-{2,}/);
-      if (lines.length <= 1) lines = raw.split(/
-/).filter(Boolean);
+      var lines = raw.split(/\n{2,}/);
+      if (lines.length <= 1) lines = raw.split(/\n/).filter(Boolean);
       return lines
         .map(function (block) {
           return '<p class="text-xs text-zinc-300 leading-relaxed indent-4">' + escapeHtml(block.trim()) + "</p>";

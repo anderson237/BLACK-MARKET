@@ -45,6 +45,31 @@ async function watermarkImage(src: string, out: string): Promise<void> {
     .toFile(out);
 }
 
+function brandLogoSvg(w = 1200, h = 630): Buffer {
+  // Flame badge (from the favicon) + wordmark, on the site's dark background.
+  const fs = Math.round(h * 0.11);
+  const badge = Math.round(h * 0.34);
+  const badgeX = (w - badge) / 2;
+  const badgeY = h * 0.13;
+  const flame = `M${badgeX + badge / 2} ${badgeY + badge * 0.10}C${badgeX + badge / 2} ${badgeY + badge * 0.10} ${badgeX + badge * 0.66} ${badgeY + badge * 0.42} ${badgeX + badge * 0.66} ${badgeY + badge * 0.56}C${badgeX + badge * 0.66} ${badgeY + badge * 0.78} ${badgeX + badge * 0.50} ${badgeY + badge * 0.88} ${badgeX + badge * 0.50} ${badgeY + badge * 0.88}C${badgeX + badge * 0.50} ${badgeY + badge * 0.88} ${badgeX + badge * 0.34} ${badgeY + badge * 0.78} ${badgeX + badge * 0.34} ${badgeY + badge * 0.56}C${badgeX + badge * 0.34} ${badgeY + badge * 0.42} ${badgeX + badge / 2} ${badgeY + badge * 0.10} ${badgeX + badge / 2} ${badgeY + badge * 0.10}Z`;
+  const flameInner = `M${badgeX + badge / 2} ${badgeY + badge * 0.30}C${badgeX + badge / 2} ${badgeY + badge * 0.30} ${badgeX + badge * 0.60} ${badgeY + badge * 0.50} ${badgeX + badge * 0.60} ${badgeY + badge * 0.62}C${badgeX + badge * 0.60} ${badgeY + badge * 0.74} ${badgeX + badge * 0.50} ${badgeY + badge * 0.84} ${badgeX + badge * 0.50} ${badgeY + badge * 0.84}C${badgeX + badge * 0.50} ${badgeY + badge * 0.84} ${badgeX + badge * 0.40} ${badgeY + badge * 0.74} ${badgeX + badge * 0.40} ${badgeY + badge * 0.62}C${badgeX + badge * 0.40} ${badgeY + badge * 0.50} ${badgeX + badge / 2} ${badgeY + badge * 0.30} ${badgeX + badge / 2} ${badgeY + badge * 0.30}Z`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
+  <rect width="${w}" height="${h}" fill="#08080c"/>
+  <rect x="${badgeX}" y="${badgeY}" width="${badge}" height="${badge}" rx="${Math.round(badge * 0.22)}" fill="#ff2a2a"/>
+  <path d="${flame}" fill="#ffffff"/>
+  <path d="${flameInner}" fill="#ffbfbf"/>
+  <text x="${w / 2}" y="${h * 0.74}" text-anchor="middle" font-family="monospace" font-weight="bold" font-size="${fs}" fill="#ff2a2a" letter-spacing="${Math.round(fs * 0.28)}">BLACK MARKET</text>
+  <text x="${w / 2}" y="${h * 0.86}" text-anchor="middle" font-family="monospace" font-weight="bold" font-size="${Math.round(fs * 0.42)}" fill="#9ca3af" letter-spacing="${Math.round(fs * 0.55)}">SOURCING EXCLUSIF CHINE</text>
+</svg>`;
+  return Buffer.from(svg);
+}
+
+async function generateBrandLogo(out: string): Promise<void> {
+  await sharp(brandLogoSvg())
+    .jpeg({ quality: 92 })
+    .toFile(out);
+}
+
 async function main() {
   mkdirSync(IMG_DIR, { recursive: true });
   mkdirSync(PAGES_DIR, { recursive: true });
@@ -58,7 +83,10 @@ async function main() {
     console.log("->", p.id, p.title);
   }
 
-  copyFileSync(path.join(IMG_DIR, products[0].id + ".jpg"), path.join(IMG_DIR, "brand.jpg"));
+  const brandPath = path.join(IMG_DIR, "brand.jpg");
+  if (!existsSync(brandPath)) {
+    await generateBrandLogo(brandPath);
+  }
   writeFileSync(path.join(ROOT, "index.html"), getHtmlTemplateCode({ siteUrl: BASE_URL }), "utf8");
   console.log("-> index.html + brand.jpg OK");
 }

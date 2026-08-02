@@ -1,11 +1,19 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { INITIAL_PRODUCTS } from "./data";
-import { Product, WebhookConfig, AIProcessingState, TabId } from "./types";
+import { Product, WebhookConfig, AIProcessingState, TabId, Order, Customer, DashboardStats } from "./types";
 import Catalog from "./components/Catalog";
 import Login from "./components/Login";
 import Header from "./components/Header";
 import StatsBar from "./components/StatsBar";
-import TabNav from "./components/TabNav";
+import Sidebar from "./components/Sidebar";
+import Dashboard from "./components/Dashboard";
+import OrdersList from "./components/OrdersList";
+import OrderDetails from "./components/OrderDetails";
+import OrdersManager from "./components/OrdersManager";
+import CustomersList from "./components/CustomersList";
+import CategoriesManager from "./components/CategoriesManager";
+import UsersManager from "./components/UsersManager";
+import Settings from "./components/Settings";
 import AIGenerator from "./components/AIGenerator";
 import MakeGuide from "./components/MakeGuide";
 import WhatsAppScriptPanel from "./components/WhatsAppScriptPanel";
@@ -14,6 +22,7 @@ import {
   logoutRequest,
   fetchProducts,
   saveProduct,
+  saveProductsBulk,
   deleteProduct,
   incrementClicks,
   translateProduct,
@@ -21,13 +30,55 @@ import {
   saveConfig,
   setAuthenticated,
   isAuthenticated,
+  googleLogin,
+  fetchOrders,
+  saveOrder,
+  updateOrder,
+  deleteOrder,
+  fetchStats,
 } from "./lib/api";
 import { DEFAULT_MARKUP } from "./lib/constants";
 import { estimatePrices } from "./lib/pricing";
 
 export default function App() {
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
-  const [activeTab, setActiveTab] = useState<TabId>("catalog");
+  const [activeTab, setActiveTab] = useState<TabId>("dashboard");
+
+  // Orders & dashboard stats (server persistence)
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [showNewOrder, setShowNewOrder] = useState(false);
+
+  // Consolidate customers from orders
+  const customers: Customer[] = useMemo(() => {
+    const map = new Map<string, Customer>();
+    orders.forEach((o) => {
+      const key = (o.customerPhone || o.customerName || "inconnu").trim();
+      if (!key) return;
+      const existing = map.get(key);
+      const totalXof = (Number(o.priceXof) || 0) * (Number(o.quantity) || 1);
+      const totalEur = (Number(o.priceEur) || 0) * (Number(o.quantity) || 1);
+      if (existing) {
+        existing.orders += 1;
+        existing.totalXof += totalXof;
+        existing.totalEur += totalEur;
+        if (new Date(o.createdAt) > new Date(existing.lastOrderAt)) existing.lastOrderAt = o.createdAt;
+      } else {
+        map.set(key, {
+          id: key,
+          name: o.customerName || key,
+          phone: o.customerPhone || "",
+          location: o.customerLocation || "—",
+          orders: 1,
+          totalXof,
+          totalEur,
+          lastOrderAt: o.createdAt,
+        });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => new Date(b.lastOrderAt).getTime() - new Date(a.lastOrderAt).getTime());
+  }, [orders]);
 
   // Secure Authentication States
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(isAuthenticated);
@@ -110,18 +161,6 @@ export default function App() {
     if (isLocked) return;
 
     const sanitizedPassword = password.trim().replace(/<[^>]*>/g, "");
-    const fail = (message: string) => {
-      const newAttempts = failedAttempts + 1;
-      setFailedAttempts(newAttempts);
-      if (newAttempts >= 3) {
-        setIsLocked(true);
-        setLockoutTime(60); // 60 seconds brute-force lockout
-        setLoginError("Accès temporairement verrouillé pour des raisons de sécurité. Veuillez patienter.");
-      } else {
-        setLoginError(message);
-      }
-      setPassword("");
-    };
 
     try {
       // Server-side authentication is the ONLY valid path.
@@ -151,6 +190,17 @@ export default function App() {
       if (serverProducts.length) setProducts(serverProducts);
     } catch {
       // ignore
+    }
+    refreshDashboard();
+  };
+
+  const refreshDashboard = async () => {
+    try {
+      const [serverOrders, serverStats] = await Promise.all([fetchOrders(), fetchStats()]);
+      setOrders(serverOrders);
+      setStats(serverStats);
+    } catch {
+      // dashboard data is non-critical
     }
   };
 
@@ -315,6 +365,76 @@ export default function App() {
     incrementClicks(product.id);
   }, []);
 
+  // Orders CRUD
+  const handleAddOrder = async (orderData: Omit<Order, "id" | "createdAt" | "status">) => {
+    const now = new Date().toISOString();
+    const optimistic: Order = { ...orderData, id: `ord_tmp_${Date.now()}`, status: "pending", createdAt: now };
+    setOrders((prev) => [optimistic, ...prev]);
+    try {
+      const saved = await saveOrder(orderData);
+      setOrders((prev) => prev.map((o) => (o.id === optimistic.id ? saved : o)));
+    } catch (err) {
+      console.warn("Order save failed:", err);
+    }
+    refreshDashboard();
+  };
+
+  const handleUpdateOrder = async (id: string, patch: Partial<Order>) => {
+    setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, ...patch } : o)));
+    if (selectedOrder?.id === id) setSelectedOrder((o) => (o ? { ...o, ...patch } : o));
+    try {
+      await updateOrder(id, patch);
+    } catch (err) {
+      console.warn("Order update failed:", err);
+    }
+    refreshDashboard();
+  };
+
+  const handleDeleteOrder = async (id: string) => {
+    if (!window.confirm("Supprimer définitivement cette commande ?")) return;
+    setOrders((prev) => prev.filter((o) => o.id !== id));
+    if (selectedOrder?.id === id) setSelectedOrder(null);
+    try {
+      await deleteOrder(id);
+    } catch (err) {
+      console.warn("Order delete failed:", err);
+    }
+    refreshDashboard();
+  };
+
+  // Category reclassification (rename/delete cascades to products)
+  const handleReclassifyCategories = async (updated: Product[]) => {
+    setProducts(updated);
+    try {
+      await saveProductsBulk(updated);
+    } catch (err) {
+      console.warn("Bulk category update failed:", err);
+    }
+    refreshDashboard();
+  };
+
+  const handleGoogleLogin = async (credential: string) => {
+    try {
+      await googleLogin(credential);
+      onLoginSuccess();
+    } catch (err: any) {
+      fail(err?.message || "Connexion Google refusée. Vérifiez que votre email est un administrateur autorisé.");
+    }
+  };
+
+  const fail = (message: string) => {
+    const newAttempts = failedAttempts + 1;
+    setFailedAttempts(newAttempts);
+    if (newAttempts >= 3) {
+      setIsLocked(true);
+      setLockoutTime(60); // 60 seconds brute-force lockout
+      setLoginError("Accès temporairement verrouillé pour des raisons de sécurité. Veuillez patienter.");
+    } else {
+      setLoginError(message);
+    }
+    setPassword("");
+  };
+
   if (!isLoggedIn) {
     return (
       <Login
@@ -324,6 +444,8 @@ export default function App() {
         isLocked={isLocked}
         lockoutTime={lockoutTime}
         onSubmit={handleLogin}
+        onGoogleLogin={handleGoogleLogin}
+        onGoogleError={(msg) => setLoginError(msg)}
       />
     );
   }
@@ -332,51 +454,105 @@ export default function App() {
     <div className="min-h-screen bg-[#08080c] text-slate-100 font-sans" id="main-applet-root">
       <Header config={config} onConfigChange={setConfig} onLogout={handleLogout} />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        <TabNav activeTab={activeTab} onTabChange={setActiveTab} />
-        <StatsBar products={products} config={config} markup={aiMarkup} />
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+          <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+          <div className="flex-1 min-w-0 space-y-6">
+            <StatsBar products={products} config={config} markup={aiMarkup} />
 
-        <div className="space-y-6">
-          {activeTab === "catalog" && (
-            <Catalog
-              products={products}
-              config={config}
-              onIncrementClicks={handleIncrementClicks}
-              onDeleteProduct={handleDeleteProduct}
-              onUpdateProduct={handleUpdateProduct}
-            />
-          )}
+            <div className="space-y-6">
+              {activeTab === "dashboard" && (
+                <Dashboard
+                  orders={orders}
+                  stats={stats}
+                  config={config}
+                  onOpenOrder={setSelectedOrder}
+                  onGoTo={(tab) => setActiveTab(tab as TabId)}
+                />
+              )}
 
-          {activeTab === "ai_generator" && (
-            <AIGenerator
-              products={products}
-              aiInputChinese={aiInputChinese}
-              setAiInputChinese={setAiInputChinese}
-              aiImagePreview={aiImagePreview}
-              aiImageBase64={aiImageBase64}
-              onImageUpload={handleImageUpload}
-              onClearImage={handleClearImage}
-              aiBasePriceRmb={aiBasePriceRmb}
-              setAiBasePriceRmb={setAiBasePriceRmb}
-              aiMarkup={aiMarkup}
-              setAiMarkup={setAiMarkup}
-              aiCategory={aiCategory}
-              setAiCategory={setAiCategory}
-              aiState={aiState}
-              onGenerate={handleAiTranslate}
-              generatedProduct={generatedProduct}
-              onInject={addProductToCatalog}
-              onRefuse={() => setGeneratedProduct(null)}
-            />
-          )}
+              {activeTab === "catalog" && (
+                <Catalog
+                  products={products}
+                  config={config}
+                  onIncrementClicks={handleIncrementClicks}
+                  onDeleteProduct={handleDeleteProduct}
+                  onUpdateProduct={handleUpdateProduct}
+                />
+              )}
 
-          {activeTab === "make_guide" && <MakeGuide copiedStates={copiedStates} onCopy={handleCopyText} />}
+              {activeTab === "orders" && (
+                <OrdersList
+                  orders={orders}
+                  config={config}
+                  onOpenOrder={setSelectedOrder}
+                  onAddOrder={() => setShowNewOrder(true)}
+                  onDeleteOrder={handleDeleteOrder}
+                />
+              )}
 
-          {activeTab === "whatsapp_script" && (
-            <WhatsAppScriptPanel copiedStates={copiedStates} onCopy={handleCopyText} />
-          )}
+              {activeTab === "customers" && <CustomersList customers={customers} config={config} />}
+
+              {activeTab === "categories" && (
+                <CategoriesManager products={products} onUpdateProducts={handleReclassifyCategories} />
+              )}
+
+              {activeTab === "users" && <UsersManager />}
+
+              {activeTab === "settings" && <Settings config={config} onConfigChange={setConfig} />}
+
+              {activeTab === "ai_generator" && (
+                <AIGenerator
+                  products={products}
+                  aiInputChinese={aiInputChinese}
+                  setAiInputChinese={setAiInputChinese}
+                  aiImagePreview={aiImagePreview}
+                  aiImageBase64={aiImageBase64}
+                  onImageUpload={handleImageUpload}
+                  onClearImage={handleClearImage}
+                  aiBasePriceRmb={aiBasePriceRmb}
+                  setAiBasePriceRmb={setAiBasePriceRmb}
+                  aiMarkup={aiMarkup}
+                  setAiMarkup={setAiMarkup}
+                  aiCategory={aiCategory}
+                  setAiCategory={setAiCategory}
+                  aiState={aiState}
+                  onGenerate={handleAiTranslate}
+                  generatedProduct={generatedProduct}
+                  onInject={addProductToCatalog}
+                  onRefuse={() => setGeneratedProduct(null)}
+                />
+              )}
+
+              {activeTab === "make_guide" && <MakeGuide copiedStates={copiedStates} onCopy={handleCopyText} />}
+
+              {activeTab === "whatsapp_script" && (
+                <WhatsAppScriptPanel copiedStates={copiedStates} onCopy={handleCopyText} />
+              )}
+            </div>
+          </div>
         </div>
       </main>
+
+      {selectedOrder && (
+        <OrderDetails
+          order={selectedOrder}
+          config={config}
+          onClose={() => setSelectedOrder(null)}
+          onUpdateStatus={(id, status) => handleUpdateOrder(id, { status })}
+          onDelete={handleDeleteOrder}
+        />
+      )}
+
+      {showNewOrder && (
+        <OrdersManager
+          orders={orders}
+          config={config}
+          products={products}
+          onAddOrder={handleAddOrder}
+          onClose={() => setShowNewOrder(false)}
+        />
+      )}
 
       <footer className="bg-[#0b0b10] border-t border-zinc-900 py-8 mt-12 text-center text-xs text-zinc-500 font-mono">
         <div className="max-w-7xl mx-auto px-4 space-y-1">

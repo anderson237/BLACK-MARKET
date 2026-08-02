@@ -5,7 +5,7 @@ import { GOOGLE_CLIENT_ID } from "./constants";
 
 export function getHtmlTemplateCode(opts?: { siteUrl?: string }): string {
   const siteUrl = (opts && opts.siteUrl) || "https://blackmarket-import-export.netlify.app/";
-  const ogImage = siteUrl + "img/brand.jpg";
+  const ogImage = siteUrl + "img/brand.jpg?v=2";
   return `<!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -292,10 +292,10 @@ export function getHtmlTemplateCode(opts?: { siteUrl?: string }): string {
         const base = isActive
           ? "bg-[#ff2a2a] text-white border border-[#ff2a2a]"
           : "bg-[#15151e] text-zinc-400 border border-zinc-800 hover:border-brand-red/40 hover:text-slate-100";
-        // JSON.stringify produces a JS-safe string literal (correct escaping for
-        // the onclick handler). escapeHtml alone is NOT enough here because the
-        // HTML parser decodes &#39; back to ' inside the attribute.
-        const jsCat = JSON.stringify(cat);
+        // JSON.stringify produces a JS-safe string literal, then escapeHtml
+        // encodes its double quotes as &quot; so the attribute survives HTML
+        // parsing; the parser decodes them back to " for the onclick JS.
+        const jsCat = escapeHtml(JSON.stringify(cat));
         return '<button onclick="filterCategory(' + jsCat + ')" class="' + base + ' text-[10px] px-4 py-1.5 rounded-full font-extrabold font-mono transition-all uppercase tracking-widest">' + escapeHtml(cat) + "</button>";
       }).join("");
     }
@@ -325,20 +325,20 @@ export function getHtmlTemplateCode(opts?: { siteUrl?: string }): string {
 
     // ===== MESSAGE WHATSAPP POLI & STRUCTURÉ (partagé) =====
     function buildWaMessage(product, priceStr, productUrl) {
-      return "Bonjour BLACK MARKET, 👋\n\n" +
-        "Je souhaite passer une PRÉCOMMANDE pour le produit suivant :\n\n" +
-        "  📦 PRODUIT : " + String(product.title || "").toUpperCase() + "\n" +
-        "  💰 PRIX : " + priceStr + "\n" +
-        "  🔗 FICHE PRODUIT : " + productUrl + "\n\n" +
-        "Merci de me confirmer la disponibilité, le délai de livraison et les modalités de paiement.\n\n" +
+      return "Bonjour BLACK MARKET, 👋\\n\\n" +
+        "Je souhaite passer une PRÉCOMMANDE pour le produit suivant :\\n\\n" +
+        "  📦 PRODUIT : " + String(product.title || "").toUpperCase() + "\\n" +
+        "  💰 PRIX : " + priceStr + "\\n" +
+        "  🔗 FICHE PRODUIT : " + productUrl + "\\n\\n" +
+        "Merci de me confirmer la disponibilité, le délai de livraison et les modalités de paiement.\\n\\n" +
         "Dans l'attente de votre retour, je vous prie d'agréer mes salutations distinguées.";
     }
 
     // ===== DESCRIPTION PARAGRAPHEE (formatée pour la lecture) =====
     function paragraphizeDescription(text) {
       var raw = String(text || "");
-      var lines = raw.split(/\n{2,}/);
-      if (lines.length <= 1) lines = raw.split(/\n/).filter(Boolean);
+      var lines = raw.split(/\\n{2,}/);
+      if (lines.length <= 1) lines = raw.split(/\\n/).filter(Boolean);
       return lines
         .map(function (block) {
           return '<p class="text-xs text-zinc-300 leading-relaxed indent-4">' + escapeHtml(block.trim()) + "</p>";
