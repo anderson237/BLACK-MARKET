@@ -42,9 +42,36 @@
   <main class="flex-1 max-w-5xl mx-auto w-full px-4 py-8">
     <div class="bg-[#15151e] rounded-3xl overflow-hidden border border-zinc-800 shadow-2xl">
       <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="relative aspect-square rounded-2xl overflow-hidden bg-zinc-950 border border-zinc-800">
-          <img src="https://blackmarket-import-export.netlify.app/img/prod_3.jpg" alt="NEO-KRYSTAL : Clavier Mécanique Transparent Tri-Mode RGB" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1618384887929-16ec33fab9ef?auto=format&amp;fit=crop&amp;q=80&amp;w=600'" class="w-full h-full object-cover">
-        </div>
+        
+          <div class="relative aspect-square rounded-2xl overflow-hidden bg-zinc-950 border border-zinc-800" id="bm-carousel">
+            <div class="carousel-slide"><img src="https://blackmarket-import-export.netlify.app/img/prod_3.jpg" alt="NEO-KRYSTAL : Clavier Mécanique Transparent Tri-Mode RGB" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1618384887929-16ec33fab9ef?auto=format&amp;fit=crop&amp;q=80&amp;w=600'" class="w-full h-full object-cover"></div>
+            
+          </div>
+          <script>
+            (function () {
+              var slides = document.querySelectorAll('#bm-carousel .carousel-slide');
+              var dots = document.querySelectorAll('#bm-carousel .bm-dot');
+              var idx = 0;
+              window.bmMove = function (dir) {
+                if (slides.length === 0) return;
+                slides[idx].classList.add('hidden');
+                if (dots.length) dots[idx].classList.remove('bg-brand-red');
+                idx = (idx + dir + slides.length) % slides.length;
+                slides[idx].classList.remove('hidden');
+                if (dots.length) dots[idx].classList.add('bg-brand-red');
+              };
+              for (var i = 0; i < dots.length; i++) {
+                dots[i].addEventListener('click', function () {
+                  var target = parseInt(this.getAttribute('data-i'), 10);
+                  slides[idx].classList.add('hidden');
+                  if (dots.length) dots[idx].classList.remove('bg-brand-red');
+                  idx = target;
+                  slides[idx].classList.remove('hidden');
+                  if (dots.length) dots[idx].classList.add('bg-brand-red');
+                });
+              }
+            })();
+          </script>
         <div class="space-y-4 flex flex-col justify-between">
           <div class="space-y-3">
             <div>

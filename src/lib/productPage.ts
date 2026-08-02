@@ -30,6 +30,61 @@ export function getProductPageHtml(p: Product, baseUrl: string, phoneNumber: str
     "Dans l'attente de votre retour, je vous prie d'agréer mes salutations distinguées.";
   const waUrl = "https://wa.me/" + phoneNumber.replace(/\+/g, "").replace(/\s/g, "") + "?text=" + encodeURIComponent(message);
 
+  // Build the media carousel: main watermarked image + gallery photos + optional video.
+  const mediaItems: string[] = [];
+  mediaItems.push(
+    `<div class="carousel-slide"><img src="${escapeHtml(imgUrl)}" alt="${title}" onerror="this.onerror=null;this.src='${escapeHtml(p.imageUrl)}'" class="w-full h-full object-cover"></div>`
+  );
+  (p.gallery || []).slice(0, 11).forEach((u) => {
+    if (!u) return;
+    mediaItems.push(
+      `<div class="carousel-slide hidden"><img src="${escapeHtml(u)}" alt="${title}" onerror="this.onerror=null;this.hidden=true" class="w-full h-full object-cover"></div>`
+    );
+  });
+  if (p.videoUrl) {
+    mediaItems.push(
+      `<div class="carousel-slide hidden"><video src="${escapeHtml(p.videoUrl)}" controls preload="metadata" playsinline class="w-full h-full object-cover"></video></div>`
+    );
+  }
+  const mediaCount = mediaItems.length;
+  const carouselHtml = `
+          <div class="relative aspect-square rounded-2xl overflow-hidden bg-zinc-950 border border-zinc-800" id="bm-carousel">
+            ${mediaItems.join("\n            ")}
+            ${mediaCount > 1 ? `
+            <button onclick="bmMove(-1)" class="absolute left-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-brand-red/80 text-white w-8 h-8 rounded-full text-lg font-black leading-none border border-white/20 transition-colors z-10">‹</button>
+            <button onclick="bmMove(1)" class="absolute right-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-brand-red/80 text-white w-8 h-8 rounded-full text-lg font-black leading-none border border-white/20 transition-colors z-10">›</button>
+            <div class="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5 z-10" id="bm-dots">
+              ${Array.from({ length: mediaCount }, (_, i) =>
+                `<span class="bm-dot w-1.5 h-1.5 rounded-full ${i === 0 ? "bg-brand-red" : "bg-white/40"}" data-i="${i}"></span>`
+              ).join("")}
+            </div>` : ""}
+          </div>
+          <script>
+            (function () {
+              var slides = document.querySelectorAll('#bm-carousel .carousel-slide');
+              var dots = document.querySelectorAll('#bm-carousel .bm-dot');
+              var idx = 0;
+              window.bmMove = function (dir) {
+                if (slides.length === 0) return;
+                slides[idx].classList.add('hidden');
+                if (dots.length) dots[idx].classList.remove('bg-brand-red');
+                idx = (idx + dir + slides.length) % slides.length;
+                slides[idx].classList.remove('hidden');
+                if (dots.length) dots[idx].classList.add('bg-brand-red');
+              };
+              for (var i = 0; i < dots.length; i++) {
+                dots[i].addEventListener('click', function () {
+                  var target = parseInt(this.getAttribute('data-i'), 10);
+                  slides[idx].classList.add('hidden');
+                  if (dots.length) dots[idx].classList.remove('bg-brand-red');
+                  idx = target;
+                  slides[idx].classList.remove('hidden');
+                  if (dots.length) dots[idx].classList.add('bg-brand-red');
+                });
+              }
+            })();
+          </script>`;
+
   return `<!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -74,9 +129,7 @@ export function getProductPageHtml(p: Product, baseUrl: string, phoneNumber: str
   <main class="flex-1 max-w-5xl mx-auto w-full px-4 py-8">
     <div class="bg-[#15151e] rounded-3xl overflow-hidden border border-zinc-800 shadow-2xl">
       <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="relative aspect-square rounded-2xl overflow-hidden bg-zinc-950 border border-zinc-800">
-          <img src="${escapeHtml(imgUrl)}" alt="${title}" onerror="this.onerror=null;this.src='${escapeHtml(p.imageUrl)}'" class="w-full h-full object-cover">
-        </div>
+        ${carouselHtml}
         <div class="space-y-4 flex flex-col justify-between">
           <div class="space-y-3">
             <div>

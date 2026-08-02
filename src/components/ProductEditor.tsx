@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, Save, Trash2, Plus, Image as ImageIcon, Upload } from "lucide-react";
+import { X, Save, Trash2, Plus, Image as ImageIcon, Upload, Video, Clapperboard } from "lucide-react";
 import { Product } from "../types";
 import RichEditor from "./RichEditor";
 import { motion, AnimatePresence } from "motion/react";
@@ -15,8 +15,9 @@ interface ProductEditorProps {
 }
 
 export default function ProductEditor({ product, categories, isNew, onClose, onSave, onDelete }: ProductEditorProps) {
-  const [draft, setDraft] = useState<Product>({ ...product, features: [...product.features] });
+  const [draft, setDraft] = useState<Product>({ ...product, features: [...product.features], gallery: [...(product.gallery || [])] });
   const [uploading, setUploading] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
   const [uploadError, setUploadError] = useState("");
 
   const set = (patch: Partial<Product>) => setDraft((d) => ({ ...d, ...patch }));
@@ -101,6 +102,85 @@ export default function ProductEditor({ product, categories, isNew, onClose, onS
         setUploading(false);
       });
   };
+
+  const handleGalleryFiles = (files: FileList | undefined) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    setUploadError("");
+    const list = Array.from(files);
+    let index = 0;
+
+    const uploadNext = async () => {
+      if (index >= list.length) {
+        setUploading(false);
+        return;
+      }
+      const file = list[index];
+      index += 1;
+      try {
+        const watermarkedBase64 = await watermarkFile(file);
+        const token = getToken();
+        const res = await fetch("/api/upload-image", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ imageBase64: watermarkedBase64 }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.url) {
+          setUploadError(data.error || "Erreur lors de l'upload d'une photo.");
+        } else {
+          setDraft((d) => ({ ...d, gallery: [...(d.gallery || []), data.url] }));
+        }
+      } catch {
+        setUploadError("Impossible de lire une des images (fichier invalide).");
+      }
+      await uploadNext();
+    };
+
+    uploadNext();
+  };
+
+  const handleVideoFile = (file: File | undefined) => {
+    if (!file) return;
+    setUploadingVideo(true);
+    setUploadError("");
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const videoBase64 = String(reader.result || "");
+        const token = getToken();
+        const res = await fetch("/api/upload-video", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ videoBase64 }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.url) {
+          setUploadError(data.error || "Erreur lors de l'upload de la vidéo.");
+        } else {
+          set({ videoUrl: data.url });
+        }
+      } catch {
+        setUploadError("Erreur réseau lors de l'upload de la vidéo.");
+      } finally {
+        setUploadingVideo(false);
+      }
+    };
+    reader.onerror = () => {
+      setUploadError("Impossible de lire la vidéo (fichier invalide).");
+      setUploadingVideo(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeGalleryImage = (idx: number) =>
+    setDraft((d) => ({ ...d, gallery: (d.gallery || []).filter((_, i) => i !== idx) }));
 
   const setFeature = (idx: number, value: string) =>
     setDraft((d) => ({ ...d, features: d.features.map((f, i) => (i === idx ? value : f)) }));
@@ -222,6 +302,76 @@ export default function ProductEditor({ product, categories, isNew, onClose, onS
                 </div>
               </div>
               <input className={inputCls} value={draft.imageUrl} onChange={(e) => set({ imageUrl: e.target.value })} placeholder="https://... (ou /api/img/xxx.jpg)" />
+            </div>
+
+            {/* Gallery: additional product photos (carousel) */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider font-mono block">
+                Galerie photos (carrousel client) — {draft.gallery?.length || 0} photo(s) ajoutée(s)
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {(draft.gallery || []).map((url, idx) => (
+                  <div key={idx} className="relative w-16 h-16 rounded-lg overflow-hidden border border-zinc-800 group/g">
+                    <img src={url} alt={`gallery ${idx + 1}`} className="w-full h-full object-cover" />
+                    <button
+                      onClick={() => removeGalleryImage(idx)}
+                      className="absolute inset-0 bg-black/70 text-red-400 opacity-0 group-hover/g:opacity-100 transition-opacity flex items-center justify-center"
+                      title="Retirer cette photo"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                <label className="w-16 h-16 rounded-lg border border-dashed border-zinc-700 hover:border-brand-red/60 bg-zinc-900/50 flex items-center justify-center cursor-pointer transition-all">
+                  <Plus className="w-5 h-5 text-zinc-500" />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    disabled={uploading}
+                    onChange={(e) => { handleGalleryFiles(e.target.files || undefined); e.target.value = ""; }}
+                  />
+                </label>
+              </div>
+              <p className="text-[9px] text-zinc-600 font-mono leading-relaxed">
+                Sélectionnez plusieurs photos à la fois. Chacune est filigranée puis affichée en carrousel sur la fiche produit client.
+              </p>
+            </div>
+
+            {/* Product video */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider font-mono block">Vidéo produit (carrousel client)</label>
+              <div className="flex items-center gap-3">
+                <div className="w-20 h-14 rounded-xl overflow-hidden border border-zinc-800 bg-zinc-950 flex items-center justify-center shrink-0">
+                  {draft.videoUrl ? (
+                    <video src={draft.videoUrl} className="w-full h-full object-cover" muted />
+                  ) : (
+                    <Clapperboard className="w-6 h-6 text-zinc-700" />
+                  )}
+                </div>
+                <div className="flex-1 space-y-2">
+                  <label className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-slate-300 px-3 py-2 rounded-lg text-[11px] font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-all w-fit">
+                    <Video className="w-3.5 h-3.5 text-brand-red" />
+                    {uploadingVideo ? "UPLOAD EN COURS..." : "UPLOADER UNE VIDÉO (MP4/WebM)"}
+                    <input
+                      type="file"
+                      accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"
+                      className="hidden"
+                      disabled={uploadingVideo}
+                      onChange={(e) => handleVideoFile(e.target.files?.[0])}
+                    />
+                  </label>
+                  {draft.videoUrl && (
+                    <button
+                      onClick={() => set({ videoUrl: undefined })}
+                      className="text-[10px] text-red-400 font-mono hover:underline"
+                    >
+                      Retirer la vidéo
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* WYSIWYG: sales pitch */}

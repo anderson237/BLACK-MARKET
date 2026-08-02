@@ -9,6 +9,7 @@ export interface Product {
   priceEur: number;
   priceXof: number;
   imageUrl: string;
+  gallery?: string[]; // Additional product photos displayed in the client carousel
   videoUrl?: string; // A video link or simulated slideshow slides
   category: string;
   whatsappClicks: number;

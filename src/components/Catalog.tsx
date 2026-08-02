@@ -69,6 +69,7 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedProductForWa, setSelectedProductForWa] = useState<Product | null>(null);
   const [selectedProductForDetails, setSelectedProductForDetails] = useState<Product | null>(null);
+  const [detailSlideIndex, setDetailSlideIndex] = useState<number>(0);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
   const [whatsappSimNumber, setWhatsappSimNumber] = useState<string>(config.phoneNumber);
@@ -139,6 +140,7 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
         setActiveVideoProduct(null);
         setVideoPlaying(false);
         setEditingProduct(null);
+        setCreatingNewProduct(false);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -807,7 +809,7 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
                 layout
                 id={`product-card-${product.id}`}
                 key={product.id}
-                onClick={() => setSelectedProductForDetails(product)}
+                onClick={() => { setDetailSlideIndex(0); setSelectedProductForDetails(product); }}
                 className="bg-brand-card rounded-3xl overflow-hidden border border-zinc-800/80 shadow-md hover:shadow-xl hover:shadow-brand-red/5 hover:border-brand-red/40 transition-all duration-300 flex flex-col group h-full relative cursor-pointer"
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1290,23 +1292,65 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
                 {/* Left side: Image & watermark overlay */}
                 <div className="space-y-4">
                   <div className="relative aspect-square rounded-2xl overflow-hidden bg-zinc-950 border border-zinc-800 flex items-center justify-center group">
-                    <img
-                      src={selectedProductForDetails.imageUrl}
-                      alt={selectedProductForDetails.title}
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover"
-                    />
+                    {(() => {
+                      const media = [
+                        { type: "image" as const, src: selectedProductForDetails.imageUrl },
+                        ...(selectedProductForDetails.gallery || []).filter(Boolean).map((src) => ({ type: "image" as const, src })),
+                        ...(selectedProductForDetails.videoUrl ? [{ type: "video" as const, src: selectedProductForDetails.videoUrl }] : []),
+                      ];
+                      const current = media[Math.min(detailSlideIndex, media.length - 1)];
+                      const showNav = media.length > 1;
+                      return (
+                        <>
+                          {current && current.type === "image" ? (
+                            <img
+                              key={current.src}
+                              src={current.src}
+                              alt={selectedProductForDetails.title}
+                              referrerPolicy="no-referrer"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : current && current.type === "video" ? (
+                            <video key={current.src} src={current.src} controls playsInline className="w-full h-full object-cover bg-black" />
+                          ) : null}
 
-                    {/* Watermark overlay */}
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden opacity-30">
-                      <span className="text-white font-extrabold text-4xl font-mono border-4 border-white/50 px-6 py-3 rotate-12 tracking-widest uppercase">
-                        BLACK MARKET
-                      </span>
-                    </div>
+                          {/* Watermark overlay */}
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden opacity-30">
+                            <span className="text-white font-extrabold text-4xl font-mono border-4 border-white/50 px-6 py-3 rotate-12 tracking-widest uppercase">
+                              BLACK MARKET
+                            </span>
+                          </div>
 
-                    <div className="absolute bottom-3 left-3 bg-black/95 border border-brand-red/40 px-3 py-1.5 rounded-xl">
-                      <p className="text-[10px] text-zinc-400 font-mono font-bold">ID DU LOT : #{selectedProductForDetails.id}</p>
-                    </div>
+                          <div className="absolute bottom-3 left-3 bg-black/95 border border-brand-red/40 px-3 py-1.5 rounded-xl">
+                            <p className="text-[10px] text-zinc-400 font-mono font-bold">ID DU LOT : #{selectedProductForDetails.id}</p>
+                          </div>
+
+                          {showNav && (
+                            <>
+                              <button
+                                onClick={() => setDetailSlideIndex((i) => (i - 1 + media.length) % media.length)}
+                                className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-brand-red/80 text-white w-8 h-8 rounded-full flex items-center justify-center border border-white/20 transition-colors"
+                                title="Photo précédente"
+                              >
+                                ‹
+                              </button>
+                              <button
+                                onClick={() => setDetailSlideIndex((i) => (i + 1) % media.length)}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-brand-red/80 text-white w-8 h-8 rounded-full flex items-center justify-center border border-white/20 transition-colors"
+                                title="Photo suivante"
+                              >
+                                ›
+                              </button>
+                              <div className="absolute bottom-3 right-3 bg-black/80 border border-zinc-800 px-2 py-1 rounded-lg">
+                                <p className="text-[9px] text-brand-red font-mono font-bold">
+                                  {Math.min(detailSlideIndex, media.length - 1) + 1}/{media.length}
+                                </p>
+                              </div>
+                            </>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
 
                   {/* Sourcing details if available */}

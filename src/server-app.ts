@@ -108,6 +108,7 @@ export function createApp() {
   const BLOBS_STORE_NAME = "bm-products";
   const BLOBS_KEY = "products.json";
   const BLOBS_IMG_STORE = "bm-images";
+  const BLOBS_VIDEO_STORE = "bm-videos";
   const BLOBS_ORDERS_STORE = "bm-orders";
   const BLOBS_ORDERS_KEY = "orders.json";
   const BLOBS_USERS_STORE = "bm-users";
@@ -136,6 +137,34 @@ export function createApp() {
     }
     try {
       return await fs.promises.readFile(path.join(UPLOADS_DIR, id + ".jpg"));
+    } catch {
+      return null;
+    }
+  }
+
+  async function saveVideo(id: string, buffer: Buffer): Promise<void> {
+    if (isNetlifyRuntime()) {
+      const store = getStore({ name: BLOBS_VIDEO_STORE });
+      await store.set(id + ".mp4", buffer);
+      return;
+    }
+    await fs.promises.mkdir(UPLOADS_DIR, { recursive: true });
+    await fs.promises.writeFile(path.join(UPLOADS_DIR, id + ".mp4"), buffer);
+  }
+
+  async function loadVideo(id: string): Promise<Buffer | null> {
+    if (isNetlifyRuntime()) {
+      try {
+        const store = getStore({ name: BLOBS_VIDEO_STORE });
+        const data = await store.get(id + ".mp4", { type: "arrayBuffer" });
+        if (data) return Buffer.from(data);
+      } catch (err) {
+        console.error("[BLOBS] video read failed:", err);
+      }
+      return null;
+    }
+    try {
+      return await fs.promises.readFile(path.join(UPLOADS_DIR, id + ".mp4"));
     } catch {
       return null;
     }
@@ -290,6 +319,9 @@ export function createApp() {
       chineseDescription: clean(body?.chineseDescription),
       chineseTitle: clean(body?.chineseTitle),
       imageUrl: clean(body?.imageUrl),
+      gallery: Array.isArray(body?.gallery)
+        ? body.gallery.slice(0, 12).map((u: unknown) => clean(u)).filter(Boolean)
+        : [],
       videoUrl: body?.videoUrl ? clean(body.videoUrl) : undefined,
       category: clean(body?.category),
       features: Array.isArray(body?.features)
@@ -321,6 +353,23 @@ export function createApp() {
         }
         if (ok) return true;
       }
+    }
+    return false;
+  }
+
+  // Validate MP4 (ftyp), WebM/Matroska (EBML), QuickTime (ftypqt), MOV.
+  function looksLikeVideo(buffer: Buffer): boolean {
+    if (buffer.length < 12) return false;
+    // MP4 / QuickTime: offset 4 = "ftyp"
+    const ascii = (from: number, len: number) =>
+      buffer.slice(from, from + len).toString("latin1");
+    if (ascii(4, 4) === "ftyp") {
+      const brand = ascii(8, 4).toLowerCase();
+      return /^(isom|mp4|avc1|qt|heic|m4v|3gp)/.test(brand);
+    }
+    // WebM / MKV: EBML header 1A 45 DF A3
+    if (buffer[0] === 0x1a && buffer[1] === 0x45 && buffer[2] === 0xdf && buffer[3] === 0xa3) {
+      return buffer.toString("latin1").includes("webm") || buffer.toString("latin1").includes("matroska");
     }
     return false;
   }
@@ -808,6 +857,43 @@ export function createApp() {
       return res.status(404).json({ error: "Image introuvable." });
     }
     res.setHeader("Content-Type", "image/jpeg");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.send(buffer);
+  });
+
+  app.post("/api/upload-video", requireAuth, rateLimit(10, 60_000), async (req, res) => {
+    try {
+      const { videoBase64 } = req.body || {};
+      if (!videoBase64 || typeof videoBase64 !== "string") {
+        return res.status(400).json({ error: "Aucune vidéo reçue (base64 manquant)." });
+      }
+      const base64Data = videoBase64.split(",").pop() || "";
+      const input = Buffer.from(base64Data, "base64");
+      if (!input.length || input.length > 60 * 1024 * 1024) {
+        return res.status(400).json({ error: "Vidéo invalide ou trop volumineuse (max 60 Mo)." });
+      }
+      if (!looksLikeVideo(input)) {
+        return res.status(400).json({ error: "Le fichier n'est pas une vidéo valide (MP4/WebM/MOV)." });
+      }
+      const id = crypto.randomBytes(8).toString("hex");
+      await saveVideo(id, input);
+      res.json({ success: true, url: `/api/vid/${id}.mp4` });
+    } catch (err: any) {
+      console.error("Upload video error:", err);
+      return res.status(500).json({ error: "Erreur lors de l'upload de la vidéo." });
+    }
+  });
+
+  app.get("/api/vid/:id", async (req, res) => {
+    const id = String(req.params.id || "").replace(/\.mp4$/i, "");
+    if (!id || !/^[a-f0-9]{16}$/i.test(id)) {
+      return res.status(404).json({ error: "Vidéo introuvable." });
+    }
+    const buffer = await loadVideo(id);
+    if (!buffer) {
+      return res.status(404).json({ error: "Vidéo introuvable." });
+    }
+    res.setHeader("Content-Type", "video/mp4");
     res.setHeader("Cache-Control", "public, max-age=86400");
     res.send(buffer);
   });
