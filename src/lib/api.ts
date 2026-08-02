@@ -159,6 +159,21 @@ export async function translateProduct(payload: TranslatePayload): Promise<any> 
   return data.data;
 }
 
+export interface RefinePayload {
+  field: "description" | "technical";
+  title: string;
+  category?: string;
+  currentText?: string;
+}
+
+export async function refineText(payload: RefinePayload): Promise<string> {
+  const data = await request<{ success: boolean; html: string }>("/api/ai-refine", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }, true);
+  return data.html;
+}
+
 export function loadConfig(): WebhookConfig | null {
   try {
     const raw = localStorage.getItem("bm_admin_config");

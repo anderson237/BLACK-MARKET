@@ -745,11 +745,14 @@ export function createApp() {
       return res.status(404).send("Produit introuvable.");
     }
     // The local watermarked copy img/<id>.jpg only exists for the products baked
-    // into the static build. For newer products use the stored (already
-    // watermarked) image URL as the OpenGraph image instead of a broken file.
-    const hasLocalImage = INITIAL_PRODUCTS.some((pp) => pp.id === p.id);
+    // into the static build. Prefer the live stored image URL whenever the admin
+    // changed/uploaded/AI-generated a new image (it is already watermarked
+    // client-side), otherwise fall back to the static watermarked copy.
+    const seedProduct = INITIAL_PRODUCTS.find((pp) => pp.id === p.id);
+    const imageChanged = !seedProduct || String(seedProduct.imageUrl) !== String(p.imageUrl);
     const html = getProductPageHtml(p, PUBLIC_BASE_URL, PHONE_NUMBER, {
-      ogImage: hasLocalImage ? undefined : p.imageUrl,
+      ogImage: imageChanged ? p.imageUrl : undefined,
+      useLiveImage: imageChanged,
     });
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Cache-Control", "public, max-age=300");
@@ -1044,6 +1047,86 @@ Tu dois impérativement renvoyer la réponse au format JSON conforme au schéma 
       console.error("Gemini Translation Error:", error);
       return res.status(500).json({
         error: error.message || "Une erreur est survenue lors de la traduction par l'IA.",
+      });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // AI REFINE: rewrite/improve the sales pitch ("argument de vente") or the
+  // technical fiche ("fiche technique") for a product, returning clean HTML
+  // that can be dropped directly into the WYSIWYG editors.
+  // ---------------------------------------------------------------------------
+  app.post("/api/ai-refine", requireAuth, rateLimit(10, 60_000), async (req, res) => {
+    try {
+      if (!apiKey || !ai) {
+        return res.status(503).json({
+          error: "Le service d'IA n'est pas configuré. Veuillez ajouter votre clé API GEMINI_API_KEY dans le fichier .env / Secrets.",
+        });
+      }
+      const { field, title, category, currentText } = req.body || {};
+      const target = field === "technical" ? "technical" : "description";
+      const cleanTitle = String(title || "").slice(0, 300);
+      const cleanCategory = String(category || "").slice(0, 80);
+      const cleanCurrent = String(currentText || "")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 4000);
+
+      const instructions =
+        target === "description"
+          ? `Tu es un copywriter d'élite pour la marque de précommande BLACK MARKET (import Chine, marché francophone).
+Rédige ou optimise l'ARGUMENTAIRE DE VENTE du produit « ${cleanTitle} » (catégorie : ${cleanCategory || "non précisée"}).
+${cleanCurrent ? `Reprends les informations utiles de l'argumentaire actuel et optimise-le pour le rendre plus percutant, plus structuré et plus orienté bénéfices clients : "${cleanCurrent}".` : "Crée un argumentaire de vente premium de toutes pièces."}
+Exigences :
+- 2 à 4 paragraphes courts et percutants, ton enthousiaste mais crédible.
+- Une liste à puces de 3 à 5 bénéfices clients concrets.
+- Mise en avant de l'exclusivité, de la qualité d'import direct et du filigrane de marque.
+- Ne jamais inventer de caractéristiques techniques fausses. Reste général si l'info manque.
+Renvoie du HTML propre : <p>, <h3>, <ul><li>. Sans balise <html>, <body> ni texte hors HTML.`
+          : `Tu es un expert en fiches techniques e-commerce (import Chine, marché francophone).
+Présente la FICHE TECHNIQUE du produit « ${cleanTitle} » (catégorie : ${cleanCategory || "non précisée"}).
+${cleanCurrent ? `Reprends les informations actuelles, réorganise-les, corrige-les et complète intelligemment : "${cleanCurrent}".` : "Crée une fiche technique structurée à partir du nom du produit."}
+Exigences :
+- Structure claire : <h3> pour chaque bloc (par ex. "Caractéristiques", "Matériaux & Qualité", "Expédition & Livraison").
+- Liste à puces <ul><li> pour les caractéristiques, concrètes et numérotées quand c'est possible.
+- Qualité et quantité d'informations adaptées : détaillé mais jamais inventé. Indique clairement les points non confirmés.
+Renvoie du HTML propre : <h3>, <p>, <ul><li>. Sans balise <html>, <body> ni texte hors HTML.`;
+
+      const response = await generateContentWithRetry(
+        ai,
+        {
+          model: geminiModel,
+          contents: [{ text: instructions }],
+          config: {
+            systemInstruction:
+              "Tu génères exclusivement du contenu HTML propre (balises <p>, <h3>, <ul>, <li>) pour une interface d'édition produit. Aucune balise <html>, <body> ni texte hors HTML.",
+            temperature: 0.7,
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                html: { type: Type.STRING, description: "Contenu HTML final à insérer directement dans l'éditeur." },
+              },
+              required: ["html"],
+            },
+          },
+        },
+        geminiFallbackModel
+      );
+
+      const resultText = response.text || "{}";
+      let resultJson: any;
+      try {
+        resultJson = JSON.parse(resultText);
+      } catch {
+        return res.status(502).json({ error: "Réponse de l'IA au format invalide. Veuillez réessayer." });
+      }
+      return res.json({ success: true, html: String(resultJson.html || "").slice(0, 12000) });
+    } catch (error: any) {
+      console.error("AI Refine Error:", error);
+      return res.status(500).json({
+        error: error.message || "Une erreur est survenue lors de la génération par l'IA.",
       });
     }
   });

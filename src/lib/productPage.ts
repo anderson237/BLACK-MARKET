@@ -4,10 +4,14 @@ function escapeHtml(value: string | undefined | null): string {
   return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
-export function getProductPageHtml(p: Product, baseUrl: string, phoneNumber: string, opts?: { ogImage?: string }): string {
+export function getProductPageHtml(p: Product, baseUrl: string, phoneNumber: string, opts?: { ogImage?: string; useLiveImage?: boolean }): string {
   const pageUrl = baseUrl + "p/" + p.id + ".html";
   const imgUrl = baseUrl + "img/" + p.id + ".jpg";
   const ogImage = (opts && opts.ogImage) || imgUrl;
+  // When the admin changed/uploaded/generated a new image, prefer the live URL
+  // (already watermarked client-side) instead of the stale static copy.
+  const primaryImg = (opts && opts.useLiveImage && p.imageUrl) ? p.imageUrl : imgUrl;
+  const fallbackImg = (opts && opts.useLiveImage && p.imageUrl) ? imgUrl : p.imageUrl;
   const title = escapeHtml(p.title);
   const descriptionMeta = escapeHtml(p.description);
   const category = escapeHtml(p.category || "EXCLUSIF");
@@ -16,10 +20,18 @@ export function getProductPageHtml(p: Product, baseUrl: string, phoneNumber: str
   const features = (p.features || [])
     .map((f) => `            <li class="flex items-start gap-2"><span class="text-brand-red mt-0.5">◆</span><span>${escapeHtml(f)}</span></li>`)
     .join("\n");
-  const descriptionBlocks = String(p.description || "")
-    .split(/\n{2,}/)
-    .map((b) => `<p class="text-xs text-zinc-300 leading-relaxed indent-4">${escapeHtml(b.trim())}</p>`)
-    .join("\n              ");
+  // Sanitize admin/AI-generated HTML: allow only safe structural tags + inline styles.
+  const rawDesc = String(p.description || "");
+  const descriptionBlocks = /<\/?[a-z][^>]*>/i.test(rawDesc)
+    ? rawDesc
+        .replace(/<(script|style|iframe|object|embed|form|input)[^>]*>.*?<\/\1>/gis, "")
+        .replace(/on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+        .replace(/javascript:/gi, "")
+        .slice(0, 12000)
+    : rawDesc
+        .split(/\n{2,}/)
+        .map((b) => `<p class="text-xs text-zinc-300 leading-relaxed indent-4">${escapeHtml(b.trim())}</p>`)
+        .join("\n              ");
   const message =
     "Bonjour BLACK MARKET, 👋\n\n" +
     "Je souhaite passer une PRÉCOMMANDE pour le produit suivant :\n\n" +
@@ -33,7 +45,7 @@ export function getProductPageHtml(p: Product, baseUrl: string, phoneNumber: str
   // Build the media carousel: main watermarked image + gallery photos + optional video.
   const mediaItems: string[] = [];
   mediaItems.push(
-    `<div class="carousel-slide"><img src="${escapeHtml(imgUrl)}" alt="${title}" onerror="this.onerror=null;this.src='${escapeHtml(p.imageUrl)}'" class="w-full h-full object-cover"></div>`
+    `<div class="carousel-slide"><img src="${escapeHtml(primaryImg)}" alt="${title}" onerror="this.onerror=null;this.src='${escapeHtml(fallbackImg)}'" class="w-full h-full object-cover"></div>`
   );
   (p.gallery || []).slice(0, 11).forEach((u) => {
     if (!u) return;
@@ -149,6 +161,15 @@ ${features}
             <div class="text-xs text-zinc-400 leading-relaxed bg-black/40 p-3 rounded-lg border border-zinc-900 space-y-2">
 ${descriptionBlocks}
             </div>
+            ${p.originalDescription ? `
+            <div class="text-xs text-zinc-300 leading-relaxed bg-black/40 p-3 rounded-lg border border-zinc-900 space-y-2">
+              <p class="text-[9px] text-brand-red font-mono uppercase font-bold tracking-wider">FICHE TECHNIQUE</p>
+              ${String(p.originalDescription)
+                .replace(/<(script|style|iframe|object|embed|form|input)[^>]*>.*?<\/\1>/gis, "")
+                .replace(/on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+                .replace(/javascript:/gi, "")
+                .slice(0, 12000)}
+            </div>` : ""}
           </div>
           <a href="${waUrl}" target="_blank" rel="noopener noreferrer" onclick="trackPreorder()" class="bg-brand-red hover:bg-red-600 text-white font-extrabold text-sm py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-brand-red/10 font-mono uppercase tracking-widest">
             💬 PRÉCOMMANDER VIA WHATSAPP

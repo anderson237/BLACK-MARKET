@@ -1,10 +1,10 @@
 import React, { useState } from "react";
-import { X, Save, Trash2, Plus, Image as ImageIcon, Upload, Video, Clapperboard, Sparkles } from "lucide-react";
+import { X, Save, Trash2, Plus, Image as ImageIcon, Upload, Video, Clapperboard, Sparkles, Wand2, FileCog } from "lucide-react";
 import { Product } from "../types";
 import RichEditor from "./RichEditor";
 import { motion, AnimatePresence } from "motion/react";
-import { getToken } from "../lib/api";
-import { generateAdImage, uploadWatermarkedImage } from "../lib/aiAds";
+import { getToken, refineText } from "../lib/api";
+import { generateAdImage, uploadWatermarkedImage, loadImage, pollinationsImageUrl, buildAdPrompt } from "../lib/aiAds";
 
 interface ProductEditorProps {
   product: Product;
@@ -20,6 +20,10 @@ export default function ProductEditor({ product, categories, isNew, onClose, onS
   const [uploading, setUploading] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [generatingAi, setGeneratingAi] = useState(false);
+  const [generatingAiGallery, setGeneratingAiGallery] = useState(false);
+  const [generatingAiVideo, setGeneratingAiVideo] = useState(false);
+  const [refiningDesc, setRefiningDesc] = useState(false);
+  const [refiningTech, setRefiningTech] = useState(false);
   const [uploadError, setUploadError] = useState("");
 
   const set = (patch: Partial<Product>) => setDraft((d) => ({ ...d, ...patch }));
@@ -218,6 +222,304 @@ export default function ProductEditor({ product, categories, isNew, onClose, onS
     }
   };
 
+  // Generate 3 AI-driven carousel photos for the product gallery.
+  const handleGenerateAiGallery = async () => {
+    if (generatingAiGallery) return;
+    if (!draft.title.trim() && !draft.description.trim()) {
+      setUploadError("Renseignez au moins un titre pour générer des photos IA pertinentes.");
+      return;
+    }
+    setGeneratingAiGallery(true);
+    setUploadError("");
+    try {
+      const added: string[] = [];
+      for (let i = 0; i < 3; i++) {
+        setUploadError(`Génération carrousel IA ${i + 1}/3...`);
+        const dataUrl = await generateAdImage(draft, 2000 + i * 11);
+        const url = await uploadWatermarkedImage(dataUrl);
+        added.push(url);
+      }
+      setUploadError("");
+      setDraft((d) => ({ ...d, gallery: [...(d.gallery || []), ...added] }));
+    } catch (e: any) {
+      setUploadError(e?.message || "Échec de la génération du carrousel IA. Réessayez.");
+    } finally {
+      setGeneratingAiGallery(false);
+    }
+  };
+
+  // Generate an AI-driven product video (4 slides, 9:16) and upload it as videoUrl.
+  const handleGenerateAiVideo = async () => {
+    if (generatingAiVideo) return;
+    if (!draft.title.trim()) {
+      setUploadError("Renseignez au moins un titre pour générer la vidéo IA.");
+      return;
+    }
+    setGeneratingAiVideo(true);
+    setUploadError("");
+    try {
+      const W = 720;
+      const H = 1280;
+      const SLIDE_MS = 3000;
+      const FPS = 30;
+      const slides = buildVideoSlides();
+      const TOTAL_MS = slides.length * SLIDE_MS;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas non supporté.");
+
+      let img: HTMLImageElement | null = null;
+      try {
+        img = await loadImage(draft.imageUrl);
+      } catch {
+        img = null;
+      }
+
+      // 4 AI backgrounds, one per slide
+      const aiBgs: (HTMLImageElement | null)[] = [];
+      for (let i = 0; i < slides.length; i++) {
+        setUploadError(`Visuels IA vidéo ${i + 1}/${slides.length}...`);
+        try {
+          const url = pollinationsImageUrl(buildAdPrompt(draft), 720, 1280, 3000 + i * 13);
+          aiBgs.push(await loadImage(url));
+        } catch {
+          aiBgs.push(null);
+        }
+      }
+      setUploadError("Composition de la vidéo IA...");
+
+      const stream = canvas.captureStream(FPS);
+      const mime = MediaRecorder.isTypeSupported("video/mp4")
+        ? "video/mp4"
+        : MediaRecorder.isTypeSupported("video/webm")
+        ? "video/webm"
+        : "video/webm;codecs=vp9";
+      const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6_000_000 });
+      const chunks: BlobPart[] = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+      const finished = new Promise<void>((resolve) => {
+        recorder.onstop = () => resolve();
+      });
+
+      recorder.start(200);
+      const startTime = performance.now();
+      const frame = () => {
+        const elapsed = performance.now() - startTime;
+        if (elapsed >= TOTAL_MS) {
+          recorder.stop();
+          return;
+        }
+        const idx = Math.min(slides.length - 1, Math.floor(elapsed / SLIDE_MS));
+        const progress = Math.min(1, (elapsed % SLIDE_MS) / SLIDE_MS);
+        drawSlideFrame(ctx, slides[idx], progress, img, aiBgs[idx], W, H);
+        requestAnimationFrame(frame);
+      };
+      requestAnimationFrame(frame);
+      await finished;
+
+      const blob = new Blob(chunks, { type: mime });
+      const base64 = await blobToBase64(blob);
+      const token = getToken();
+      const res = await fetch("/api/upload-video", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ videoBase64: base64 }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.url) {
+        setUploadError(data.error || "Erreur lors de l'upload de la vidéo générée.");
+      } else {
+        set({ videoUrl: data.url });
+        setUploadError("");
+      }
+    } catch (e: any) {
+      console.error("Génération vidéo IA échouée:", e);
+      setUploadError(e?.message || "Échec de la génération de la vidéo IA.");
+    } finally {
+      setGeneratingAiVideo(false);
+    }
+  };
+
+  // Optimize the sales pitch with Gemini (reuse current text or create from scratch).
+  const handleRefineDescription = async () => {
+    if (refiningDesc) return;
+    setRefiningDesc(true);
+    setUploadError("");
+    try {
+      const html = await refineText({
+        field: "description",
+        title: draft.title,
+        category: draft.category,
+        currentText: draft.description,
+      });
+      set({ description: html });
+    } catch (e: any) {
+      setUploadError(e?.message || "Échec de l'optimisation par l'IA (vérifiez GEMINI_API_KEY).");
+    } finally {
+      setRefiningDesc(false);
+    }
+  };
+
+  // Present/restructure the technical fiche with Gemini.
+  const handleRefineTechnical = async () => {
+    if (refiningTech) return;
+    setRefiningTech(true);
+    setUploadError("");
+    try {
+      const html = await refineText({
+        field: "technical",
+        title: draft.title,
+        category: draft.category,
+        currentText: draft.originalDescription,
+      });
+      set({ originalDescription: html });
+    } catch (e: any) {
+      setUploadError(e?.message || "Échec de la présentation par l'IA (vérifiez GEMINI_API_KEY).");
+    } finally {
+      setRefiningTech(false);
+    }
+  };
+
+  const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+
+  const buildVideoSlides = () => {
+    const priceXof = (draft.priceXof || 0).toLocaleString("fr-FR");
+    return [
+      { title: draft.title, subtitle: "⚠️ EN DIRECT DE SHENZHEN - LIMITED DROP", text: "Sourcing direct sans intermédiaires via BLACK MARKET. Pièces vérifiées et filigranées.", badge: "EXCLUSIF" },
+      { title: "PITCH PREMIUM", subtitle: "🔥 COP DIRECT", text: (draft.description || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 140) + "...", badge: "COPYWRITING IA" },
+      { title: "SPÉCIFICATIONS", subtitle: "⚙️ ENQUÊTE QUALITÉ", text: (draft.features[0] || "Produit sélectionné par nos soins."), badge: "CONTRÔLE QUALITÉ" },
+      { title: `TARIF : ${priceXof} F CFA`, subtitle: "💬 COMMANDE WHATSAPP IMMÉDIATE", text: "Cliquez sur 'Commander' pour ouvrir WhatsApp avec le bon de précommande pré-rempli.", badge: "TARIF USINE" },
+    ];
+  };
+
+  const drawSlideFrame = (
+    ctx: CanvasRenderingContext2D,
+    s: { title: string; subtitle: string; text: string; badge: string },
+    progress: number,
+    img: HTMLImageElement | null,
+    aiBg: HTMLImageElement | null,
+    W: number,
+    H: number
+  ) => {
+    const wrap = (text: string, maxWidth: number): string[] => {
+      const words = text.split(/\s+/);
+      const lines: string[] = [];
+      let line = "";
+      for (const word of words) {
+        const test = line ? line + " " + word : word;
+        if (ctx.measureText(test).width > maxWidth && line) {
+          lines.push(line);
+          line = word;
+        } else {
+          line = test;
+        }
+      }
+      if (line) lines.push(line);
+      return lines;
+    };
+
+    if (aiBg) {
+      const cover = Math.max(W / aiBg.width, H / aiBg.height);
+      const dw = aiBg.width * cover;
+      const dh = aiBg.height * cover;
+      ctx.drawImage(aiBg, (W - dw) / 2, (H - dh) / 2, dw, dh);
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
+      ctx.fillRect(0, 0, W, H);
+    } else {
+      const grad = ctx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, "#1d0404");
+      grad.addColorStop(0.5, "#000000");
+      grad.addColorStop(1, "#10030c");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+      if (img) {
+        const cover = Math.max(W / img.width, H / img.height);
+        const dw = img.width * cover;
+        const dh = img.height * cover;
+        ctx.save();
+        ctx.globalAlpha = 0.28;
+        ctx.filter = "blur(6px)";
+        ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+        ctx.restore();
+        ctx.fillStyle = "rgba(0,0,0,0.45)";
+        ctx.fillRect(0, 0, W, H);
+      }
+    }
+
+    const pad = Math.round(W * 0.08);
+    ctx.fillStyle = "#e11d48";
+    ctx.beginPath();
+    ctx.roundRect(pad, 48, Math.min(W - pad * 2, 260), 44, 22);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 24px monospace";
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "center";
+    ctx.fillText(s.badge.toUpperCase(), pad + Math.min(W - pad * 2, 260) / 2, 70);
+
+    ctx.fillStyle = "#e11d48";
+    ctx.font = "bold 26px monospace";
+    ctx.textAlign = "left";
+    ctx.fillText(s.subtitle.toUpperCase(), pad, H * 0.32);
+
+    ctx.fillStyle = "#fafafa";
+    ctx.font = "900 52px Arial, sans-serif";
+    const titleLines = wrap(s.title.toUpperCase(), W - pad * 2).slice(0, 4);
+    let ty = H * 0.38;
+    for (const ln of titleLines) {
+      ctx.fillText(ln, pad, ty);
+      ty += 62;
+    }
+
+    ctx.fillStyle = "rgba(226,232,240,0.92)";
+    ctx.font = "26px Arial, sans-serif";
+    const bodyLines = wrap(s.text, W - pad * 2).slice(0, 6);
+    ty += 18;
+    for (const ln of bodyLines) {
+      ctx.fillText(ln, pad, ty);
+      ty += 38;
+    }
+
+    ctx.fillStyle = "#e11d48";
+    ctx.beginPath();
+    ctx.roundRect(pad, H - 190, W - pad * 2, 92, 24);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 34px Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("PRÉCOMMANDER SUR WHATSAPP", W / 2, H - 138);
+
+    ctx.save();
+    ctx.translate(W / 2, H / 2);
+    ctx.rotate(-Math.PI / 6);
+    ctx.fillStyle = "rgba(255,255,255,0.10)";
+    ctx.font = "bold 60px monospace";
+    ctx.textAlign = "center";
+    const spacing = 240;
+    for (let d = -H; d < H; d += spacing) {
+      ctx.fillText("BLACK MARKET", 0, d);
+    }
+    ctx.restore();
+
+    ctx.fillStyle = "#e11d48";
+    ctx.fillRect(0, H - 8, W * progress, 8);
+  };
+
   const handleDelete = () => {
     if (window.confirm(`Supprimer définitivement "${draft.title}" du catalogue ?`)) {
       onDelete(product);
@@ -338,9 +640,20 @@ export default function ProductEditor({ product, categories, isNew, onClose, onS
 
             {/* Gallery: additional product photos (carousel) */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider font-mono block">
-                Galerie photos (carrousel client) — {draft.gallery?.length || 0} photo(s) ajoutée(s)
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider font-mono block">
+                  Galerie photos (carrousel client) — {draft.gallery?.length || 0} photo(s)
+                </label>
+                <button
+                  onClick={handleGenerateAiGallery}
+                  disabled={generatingAiGallery}
+                  className="bg-brand-red/15 hover:bg-brand-red/25 border border-brand-red/40 text-brand-red px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold flex items-center gap-1.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Générer 3 photos de carrousel par IA (Pollinations Flux, gratuit, sans clé API)"
+                >
+                  {generatingAiGallery ? <Upload className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                  {generatingAiGallery ? "GÉNÉRATION..." : "GÉNÉRER 3 PHOTOS IA"}
+                </button>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {(draft.gallery || []).map((url, idx) => (
                   <div key={idx} className="relative w-16 h-16 rounded-lg overflow-hidden border border-zinc-800 group/g">
@@ -367,7 +680,7 @@ export default function ProductEditor({ product, categories, isNew, onClose, onS
                 </label>
               </div>
               <p className="text-[9px] text-zinc-600 font-mono leading-relaxed">
-                Sélectionnez plusieurs photos à la fois. Chacune est filigranée puis affichée en carrousel sur la fiche produit client.
+                Upload multiple filigrané automatiquement, ou génération de 3 photos publicitaires par IA (Pollinations, gratuit, sans clé API).
               </p>
             </div>
 
@@ -383,38 +696,71 @@ export default function ProductEditor({ product, categories, isNew, onClose, onS
                   )}
                 </div>
                 <div className="flex-1 space-y-2">
-                  <label className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-slate-300 px-3 py-2 rounded-lg text-[11px] font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-all w-fit">
-                    <Video className="w-3.5 h-3.5 text-brand-red" />
-                    {uploadingVideo ? "UPLOAD EN COURS..." : "UPLOADER UNE VIDÉO (MP4/WebM)"}
-                    <input
-                      type="file"
-                      accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"
-                      className="hidden"
-                      disabled={uploadingVideo}
-                      onChange={(e) => handleVideoFile(e.target.files?.[0])}
-                    />
-                  </label>
-                  {draft.videoUrl && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <label className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-slate-300 px-3 py-2 rounded-lg text-[11px] font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-all">
+                      <Video className="w-3.5 h-3.5 text-brand-red" />
+                      {uploadingVideo ? "UPLOAD EN COURS..." : "UPLOADER UNE VIDÉO (MP4/WebM)"}
+                      <input
+                        type="file"
+                        accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"
+                        className="hidden"
+                        disabled={uploadingVideo}
+                        onChange={(e) => handleVideoFile(e.target.files?.[0])}
+                      />
+                    </label>
                     <button
-                      onClick={() => set({ videoUrl: undefined })}
-                      className="text-[10px] text-red-400 font-mono hover:underline"
+                      onClick={handleGenerateAiVideo}
+                      disabled={generatingAiVideo}
+                      className="bg-brand-red/15 hover:bg-brand-red/25 border border-brand-red/40 text-brand-red px-3 py-2 rounded-lg text-[11px] font-mono font-bold flex items-center gap-1.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Générer une vidéo publicitaire IA (4 slides, visuels Flux + filigrane + CTA), puis l'attacher au produit"
                     >
-                      Retirer la vidéo
+                      {generatingAiVideo ? <Upload className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
+                      {generatingAiVideo ? "GÉNÉRATION VIDÉO IA..." : "GÉNÉRER VIDÉO PUB IA"}
                     </button>
-                  )}
+                    {draft.videoUrl && (
+                      <button
+                        onClick={() => set({ videoUrl: undefined })}
+                        className="text-[10px] text-red-400 font-mono hover:underline"
+                      >
+                        Retirer la vidéo
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* WYSIWYG: sales pitch */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider font-mono block">Argumentaire de vente (WYSIWYG)</label>
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider font-mono block">Argumentaire de vente (WYSIWYG)</label>
+                <button
+                  onClick={handleRefineDescription}
+                  disabled={refiningDesc}
+                  className="bg-brand-red/15 hover:bg-brand-red/25 border border-brand-red/40 text-brand-red px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold flex items-center gap-1.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Générer ou optimiser l'argumentaire de vente par IA (Gemini) : reprend l'actuel et l'améliore, ou en crée un selon le produit"
+                >
+                  {refiningDesc ? <Upload className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+                  {refiningDesc ? "GÉNÉRATION IA..." : "GÉNÉRER / OPTIMISER PAR IA"}
+                </button>
+              </div>
               <RichEditor value={draft.description} onChange={(html) => set({ description: html })} placeholder="Votre pitch de vente premium..." minHeight={130} />
             </div>
 
             {/* WYSIWYG: technical fiche */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider font-mono block">Fiche technique traduite (WYSIWYG)</label>
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider font-mono block">Fiche technique traduite (WYSIWYG)</label>
+                <button
+                  onClick={handleRefineTechnical}
+                  disabled={refiningTech}
+                  className="bg-brand-red/15 hover:bg-brand-red/25 border border-brand-red/40 text-brand-red px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold flex items-center gap-1.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Présenter la fiche technique par IA (Gemini) : arrange, ajuste la présentation ainsi que la quantité et la qualité des informations"
+                >
+                  {refiningTech ? <Upload className="w-3 h-3 animate-spin" /> : <FileCog className="w-3 h-3" />}
+                  {refiningTech ? "PRÉSENTATION IA..." : "PRÉSENTER PAR IA"}
+                </button>
+              </div>
               <RichEditor value={draft.originalDescription || ""} onChange={(html) => set({ originalDescription: html })} placeholder="Traduction technique détaillée..." minHeight={100} />
             </div>
 
