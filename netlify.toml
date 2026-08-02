@@ -28,6 +28,15 @@
   to = "/.netlify/functions/api/catalog.json"
   status = 200
 
+# Dynamic product pages: static /p/*.html files are served directly when they
+# exist (fast, pre-watermarked); any other /p/<id> is rendered live by the API
+# function from the current catalog (new products appear without a rebuild).
+[[redirects]]
+  from = "/p/*"
+  to = "/.netlify/functions/api/p/:splat"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

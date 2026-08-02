@@ -4,9 +4,10 @@ function escapeHtml(value: string | undefined | null): string {
   return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
-export function getProductPageHtml(p: Product, baseUrl: string, phoneNumber: string): string {
+export function getProductPageHtml(p: Product, baseUrl: string, phoneNumber: string, opts?: { ogImage?: string }): string {
   const pageUrl = baseUrl + "p/" + p.id + ".html";
   const imgUrl = baseUrl + "img/" + p.id + ".jpg";
+  const ogImage = (opts && opts.ogImage) || imgUrl;
   const title = escapeHtml(p.title);
   const descriptionMeta = escapeHtml(p.description);
   const category = escapeHtml(p.category || "EXCLUSIF");
@@ -40,10 +41,10 @@ export function getProductPageHtml(p: Product, baseUrl: string, phoneNumber: str
   <meta property="og:url" content="${pageUrl}">
   <meta property="og:title" content="${title}">
   <meta property="og:description" content="${descriptionMeta}">
-  <meta property="og:image" content="${imgUrl}">
+  <meta property="og:image" content="${ogImage}">
   <meta property="twitter:card" content="summary_large_image">
   <meta property="twitter:title" content="${title}">
-  <meta property="twitter:image" content="${imgUrl}">
+  <meta property="twitter:image" content="${ogImage}">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='32' height='32'%3E%3Crect width='24' height='24' rx='6' fill='%23ff2a2a'/%3E%3Cpath d='M12 2C12 2 15 5.5 15 8.5C15 11.5 12 14 12 14C12 14 9 11.5 9 8.5C9 5.5 12 2 12 2Z' fill='white'/%3E%3C/svg%3E" />
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin>
@@ -74,7 +75,7 @@ export function getProductPageHtml(p: Product, baseUrl: string, phoneNumber: str
     <div class="bg-[#15151e] rounded-3xl overflow-hidden border border-zinc-800 shadow-2xl">
       <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="relative aspect-square rounded-2xl overflow-hidden bg-zinc-950 border border-zinc-800">
-          <img src="${escapeHtml(imgUrl)}" alt="${title}" class="w-full h-full object-cover">
+          <img src="${escapeHtml(imgUrl)}" alt="${title}" onerror="this.onerror=null;this.src='${escapeHtml(p.imageUrl)}'" class="w-full h-full object-cover">
         </div>
         <div class="space-y-4 flex flex-col justify-between">
           <div class="space-y-3">
@@ -96,7 +97,7 @@ ${features}
 ${descriptionBlocks}
             </div>
           </div>
-          <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="bg-brand-red hover:bg-red-600 text-white font-extrabold text-sm py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-brand-red/10 font-mono uppercase tracking-widest">
+          <a href="${waUrl}" target="_blank" rel="noopener noreferrer" onclick="trackPreorder()" class="bg-brand-red hover:bg-red-600 text-white font-extrabold text-sm py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-brand-red/10 font-mono uppercase tracking-widest">
             💬 PRÉCOMMANDER VIA WHATSAPP
           </a>
         </div>
@@ -104,6 +105,20 @@ ${descriptionBlocks}
     </div>
     <p class="text-center text-[10px] text-zinc-600 font-mono mt-6">© 2026 BLACK MARKET CO. IMAGES PROTÉGÉES PAR FILIGRANE AUTOMATIQUE</p>
   </main>
+  <script>
+    // Real activity tracking: feeds the admin dashboard (clicks + pending lead order)
+    function trackPreorder() {
+      try {
+        fetch("/api/products/" + encodeURIComponent("${p.id}") + "/clicks", { method: "POST", keepalive: true }).catch(function () {});
+        fetch("/api/lead", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ productId: "${p.id}", quantity: 1 }),
+          keepalive: true,
+        }).catch(function () {});
+      } catch (e) {}
+    }
+  </script>
 </body>
 </html>
 `;

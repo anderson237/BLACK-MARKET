@@ -15,8 +15,6 @@ import CategoriesManager from "./components/CategoriesManager";
 import UsersManager from "./components/UsersManager";
 import Settings from "./components/Settings";
 import AIGenerator from "./components/AIGenerator";
-import MakeGuide from "./components/MakeGuide";
-import WhatsAppScriptPanel from "./components/WhatsAppScriptPanel";
 import {
   loginRequest,
   logoutRequest,
@@ -140,7 +138,7 @@ export default function App() {
       });
   }, [isLoggedIn]);
 
-  // Config (webhook/phone/currency) persisted in localStorage
+  // Config (phone/currency) persisted in localStorage
   const [config, setConfig] = useState<WebhookConfig>(
     loadConfig() ?? {
       phoneNumber: "237683963007",
@@ -148,7 +146,6 @@ export default function App() {
       githubRepo: "mon-pseudo/blackmarket-sheets",
       githubBranch: "main",
       githubToken: "",
-      makeWebhookUrl: "https://hook.eu1.make.com/xxxxxxxxxxxxxxxxxxxxxxxx",
     }
   );
 
@@ -222,17 +219,6 @@ export default function App() {
   const [aiState, setAiState] = useState<AIProcessingState>({ loading: false, error: null, success: false });
   const [generatedProduct, setGeneratedProduct] = useState<Product | null>(null);
 
-  // Copy status indicators for different guide parts
-  const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({});
-
-  const handleCopyText = (id: string, text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedStates((prev) => ({ ...prev, [id]: true }));
-    setTimeout(() => {
-      setCopiedStates((prev) => ({ ...prev, [id]: false }));
-    }, 2000);
-  };
-
   // Convert uploaded image file to Base64 for the server-side Gemini API
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -297,43 +283,7 @@ export default function App() {
     }
   };
 
-  const sendToWebhook = async (productToSend: Product) => {
-    const isWebhookConfigured =
-      config.makeWebhookUrl &&
-      config.makeWebhookUrl.trim() !== "" &&
-      !config.makeWebhookUrl.includes("xxxxxxxxxxxxxxxxxxxxxxxx");
-
-    if (!isWebhookConfigured) return;
-
-    try {
-      const response = await fetch(config.makeWebhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(productToSend),
-        mode: "cors",
-      });
-      if (response.ok) {
-        alert(`✅ Produit "${productToSend.title}" envoyé avec succès à votre Google Sheet via Make.com !`);
-      } else {
-        alert(`⚠️ Le webhook Make a répondu avec le statut ${response.status}. Vérifiez votre scénario.`);
-      }
-    } catch (err: any) {
-      console.error("Error sending to webhook:", err);
-      try {
-        await fetch(config.makeWebhookUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(productToSend),
-          mode: "no-cors",
-        });
-        alert("✅ Requête d'envoi transmise au Webhook Make (mode no-cors de secours).");
-      } catch (subErr) {
-        alert(`❌ Impossible d'envoyer au webhook Make.com : ${err.message || err}`);
-      }
-    }
-  };
-
-  // Append generated product to the catalog (local + server persistence + webhook)
+  // Append generated product to the catalog (local + server persistence)
   const addProductToCatalog = async () => {
     if (!generatedProduct) return;
 
@@ -344,8 +294,6 @@ export default function App() {
 
     // Persist to server (silent best-effort)
     saveProduct(productToSend).catch((err) => console.warn("Server persistence failed:", err));
-
-    await sendToWebhook(productToSend);
   };
 
   const handleDeleteProduct = async (product: Product) => {
@@ -522,12 +470,6 @@ export default function App() {
                   onInject={addProductToCatalog}
                   onRefuse={() => setGeneratedProduct(null)}
                 />
-              )}
-
-              {activeTab === "make_guide" && <MakeGuide copiedStates={copiedStates} onCopy={handleCopyText} />}
-
-              {activeTab === "whatsapp_script" && (
-                <WhatsAppScriptPanel copiedStates={copiedStates} onCopy={handleCopyText} />
               )}
             </div>
           </div>

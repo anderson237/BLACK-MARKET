@@ -6,8 +6,6 @@ import {
   Users,
   Tag,
   Sparkles,
-  Database,
-  Code,
   Settings as SettingsIcon,
   Flame,
   ShieldCheck,
@@ -34,8 +32,6 @@ const NAV: NavItem[] = [
   { id: "categories", label: "Catégories", icon: <Tag className="w-4 h-4" />, group: "Ventes" },
   { id: "users", label: "Utilisateurs", icon: <ShieldCheck className="w-4 h-4" />, group: "Système" },
   { id: "ai_generator", label: "Fiches IA", icon: <Sparkles className="w-4 h-4 text-yellow-400 fill-yellow-400" />, group: "Outils" },
-  { id: "make_guide", label: "Webhook Make", icon: <Database className="w-4 h-4" />, group: "Outils" },
-  { id: "whatsapp_script", label: "Script WhatsApp", icon: <Code className="w-4 h-4" />, group: "Outils" },
   { id: "settings", label: "Paramètres", icon: <SettingsIcon className="w-4 h-4" />, group: "Système" },
 ];
 

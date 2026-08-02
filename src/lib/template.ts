@@ -1,5 +1,5 @@
-// Self-contained public client template (GitHub Pages compatible).
-// Loads ./catalog.json (written by the Make.com webhook flow) and falls back
+// Self-contained public client template (Netlify compatible).
+// Loads ./catalog.json (served live from the admin database) and falls back
 // to embedded demo data when the file is absent.
 import { GOOGLE_CLIENT_ID } from "./constants";
 
@@ -15,7 +15,7 @@ export function getHtmlTemplateCode(opts?: { siteUrl?: string }): string {
 
   <!-- SEO Optimization -->
   <meta name="description" content="BLACK MARKET - SOURCING EXCLUSIF CHINE. Découvrez notre catalogue exclusif de produits tendance importés directement d'usines chinoises (Taobao, 1688) avec prix d'usine, précommande WhatsApp et livraison sécurisée.">
-  <meta name="keywords" content="sourcing chine, import chine, streetwear coréen, techwear, black market, grossiste chine, précommande chine, taobao, 1688, aliexpress, make webhook">
+  <meta name="keywords" content="sourcing chine, import chine, streetwear coréen, techwear, black market, grossiste chine, précommande chine, taobao, 1688, aliexpress">
   <meta name="robots" content="index, follow">
 
   <!-- Open Graph / Facebook -->
@@ -151,7 +151,7 @@ export function getHtmlTemplateCode(opts?: { siteUrl?: string }): string {
           </div>
 
           <div class="pt-3 border-t border-zinc-900 flex gap-2">
-            <a id="modal-wa-btn" href="" target="_blank" rel="noopener noreferrer" class="flex-1 bg-brand-red hover:bg-red-600 text-white font-extrabold text-xs py-3 px-4 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-md shadow-brand-red/10 font-mono text-center">
+            <a id="modal-wa-btn" href="" target="_blank" rel="noopener noreferrer" onclick="trackPreorder(currentModalId)" class="flex-1 bg-brand-red hover:bg-red-600 text-white font-extrabold text-xs py-3 px-4 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-md shadow-brand-red/10 font-mono text-center">
               💬 PRÉCOMMANDER VIA WHATSAPP
             </a>
             <button onclick="closeDetailsModal()" class="bg-zinc-800 hover:bg-zinc-700 text-slate-300 font-bold text-xs px-4 rounded-xl transition-all border border-zinc-700/50">Retour</button>
@@ -264,7 +264,7 @@ export function getHtmlTemplateCode(opts?: { siteUrl?: string }): string {
 
     let PRODUCTS = FALLBACK_PRODUCTS;
 
-    // ===== SYNC DEPUIS catalog.json (écrit par le webhook Make.com) =====
+    // ===== SYNC DEPUIS catalog.json (servi en direct depuis la base de données) =====
     async function loadCatalog() {
       try {
         const res = await fetch("./catalog.json", { cache: "no-store" });
@@ -282,6 +282,7 @@ export function getHtmlTemplateCode(opts?: { siteUrl?: string }): string {
 
     let selectedCategory = "Tous";
     let searchQuery = "";
+    var currentModalId = "";
 
     function renderCategories() {
       const container = document.getElementById("category-tabs");
@@ -346,6 +347,21 @@ export function getHtmlTemplateCode(opts?: { siteUrl?: string }): string {
         .join("");
     }
 
+    // ===== ACTIVITY TRACKING (real data for the admin dashboard) =====
+    // Fires on every PRÉCOMMANDER click: increments the product's click counter
+    // and creates a pending lead order that the admin can complete from WhatsApp.
+    function trackPreorder(productId) {
+      try {
+        fetch("/api/products/" + encodeURIComponent(productId) + "/clicks", { method: "POST", keepalive: true }).catch(function () {});
+        fetch("/api/lead", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ productId: productId, quantity: 1 }),
+          keepalive: true,
+        }).catch(function () {});
+      } catch (e) {}
+    }
+
     function renderGrid(itemsToRender) {
       let filterText = String(selectedCategory).toUpperCase();
       if (searchQuery) filterText += " & RECHERCHE";
@@ -382,7 +398,7 @@ export function getHtmlTemplateCode(opts?: { siteUrl?: string }): string {
               "</div>" +
               '<div class="flex items-center justify-between pt-2 border-t border-zinc-900">' +
                 '<div class="flex flex-col"><span class="text-[8px] text-zinc-500 font-mono">PRIX FACTORY</span><span class="font-extrabold text-slate-100 text-sm font-mono">' + priceStr + "</span></div>" +
-                '<a href="' + waUrl + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();" class="bg-brand-red text-white font-bold text-[11px] px-3.5 py-2 rounded-xl transition-all font-mono">PRÉCOMMANDER</a>' +
+                '<a href="' + waUrl + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();trackPreorder(' + escapeHtml(JSON.stringify(p.id)) + ');" class="bg-brand-red text-white font-bold text-[11px] px-3.5 py-2 rounded-xl transition-all font-mono">PRÉCOMMANDER</a>' +
               "</div>" +
             "</div>" +
           "</div>";
@@ -401,6 +417,7 @@ export function getHtmlTemplateCode(opts?: { siteUrl?: string }): string {
 
       var modalImg = document.getElementById("modal-image");
       delete modalImg.dataset.wm;
+      currentModalId = p.id;
       modalImg.onerror = function () {
         modalImg.onerror = null;
         modalImg.src = p.imageUrl;

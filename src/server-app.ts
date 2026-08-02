@@ -6,11 +6,15 @@ import dotenv from "dotenv";
 import { getStore } from "@netlify/blobs";
 import { GoogleGenAI, Type } from "@google/genai";
 import { INITIAL_PRODUCTS } from "./data";
+import { getProductPageHtml } from "./lib/productPage";
 
 dotenv.config();
 
 export function createApp() {
   const app = express();
+
+  const PUBLIC_BASE_URL = "https://blackmarket-import-export.netlify.app/";
+  const PHONE_NUMBER = "237683963007";
 
   // Enable JSON bodies with higher limits for base64 image uploads
   app.use(express.json({ limit: "15mb" }));
@@ -601,6 +605,74 @@ export function createApp() {
     if (next.length === orders.length) return res.status(404).json({ error: "Commande introuvable." });
     await saveOrders(next);
     res.json({ success: true });
+  });
+
+  // ---------------------------------------------------------------------------
+  // PUBLIC LEAD CAPTURE (client site -> real order data in the admin dashboard)
+  // A visitor clicking "PRÉCOMMANDER" creates a pending order (lead) that the
+  // admin can complete with the customer's real details from WhatsApp.
+  // ---------------------------------------------------------------------------
+  app.post("/api/lead", rateLimit(30, 60_000), async (req, res) => {
+    const productId = String(req.body?.productId || "");
+    const quantity = Math.max(1, Number(req.body?.quantity) || 1);
+    if (!productId) return res.status(400).json({ error: "Identifiant produit manquant." });
+
+    const products = await loadProducts();
+    const p = products.find((pp) => pp.id === productId);
+    if (!p) return res.status(404).json({ error: "Produit introuvable." });
+
+    // Increment the product's click counter (feeds top products / total clicks)
+    products[products.findIndex((pp) => pp.id === productId)] = {
+      ...p,
+      whatsappClicks: (Number(p.whatsappClicks) || 0) + 1,
+    };
+    await saveProducts(products);
+
+    const order = {
+      id: `ord_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      productId: p.id,
+      productTitle: String(p.title || "").slice(0, 200),
+      productImage: String(p.imageUrl || ""),
+      customerName: "Nouveau lead WhatsApp",
+      customerPhone: "",
+      customerLocation: "À confirmer",
+      quantity,
+      priceXof: Number(p.priceXof) || 0,
+      priceEur: Number(p.priceEur) || 0,
+      status: "pending",
+      createdAt: new Date().toISOString(),
+    };
+    const orders = await loadOrders();
+    orders.unshift(order);
+    await saveOrders(orders);
+    res.json({ success: true, order });
+  });
+
+  // ---------------------------------------------------------------------------
+  // DYNAMIC PRODUCT PAGES (client site) — rendered live from the catalog so new
+  // products added in the admin get a shareable /p/<id>.html page immediately,
+  // with current price / description / WhatsApp number.
+  // ---------------------------------------------------------------------------
+  app.get(["/p/:id", "/p/:id.html"], async (req, res) => {
+    const id = String(req.params.id || "").replace(/\.html$/i, "");
+    if (!id || !/^[a-zA-Z0-9_-]+$/.test(id)) {
+      return res.status(404).send("Produit introuvable.");
+    }
+    const products = await loadProducts();
+    const p = products.find((pp) => pp.id === id);
+    if (!p) {
+      return res.status(404).send("Produit introuvable.");
+    }
+    // The local watermarked copy img/<id>.jpg only exists for the products baked
+    // into the static build. For newer products use the stored (already
+    // watermarked) image URL as the OpenGraph image instead of a broken file.
+    const hasLocalImage = INITIAL_PRODUCTS.some((pp) => pp.id === p.id);
+    const html = getProductPageHtml(p, PUBLIC_BASE_URL, PHONE_NUMBER, {
+      ogImage: hasLocalImage ? undefined : p.imageUrl,
+    });
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=300");
+    res.send(html);
   });
 
   app.get("/api/stats", requireAuth, async (_req, res) => {

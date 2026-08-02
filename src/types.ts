@@ -22,7 +22,6 @@ export interface WebhookConfig {
   githubRepo: string;
   githubBranch: string;
   githubToken: string;
-  makeWebhookUrl: string;
   siteUrl?: string;
 }
 
@@ -79,8 +78,6 @@ export type TabId =
   | "categories"
   | "users"
   | "ai_generator"
-  | "make_guide"
-  | "whatsapp_script"
   | "settings";
 
 export interface UserLogin {

@@ -43,7 +43,7 @@
     <div class="bg-[#15151e] rounded-3xl overflow-hidden border border-zinc-800 shadow-2xl">
       <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="relative aspect-square rounded-2xl overflow-hidden bg-zinc-950 border border-zinc-800">
-          <img src="https://blackmarket-import-export.netlify.app/img/prod_7.jpg" alt="NeoPulse™ X-Series: Écouteurs TWS RGB | Son Cristal, Style Urbain" class="w-full h-full object-cover">
+          <img src="https://blackmarket-import-export.netlify.app/img/prod_7.jpg" alt="NeoPulse™ X-Series: Écouteurs TWS RGB | Son Cristal, Style Urbain" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&amp;fit=crop&amp;q=80&amp;w=600'" class="w-full h-full object-cover">
         </div>
         <div class="space-y-4 flex flex-col justify-between">
           <div class="space-y-3">
@@ -69,7 +69,7 @@
 <p class="text-xs text-zinc-300 leading-relaxed indent-4">Plongez au cœur de l&#39;action avec les NeoPulse™ X-Series, vos nouveaux compagnons audio pour une expérience sonore sans compromis. Leur design futuriste illuminé par des lumières RGB pulsaire vous propulse dans l&#39;esthétique cyberpunk, tandis que la puce Bluetooth 5.3 et le mode gaming à faible latence garantissent une synchronisation parfaite entre l&#39;image et le son. Bénéficiez d&#39;appels cristallins grâce à la réduction de bruit double micro et d&#39;une autonomie de 30 heures pour dominer chaque session, que ce soit en jeu ou en ville.</p>
             </div>
           </div>
-          <a href="https://wa.me/237683963007?text=Bonjour%20BLACK%20MARKET%2C%20%F0%9F%91%8B%0A%0AJe%20souhaite%20passer%20une%20PR%C3%89COMMANDE%20pour%20le%20produit%20suivant%20%3A%0A%0A%20%20%F0%9F%93%A6%20PRODUIT%20%3A%20NEOPULSE%E2%84%A2%20X-SERIES%3A%20%C3%89COUTEURS%20TWS%20RGB%20%7C%20SON%20CRISTAL%2C%20STYLE%20URBAIN%0A%20%20%F0%9F%92%B0%20PRIX%20%3A%2010%E2%80%AF500%20F%20CFA%20(%E2%89%88%2016%20%E2%82%AC)%0A%20%20%F0%9F%94%97%20FICHE%20PRODUIT%20%3A%20https%3A%2F%2Fblackmarket-import-export.netlify.app%2Fp%2Fprod_7.html%0A%0AMerci%20de%20me%20confirmer%20la%20disponibilit%C3%A9%2C%20le%20d%C3%A9lai%20de%20livraison%20et%20les%20modalit%C3%A9s%20de%20paiement.%0A%0ADans%20l'attente%20de%20votre%20retour%2C%20je%20vous%20prie%20d'agr%C3%A9er%20mes%20salutations%20distingu%C3%A9es." target="_blank" rel="noopener noreferrer" class="bg-brand-red hover:bg-red-600 text-white font-extrabold text-sm py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-brand-red/10 font-mono uppercase tracking-widest">
+          <a href="https://wa.me/237683963007?text=Bonjour%20BLACK%20MARKET%2C%20%F0%9F%91%8B%0A%0AJe%20souhaite%20passer%20une%20PR%C3%89COMMANDE%20pour%20le%20produit%20suivant%20%3A%0A%0A%20%20%F0%9F%93%A6%20PRODUIT%20%3A%20NEOPULSE%E2%84%A2%20X-SERIES%3A%20%C3%89COUTEURS%20TWS%20RGB%20%7C%20SON%20CRISTAL%2C%20STYLE%20URBAIN%0A%20%20%F0%9F%92%B0%20PRIX%20%3A%2010%E2%80%AF500%20F%20CFA%20(%E2%89%88%2016%20%E2%82%AC)%0A%20%20%F0%9F%94%97%20FICHE%20PRODUIT%20%3A%20https%3A%2F%2Fblackmarket-import-export.netlify.app%2Fp%2Fprod_7.html%0A%0AMerci%20de%20me%20confirmer%20la%20disponibilit%C3%A9%2C%20le%20d%C3%A9lai%20de%20livraison%20et%20les%20modalit%C3%A9s%20de%20paiement.%0A%0ADans%20l'attente%20de%20votre%20retour%2C%20je%20vous%20prie%20d'agr%C3%A9er%20mes%20salutations%20distingu%C3%A9es." target="_blank" rel="noopener noreferrer" onclick="trackPreorder()" class="bg-brand-red hover:bg-red-600 text-white font-extrabold text-sm py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-brand-red/10 font-mono uppercase tracking-widest">
             💬 PRÉCOMMANDER VIA WHATSAPP
           </a>
         </div>
@@ -77,5 +77,19 @@
     </div>
     <p class="text-center text-[10px] text-zinc-600 font-mono mt-6">© 2026 BLACK MARKET CO. IMAGES PROTÉGÉES PAR FILIGRANE AUTOMATIQUE</p>
   </main>
+  <script>
+    // Real activity tracking: feeds the admin dashboard (clicks + pending lead order)
+    function trackPreorder() {
+      try {
+        fetch("/api/products/" + encodeURIComponent("prod_7") + "/clicks", { method: "POST", keepalive: true }).catch(function () {});
+        fetch("/api/lead", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ productId: "prod_7", quantity: 1 }),
+          keepalive: true,
+        }).catch(function () {});
+      } catch (e) {}
+    }
+  </script>
 </body>
 </html>

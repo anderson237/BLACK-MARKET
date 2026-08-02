@@ -84,7 +84,7 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
     const intervals = [
       "Nouveau produit détecté sur WeChat : Hoodie réfléchissant",
       "Calcul des marges à 60% appliqué via Google Sheets",
-      "Webhook Make.com déclenché avec succès pour 1 article",
+      "Fiche produit enregistrée dans la base de données",
       "Frais de douane estimés mis à jour pour la zone CEDEAO",
       "Lot expédié vers l'entrepôt de tri de Shenzhen",
       "Traduction IA finalisée : Lunettes de soleil néon Y2K",
@@ -371,7 +371,7 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
           {/* Sourcing footer status */}
           <div className="mt-4 pt-3 border-t border-zinc-800 flex items-center justify-between text-[9px] font-mono text-zinc-400">
             <span className="flex items-center gap-1">
-              <Database className="w-3 h-3 text-brand-red" /> Webhook: CONNECTED TO MAKE.COM
+              <Database className="w-3 h-3 text-brand-red" /> DONNÉES: PERSISTÉES EN BASE
             </span>
             <span className="text-brand-red font-bold">LIVE STREAM</span>
           </div>
@@ -1113,52 +1113,12 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
                       </div>
                     )}
 
-                    {/* Manual Sync Button with Webhook */}
+                    {/* Product saved to the live database (no external webhook needed) */}
                     <div className="pt-2">
-                      <button
-                        onClick={async () => {
-                          const isWebhookConfigured = config.makeWebhookUrl && 
-                                                      config.makeWebhookUrl.trim() !== "" && 
-                                                      !config.makeWebhookUrl.includes("xxxxxxxxxxxxxxxxxxxxxxxx");
-                          if (!isWebhookConfigured) {
-                            alert(`⚠️ URL Webhook non configurée.\n\nVeuillez d'abord renseigner votre véritable URL de Webhook Make.com dans le champ "WEBHOOK MAKE" situé tout en haut de la console d'administration !`);
-                            return;
-                          }
-
-                          try {
-                            const response = await fetch(config.makeWebhookUrl, {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify(selectedProductForDetails),
-                              mode: "cors"
-                            });
-
-                            if (response.ok) {
-                              alert(`✅ Produit "${selectedProductForDetails.title}" envoyé avec succès à votre Google Sheet via Make.com !`);
-                            } else {
-                              alert(`⚠️ Réponse du Webhook : Statut ${response.status}. Veuillez vérifier votre scénario Make.com.`);
-                            }
-                          } catch (err: any) {
-                            console.error(err);
-                            // Fallback to no-cors mode
-                            try {
-                              await fetch(config.makeWebhookUrl, {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify(selectedProductForDetails),
-                                mode: "no-cors"
-                              });
-                              alert(`✅ Requête d'envoi transmise au Webhook (mode no-cors de secours).`);
-                            } catch (subErr) {
-                              alert(`❌ Erreur d'envoi au webhook : ${err.message || err}`);
-                            }
-                          }
-                        }}
-                        className="w-full bg-[#12121a] hover:bg-zinc-800 text-slate-300 border border-zinc-800 rounded-xl py-2 px-4 text-xs font-mono font-bold flex items-center justify-center gap-2 transition-all hover:border-brand-red/30"
-                      >
-                        <Database className="w-3.5 h-3.5 text-brand-red animate-pulse" />
-                        <span>SYNCHRONISER VERS GOOGLE SHEET (MAKE)</span>
-                      </button>
+                      <div className="w-full bg-[#12121a] border border-zinc-800 rounded-xl py-2 px-4 text-xs font-mono font-bold flex items-center justify-center gap-2">
+                        <Database className="w-3.5 h-3.5 text-brand-red" />
+                        <span>SAUVEGARDÉ DANS LA BASE DE DONNÉES (EN DIRECT)</span>
+                      </div>
                     </div>
                   </div>
 

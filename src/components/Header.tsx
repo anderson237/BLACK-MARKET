@@ -51,18 +51,6 @@ export default function Header({ config, onConfigChange, onLogout }: HeaderProps
             />
           </div>
 
-          <div className="flex items-center gap-2 bg-black border border-zinc-800 px-3 py-1.5 rounded-xl text-xs font-mono">
-            <span className="text-zinc-500">WEBHOOK MAKE :</span>
-            <input
-              type="text"
-              className="bg-transparent font-bold text-slate-200 w-44 focus:outline-none text-left truncate placeholder-zinc-700"
-              value={config.makeWebhookUrl}
-              onChange={(e) => onConfigChange({ ...config, makeWebhookUrl: e.target.value })}
-              placeholder="https://hook.eu1.make.com/..."
-              title={config.makeWebhookUrl}
-            />
-          </div>
-
           <a
             href="/"
             className="bg-zinc-900 hover:bg-brand-red/20 text-zinc-400 hover:text-brand-red border border-zinc-800 px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer"
