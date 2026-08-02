@@ -1,9 +1,10 @@
 import React, { useState } from "react";
-import { X, Save, Trash2, Plus, Image as ImageIcon, Upload, Video, Clapperboard } from "lucide-react";
+import { X, Save, Trash2, Plus, Image as ImageIcon, Upload, Video, Clapperboard, Sparkles } from "lucide-react";
 import { Product } from "../types";
 import RichEditor from "./RichEditor";
 import { motion, AnimatePresence } from "motion/react";
 import { getToken } from "../lib/api";
+import { generateAdImage, uploadWatermarkedImage } from "../lib/aiAds";
 
 interface ProductEditorProps {
   product: Product;
@@ -18,6 +19,7 @@ export default function ProductEditor({ product, categories, isNew, onClose, onS
   const [draft, setDraft] = useState<Product>({ ...product, features: [...product.features], gallery: [...(product.gallery || [])] });
   const [uploading, setUploading] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [generatingAi, setGeneratingAi] = useState(false);
   const [uploadError, setUploadError] = useState("");
 
   const set = (patch: Partial<Product>) => setDraft((d) => ({ ...d, ...patch }));
@@ -195,6 +197,27 @@ export default function ProductEditor({ product, categories, isNew, onClose, onS
     onClose();
   };
 
+  // Generate an AI-driven ad photo for this product (Pollinations, free, no key),
+  // watermark it client-side and persist it through the uploader.
+  const handleGenerateAiPhoto = async () => {
+    if (generatingAi) return;
+    if (!draft.title.trim() && !draft.description.trim()) {
+      setUploadError("Renseignez au moins un titre pour générer une photo IA pertinente.");
+      return;
+    }
+    setGeneratingAi(true);
+    setUploadError("");
+    try {
+      const dataUrl = await generateAdImage(draft);
+      const url = await uploadWatermarkedImage(dataUrl);
+      set({ imageUrl: url });
+    } catch (e: any) {
+      setUploadError(e?.message || "Échec de la génération IA (Pollinations). Réessayez.");
+    } finally {
+      setGeneratingAi(false);
+    }
+  };
+
   const handleDelete = () => {
     if (window.confirm(`Supprimer définitivement "${draft.title}" du catalogue ?`)) {
       onDelete(product);
@@ -291,6 +314,15 @@ export default function ProductEditor({ product, categories, isNew, onClose, onS
                         onChange={(e) => handleImageFile(e.target.files?.[0])}
                       />
                     </label>
+                    <button
+                      onClick={handleGenerateAiPhoto}
+                      disabled={generatingAi}
+                      className="bg-brand-red/15 hover:bg-brand-red/25 border border-brand-red/40 text-brand-red px-3 py-2 rounded-lg text-[11px] font-mono font-bold flex items-center gap-1.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Générer une photo publicitaire IA (Pollinations Flux, gratuit, sans clé API)"
+                    >
+                      {generatingAi ? <Upload className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                      {generatingAi ? "GÉNÉRATION IA..." : "GÉNÉRER PHOTO PUB IA"}
+                    </button>
                     {draft.imageUrl && draft.imageUrl.startsWith("/api/img/") && (
                       <span className="text-[9px] text-green-500 font-mono">FILIGRANÉE ✔</span>
                     )}

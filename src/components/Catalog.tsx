@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import ProductEditor from "./ProductEditor";
+import { loadImage, pollinationsImageUrl, buildAdPrompt } from "../lib/aiAds";
 
 interface CatalogProps {
   products: Product[];
@@ -88,6 +89,9 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
   const [exportingVideo, setExportingVideo] = useState<boolean>(false);
   const [exportStatus, setExportStatus] = useState<string>("");
   const [creatingNewProduct, setCreatingNewProduct] = useState<boolean>(false);
+  const [generatingAiSlides, setGeneratingAiSlides] = useState<boolean>(false);
+  const [aiSlidesReady, setAiSlidesReady] = useState<boolean>(false);
+  const aiSlidesRef = useRef<Record<string, HTMLImageElement[]>>({});
 
   // Interactive Sourcing Tool State (Simulated Korean interactive widgets)
   const [rmbRate, setRmbRate] = useState<number>(91.5); // 1 RMB = 91.5 XOF
@@ -358,31 +362,42 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
     idx: number,
     progress: number,
     img: HTMLImageElement | null,
+    aiBg: HTMLImageElement | null,
     W: number,
     H: number
   ) => {
     const s = slides[idx];
 
-    // Background gradient (9:16 vertical)
-    const grad = ctx.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, "#1d0404");
-    grad.addColorStop(0.5, "#000000");
-    grad.addColorStop(1, "#10030c");
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, W, H);
-
-    // Subtle product image backdrop
-    if (img) {
-      const cover = Math.max(W / img.width, H / img.height);
-      const dw = img.width * cover;
-      const dh = img.height * cover;
-      ctx.save();
-      ctx.globalAlpha = 0.28;
-      ctx.filter = "blur(6px)";
-      ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
-      ctx.restore();
+    // AI-generated slide background (if available) drawn full-cover
+    if (aiBg) {
+      const cover = Math.max(W / aiBg.width, H / aiBg.height);
+      const dw = aiBg.width * cover;
+      const dh = aiBg.height * cover;
+      ctx.drawImage(aiBg, (W - dw) / 2, (H - dh) / 2, dw, dh);
       ctx.fillStyle = "rgba(0,0,0,0.45)";
       ctx.fillRect(0, 0, W, H);
+    } else {
+      // Background gradient (9:16 vertical)
+      const grad = ctx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, "#1d0404");
+      grad.addColorStop(0.5, "#000000");
+      grad.addColorStop(1, "#10030c");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+
+      // Subtle product image backdrop
+      if (img) {
+        const cover = Math.max(W / img.width, H / img.height);
+        const dw = img.width * cover;
+        const dh = img.height * cover;
+        ctx.save();
+        ctx.globalAlpha = 0.28;
+        ctx.filter = "blur(6px)";
+        ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+        ctx.restore();
+        ctx.fillStyle = "rgba(0,0,0,0.45)";
+        ctx.fillRect(0, 0, W, H);
+      }
     }
 
     const pad = Math.round(W * 0.08);
@@ -501,6 +516,7 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
       if (!ctx) throw new Error("Canvas non supporté.");
 
       const img = await loadImageForVideo(product.imageUrl);
+      const aiBgs = aiSlidesRef.current[product.id] || [];
       const stream = canvas.captureStream(FPS);
       const mime = MediaRecorder.isTypeSupported("video/mp4")
         ? "video/mp4"
@@ -531,7 +547,7 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
         }
         const idx = Math.min(slides.length - 1, Math.floor(elapsed / SLIDE_MS));
         const progress = Math.min(1, (elapsed % SLIDE_MS) / SLIDE_MS);
-        drawVideoFrame(ctx, product, slides, idx, progress, img, W, H);
+        drawVideoFrame(ctx, product, slides, idx, progress, img, aiBgs[idx] || null, W, H);
         requestAnimationFrame(frame);
       };
       requestAnimationFrame(frame);
@@ -553,6 +569,45 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
       setExportStatus("Erreur d'export : " + (e?.message || "inconnue"));
     } finally {
       setExportingVideo(false);
+      setTimeout(() => setExportStatus(""), 4000);
+    }
+  };
+
+  // Generate 4 AI-driven ad visuals (one per slide) via Pollinations (free, no key).
+  const generateAiSlideBackgrounds = async (product: Product) => {
+    if (generatingAiSlides) return;
+    setGeneratingAiSlides(true);
+    setAiSlidesReady(false);
+    setExportStatus("Génération des visuels IA (Flux)...");
+    try {
+      const slides = getProductSlides(product);
+      const prompts = slides.map((s, i) =>
+        buildAdPrompt({
+          title: product.title,
+          description: product.description,
+          category: product.category,
+        }) + `, scene ${i + 1}: ${s.subtitle.replace(/[^\wÀ-ÿ -]/g, "")}`
+      );
+      const results: HTMLImageElement[] = [];
+      for (let i = 0; i < prompts.length; i++) {
+        setExportStatus(`Visuel IA ${i + 1}/${prompts.length}...`);
+        const url = pollinationsImageUrl(prompts[i], 720, 1280, 1000 + i * 7);
+        try {
+          const img = await loadImage(url);
+          results.push(img);
+        } catch {
+          // keep going; a failed visual falls back to the gradient/product backdrop
+          results.push(null as any);
+        }
+      }
+      aiSlidesRef.current[product.id] = results;
+      setAiSlidesReady(true);
+      setExportStatus("Visuels IA prêts ✓");
+    } catch (e: any) {
+      console.error("Génération visuels IA échouée:", e);
+      setExportStatus("Erreur de génération IA : " + (e?.message || "inconnue"));
+    } finally {
+      setGeneratingAiSlides(false);
       setTimeout(() => setExportStatus(""), 4000);
     }
   };
@@ -1227,12 +1282,26 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
                         <strong className="text-zinc-200 font-mono">Filigrane indélébile</strong> : « BLACK MARKET © 2026 » est dessiné sur chaque frame du rendu — impossible à retirer sans dégrader la vidéo.
                       </li>
                       <li>
-                        <strong className="text-zinc-200 font-mono">Aucun service tiers</strong> : pas de Make, Creatomate ni Bannerbear. L'export fonctionne hors-ligne.
+                        <strong className="text-zinc-200 font-mono">Visuels IA (optionnel)</strong> : générez un fond Flux par slide via Pollinations (gratuit, sans clé) pour une pub 100% AI-driven.
                       </li>
                     </ul>
                     <button
+                      onClick={() => generateAiSlideBackgrounds(activeVideoProduct)}
+                      disabled={generatingAiSlides || exportingVideo}
+                      className="w-full bg-black hover:bg-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed border border-brand-red/40 text-brand-red font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer"
+                    >
+                      {generatingAiSlides ? <Loader className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                      <span>
+                        {generatingAiSlides
+                          ? "GÉNÉRATION DES VISUELS IA (4/4)..."
+                          : aiSlidesReady
+                          ? "VISUELS IA PRÊTS — RÉGÉNÉRER (4 IMAGES)"
+                          : "GÉNÉRER LES VISUELS IA (FOND 4 SLIDES)"}
+                      </span>
+                    </button>
+                    <button
                       onClick={() => exportProductVideo(activeVideoProduct)}
-                      disabled={exportingVideo}
+                      disabled={exportingVideo || generatingAiSlides}
                       className="w-full bg-brand-red hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm py-3 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer border border-brand-red/50 shadow-lg shadow-brand-red/20"
                     >
                       {exportingVideo ? <Loader className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
