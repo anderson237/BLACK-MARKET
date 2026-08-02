@@ -326,6 +326,12 @@ export default function App() {
     saveProduct(updated).catch((err) => console.warn("Server update failed:", err));
   };
 
+  const handleAddProduct = async (newProduct: Product) => {
+    setProducts((prev) => [newProduct, ...prev]);
+    saveProduct(newProduct).catch((err) => console.warn("Server create failed:", err));
+    refreshDashboard();
+  };
+
   const handleIncrementClicks = useCallback((product: Product) => {
     setProducts((prev) =>
       prev.map((p) => (p.id === product.id ? { ...p, whatsappClicks: (p.whatsappClicks || 0) + 1 } : p))
@@ -446,6 +452,7 @@ export default function App() {
                   onIncrementClicks={handleIncrementClicks}
                   onDeleteProduct={handleDeleteProduct}
                   onUpdateProduct={handleUpdateProduct}
+                  onAddProduct={handleAddProduct}
                 />
               )}
 

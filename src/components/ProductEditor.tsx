@@ -8,12 +8,13 @@ import { getToken } from "../lib/api";
 interface ProductEditorProps {
   product: Product;
   categories: string[];
+  isNew?: boolean;
   onClose: () => void;
   onSave: (product: Product) => void;
   onDelete: (product: Product) => void;
 }
 
-export default function ProductEditor({ product, categories, onClose, onSave, onDelete }: ProductEditorProps) {
+export default function ProductEditor({ product, categories, isNew, onClose, onSave, onDelete }: ProductEditorProps) {
   const [draft, setDraft] = useState<Product>({ ...product, features: [...product.features] });
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
@@ -140,7 +141,9 @@ export default function ProductEditor({ product, categories, onClose, onSave, on
                 <Save className="w-4 h-4 text-white" />
               </div>
               <div>
-                <h3 className="font-extrabold text-sm uppercase tracking-wider font-mono">Éditeur Produit WYSIWYG</h3>
+                <h3 className="font-extrabold text-sm uppercase tracking-wider font-mono">
+                  {isNew ? "Nouveau Produit" : "Éditeur Produit WYSIWYG"}
+                </h3>
                 <p className="text-[10px] text-white/80">BLACK MARKET // Fiche #{product.id}</p>
               </div>
             </div>
@@ -271,15 +274,17 @@ export default function ProductEditor({ product, categories, onClose, onSave, on
               className="flex-1 bg-brand-red hover:bg-red-700 text-white font-bold text-xs py-3 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer border border-brand-red/45"
             >
               <Save className="w-4 h-4" />
-              ENREGISTRER LES MODIFICATIONS
+              {isNew ? "CRÉER LE PRODUIT" : "ENREGISTRER LES MODIFICATIONS"}
             </button>
-            <button
-              onClick={handleDelete}
-              className="bg-red-950/60 hover:bg-red-900/60 text-red-400 border border-red-900/50 px-4 py-3 rounded-xl text-xs font-bold font-mono flex items-center gap-2 transition-all"
-            >
-              <Trash2 className="w-4 h-4" />
-              SUPPRIMER
-            </button>
+            {!isNew && (
+              <button
+                onClick={handleDelete}
+                className="bg-red-950/60 hover:bg-red-900/60 text-red-400 border border-red-900/50 px-4 py-3 rounded-xl text-xs font-bold font-mono flex items-center gap-2 transition-all"
+              >
+                <Trash2 className="w-4 h-4" />
+                SUPPRIMER
+              </button>
+            )}
             <button onClick={onClose} className="bg-zinc-900 hover:bg-zinc-800 text-zinc-400 px-5 py-3 rounded-xl text-xs font-bold transition-all">
               ANNULER
             </button>

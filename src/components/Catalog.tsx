@@ -15,6 +15,7 @@ import {
   RotateCcw, 
   Volume2, 
   VolumeX,
+  Plus,
   Smartphone,
   MessageSquare,
   Activity,
@@ -29,7 +30,9 @@ import {
   Globe,
   Database,
   Trash2,
-  Pencil
+  Pencil,
+  Download,
+  Loader
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import ProductEditor from "./ProductEditor";
@@ -40,10 +43,28 @@ interface CatalogProps {
   onIncrementClicks?: (product: Product) => void;
   onDeleteProduct?: (product: Product) => void;
   onUpdateProduct?: (product: Product) => void;
+  onAddProduct?: (product: Product) => void;
   config: WebhookConfig;
 }
 
-export default function Catalog({ products, config, onIncrementClicks, onDeleteProduct, onUpdateProduct }: CatalogProps) {
+const createBlankProduct = (): Product => ({
+  id: `prod_${Date.now()}`,
+  title: "",
+  chineseTitle: "",
+  description: "",
+  originalDescription: "",
+  chineseDescription: "",
+  features: [],
+  priceEur: 0,
+  priceXof: 0,
+  imageUrl: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&q=80&w=600",
+  category: "Nouveautés",
+  whatsappClicks: 0,
+  sourceRmb: undefined,
+  createdAt: new Date().toISOString(),
+});
+
+export default function Catalog({ products, config, onIncrementClicks, onDeleteProduct, onUpdateProduct, onAddProduct }: CatalogProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>("Tous");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedProductForWa, setSelectedProductForWa] = useState<Product | null>(null);
@@ -63,6 +84,9 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
   const [currentSlideIndex, setCurrentSlideIndex] = useState<number>(0);
   const [isMuted, setIsMuted] = useState<boolean>(true);
   const [synthAudioActive, setSynthAudioActive] = useState<boolean>(false);
+  const [exportingVideo, setExportingVideo] = useState<boolean>(false);
+  const [exportStatus, setExportStatus] = useState<string>("");
+  const [creatingNewProduct, setCreatingNewProduct] = useState<boolean>(false);
 
   // Interactive Sourcing Tool State (Simulated Korean interactive widgets)
   const [rmbRate, setRmbRate] = useState<number>(91.5); // 1 RMB = 91.5 XOF
@@ -308,6 +332,229 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
     ];
   };
 
+  const wrapText = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] => {
+    const words = text.split(/\s+/);
+    const lines: string[] = [];
+    let line = "";
+    for (const word of words) {
+      const test = line ? line + " " + word : word;
+      if (ctx.measureText(test).width > maxWidth && line) {
+        lines.push(line);
+        line = word;
+      } else {
+        line = test;
+      }
+    }
+    if (line) lines.push(line);
+    return lines;
+  };
+
+  const drawVideoFrame = (
+    ctx: CanvasRenderingContext2D,
+    product: Product,
+    slides: ReturnType<typeof getProductSlides>,
+    idx: number,
+    progress: number,
+    img: HTMLImageElement | null,
+    W: number,
+    H: number
+  ) => {
+    const s = slides[idx];
+
+    // Background gradient (9:16 vertical)
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, "#1d0404");
+    grad.addColorStop(0.5, "#000000");
+    grad.addColorStop(1, "#10030c");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    // Subtle product image backdrop
+    if (img) {
+      const cover = Math.max(W / img.width, H / img.height);
+      const dw = img.width * cover;
+      const dh = img.height * cover;
+      ctx.save();
+      ctx.globalAlpha = 0.28;
+      ctx.filter = "blur(6px)";
+      ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+      ctx.restore();
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    const pad = Math.round(W * 0.08);
+
+    // Badge pill (top)
+    ctx.fillStyle = "#e11d48";
+    ctx.beginPath();
+    ctx.roundRect(pad, 48, Math.min(W - pad * 2, 260), 44, 22);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 24px monospace";
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "center";
+    ctx.fillText(s.badge.toUpperCase(), pad + Math.min(W - pad * 2, 260) / 2, 70);
+
+    // Slide progress dots (top-right)
+    for (let i = 0; i < slides.length; i++) {
+      ctx.fillStyle = i === idx ? "#e11d48" : "rgba(255,255,255,0.25)";
+      ctx.beginPath();
+      ctx.arc(W - pad - (slides.length - i) * 26 + 13, 70, 7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Subtitle
+    ctx.fillStyle = "#e11d48";
+    ctx.font = "bold 26px monospace";
+    ctx.textAlign = "left";
+    ctx.fillText(s.subtitle.toUpperCase(), pad, H * 0.32);
+
+    // Title (wrapped, uppercase, kinetic)
+    ctx.fillStyle = "#fafafa";
+    ctx.font = "900 52px Arial, sans-serif";
+    const titleLines = wrapText(ctx, s.title.toUpperCase(), W - pad * 2).slice(0, 4);
+    let ty = H * 0.38;
+    for (const ln of titleLines) {
+      ctx.fillText(ln, pad, ty);
+      ty += 62;
+    }
+
+    // Description text
+    ctx.fillStyle = "rgba(226,232,240,0.92)";
+    ctx.font = "26px Arial, sans-serif";
+    const bodyLines = wrapText(ctx, s.text, W - pad * 2).slice(0, 6);
+    ty += 18;
+    for (const ln of bodyLines) {
+      ctx.fillText(ln, pad, ty);
+      ty += 38;
+    }
+
+    // CTA bottom
+    if (idx === slides.length - 1) {
+      ctx.fillStyle = "#e11d48";
+      ctx.beginPath();
+      ctx.roundRect(pad, H - 190, W - pad * 2, 92, 24);
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 34px Arial, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("PRÉCOMMANDER SUR WHATSAPP", W / 2, H - 138);
+    } else {
+      ctx.fillStyle = "rgba(0,0,0,0.5)";
+      ctx.beginPath();
+      ctx.roundRect(pad, H - 170, W - pad * 2, 76, 20);
+      ctx.fill();
+      ctx.fillStyle = "#e11d48";
+      ctx.font = "bold 26px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("BLACK MARKET © 2026", W / 2, H - 124);
+    }
+
+    // Security watermark (diagonal, repeated)
+    ctx.save();
+    ctx.translate(W / 2, H / 2);
+    ctx.rotate(-Math.PI / 6);
+    ctx.fillStyle = "rgba(255,255,255,0.10)";
+    ctx.font = "bold 60px monospace";
+    ctx.textAlign = "center";
+    const spacing = 240;
+    for (let d = -H; d < H; d += spacing) {
+      ctx.fillText("BLACK MARKET", 0, d);
+    }
+    ctx.restore();
+
+    // Slide progress bar (bottom)
+    ctx.fillStyle = "#e11d48";
+    ctx.fillRect(0, H - 8, W * progress, 8);
+  };
+
+  const loadImageForVideo = (src: string): Promise<HTMLImageElement | null> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = src;
+    });
+  };
+
+  // Export a real 9:16 MP4/WebM video client-side (no external service needed).
+  const exportProductVideo = async (product: Product) => {
+    if (exportingVideo) return;
+    setExportingVideo(true);
+    setExportStatus("Préparation du rendu...");
+    try {
+      const W = 720;
+      const H = 1280;
+      const slides = getProductSlides(product);
+      const SLIDE_MS = 3000;
+      const TOTAL_MS = slides.length * SLIDE_MS;
+      const FPS = 30;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas non supporté.");
+
+      const img = await loadImageForVideo(product.imageUrl);
+      const stream = canvas.captureStream(FPS);
+      const mime = MediaRecorder.isTypeSupported("video/mp4")
+        ? "video/mp4"
+        : MediaRecorder.isTypeSupported("video/webm")
+        ? "video/webm"
+        : "video/webm;codecs=vp9";
+      const recorder = new MediaRecorder(stream, {
+        mimeType: mime,
+        videoBitsPerSecond: 6_000_000,
+      });
+      const chunks: BlobPart[] = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+
+      const finished = new Promise<void>((resolve) => {
+        recorder.onstop = () => resolve();
+      });
+
+      recorder.start(200);
+      const startTime = performance.now();
+
+      const frame = () => {
+        const elapsed = performance.now() - startTime;
+        if (elapsed >= TOTAL_MS) {
+          recorder.stop();
+          return;
+        }
+        const idx = Math.min(slides.length - 1, Math.floor(elapsed / SLIDE_MS));
+        const progress = Math.min(1, (elapsed % SLIDE_MS) / SLIDE_MS);
+        drawVideoFrame(ctx, product, slides, idx, progress, img, W, H);
+        requestAnimationFrame(frame);
+      };
+      requestAnimationFrame(frame);
+
+      await finished;
+      const blob = new Blob(chunks, { type: mime });
+      const ext = mime.includes("mp4") ? "mp4" : "webm";
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${product.id}-pub.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      setExportStatus("Vidéo exportée ✓");
+    } catch (e: any) {
+      console.error("Export vidéo échoué:", e);
+      setExportStatus("Erreur d'export : " + (e?.message || "inconnue"));
+    } finally {
+      setExportingVideo(false);
+      setTimeout(() => setExportStatus(""), 4000);
+    }
+  };
+
   return (
     <div className="space-y-8" id="catalog-section">
       
@@ -502,6 +749,22 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
             </button>
           )}
         </div>
+
+        {/* Add New Product Button */}
+        <button
+          onClick={() => {
+            setSelectedProductForDetails(null);
+            setSelectedProductForWa(null);
+            setActiveVideoProduct(null);
+            setEditingProduct(null);
+            setCreatingNewProduct(true);
+          }}
+          className="px-4 py-2.5 bg-brand-red hover:bg-red-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg shadow-brand-red/20 border border-brand-red/50 whitespace-nowrap"
+          title="Créer un nouveau produit de zéro"
+        >
+          <Plus className="w-4 h-4" />
+          NOUVEAU PRODUIT
+        </button>
 
         {/* Korean Streetwear Categories Pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-2 md:pb-0 scrollbar-none">
@@ -948,21 +1211,34 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
 
                   {/* Explanation of No-Code/API Video integration requested */}
                   <div className="space-y-3 bg-black/40 p-4 rounded-2xl border border-zinc-900 text-xs text-zinc-300 leading-relaxed">
-                    <p className="font-bold text-slate-100 text-xs font-mono">🛠️ Comment appliquer le filigrane "BLACK MARKET" de façon automatisée ?</p>
+                    <p className="font-bold text-slate-100 text-xs font-mono">🎬 GÉNÉRATION VIDÉO INTÉGRÉE (SANS MAKE)</p>
                     <p>
-                      Pour injecter de façon dynamique le filigrane sur toutes les photos et vidéos générées via Make.com, vous avez deux solutions :
+                      L'annonce est rendue <strong className="text-zinc-200">directement dans votre navigateur</strong> en
+                      9:16 (720×1280), avec le filigrane <strong className="text-brand-red">BLACK MARKET © 2026</strong> incrusté
+                      dans chaque image, puis enregistrée en fichier vidéo prêt à publier (WhatsApp/TikTok/Reels).
                     </p>
                     <ul className="space-y-1.5 list-disc pl-4 mt-1 text-zinc-400">
                       <li>
-                        <strong className="text-zinc-200 font-mono">Dans Creatomate (Vidéo)</strong> : Ajoutez une couche statique de texte ou d'image semi-transparente "BLACK MARKET" à un angle ou au centre de votre modèle de diaporama. Ainsi, chaque rendu MP4 généré aura nativement le filigrane indélébile.
+                        <strong className="text-zinc-200 font-mono">4 slides automatiques</strong> : badge exclusif, pitch IA, spécifications, tarif + CTA WhatsApp.
                       </li>
                       <li>
-                        <strong className="text-zinc-200 font-mono">Dans Bannerbear (Image)</strong> : Superposez un calque de filigrane translucide au-dessus de la photo d'origine récupérée du Sheets.
+                        <strong className="text-zinc-200 font-mono">Filigrane indélébile</strong> : « BLACK MARKET © 2026 » est dessiné sur chaque frame du rendu — impossible à retirer sans dégrader la vidéo.
                       </li>
                       <li>
-                        <strong className="text-zinc-200 font-mono">CSS overlay (Client-side)</strong> : Utilisez notre méthode d'incrustation CSS (déjà programmée ci-contre) pour protéger vos images en ligne contre le vol de fiches.
+                        <strong className="text-zinc-200 font-mono">Aucun service tiers</strong> : pas de Make, Creatomate ni Bannerbear. L'export fonctionne hors-ligne.
                       </li>
                     </ul>
+                    <button
+                      onClick={() => exportProductVideo(activeVideoProduct)}
+                      disabled={exportingVideo}
+                      className="w-full bg-brand-red hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm py-3 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer border border-brand-red/50 shadow-lg shadow-brand-red/20"
+                    >
+                      {exportingVideo ? <Loader className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                      <span>{exportingVideo ? "GÉNÉRATION EN COURS..." : "EXPORTER LA VIDÉO (.MP4)"}</span>
+                    </button>
+                    {exportStatus && (
+                      <p className="text-[10px] font-mono text-center text-green-400">{exportStatus}</p>
+                    )}
                   </div>
                 </div>
 
@@ -1162,15 +1438,27 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
       </AnimatePresence>
 
       {/* ----------------- MODAL: WYSIWYG PRODUCT EDITOR ----------------- */}
-      {editingProduct && onUpdateProduct && (
+      {(editingProduct && onUpdateProduct) || creatingNewProduct ? (
         <ProductEditor
-          product={editingProduct}
+          product={creatingNewProduct ? createBlankProduct() : editingProduct!}
           categories={categories}
-          onClose={() => setEditingProduct(null)}
-          onSave={onUpdateProduct}
+          isNew={creatingNewProduct}
+          onClose={() => {
+            setEditingProduct(null);
+            setCreatingNewProduct(false);
+          }}
+          onSave={(saved) => {
+            if (creatingNewProduct) {
+              onAddProduct?.(saved);
+              setCreatingNewProduct(false);
+            } else {
+              onUpdateProduct?.(saved);
+              setEditingProduct(null);
+            }
+          }}
           onDelete={onDeleteProduct!}
         />
-      )}
+      ) : null}
     </div>
   );
 }
