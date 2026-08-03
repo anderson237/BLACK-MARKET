@@ -896,7 +896,15 @@ export function createApp() {
     if (!buffer) {
       return res.status(404).json({ error: "Vidéo introuvable." });
     }
-    res.setHeader("Content-Type", "video/mp4");
+    // The recorder may produce WebM (Chrome/Edge) even though it was stored with
+    // a .mp4 key. Serve the real MIME so browsers can actually play it.
+    const isWebM =
+      buffer.length > 4 &&
+      buffer[0] === 0x1a &&
+      buffer[1] === 0x45 &&
+      buffer[2] === 0xdf &&
+      buffer[3] === 0xa3;
+    res.setHeader("Content-Type", isWebM ? "video/webm" : "video/mp4");
     res.setHeader("Cache-Control", "public, max-age=86400");
     res.send(buffer);
   });

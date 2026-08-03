@@ -122,8 +122,11 @@
       </div>
 
       <div class="p-6 overflow-y-auto max-h-[75vh] grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="relative aspect-square rounded-2xl overflow-hidden bg-zinc-950 border border-zinc-800 flex items-center justify-center">
-          <img id="modal-image" src="" alt="" crossorigin="anonymous" onload="watermarkImage(this)" class="w-full h-full object-cover">
+        <div class="relative aspect-square rounded-2xl overflow-hidden bg-zinc-950 border border-zinc-800 flex items-center justify-center" id="modal-carousel">
+          <img id="modal-image" src="" alt="" crossorigin="anonymous" class="w-full h-full object-cover">
+          <button onclick="bmModalMove(-1)" id="modal-prev" class="hidden absolute left-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-brand-red/80 text-white w-8 h-8 rounded-full text-lg font-black leading-none border border-white/20 transition-colors z-10">‹</button>
+          <button onclick="bmModalMove(1)" id="modal-next" class="hidden absolute right-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-brand-red/80 text-white w-8 h-8 rounded-full text-lg font-black leading-none border border-white/20 transition-colors z-10">›</button>
+          <div id="modal-dots" class="hidden absolute bottom-2 left-0 right-0 flex justify-center gap-1.5 z-10"></div>
         </div>
 
         <div class="space-y-4 flex flex-col justify-between">
@@ -257,18 +260,36 @@
     let PRODUCTS = FALLBACK_PRODUCTS;
 
     // ===== SYNC DEPUIS catalog.json (servi en direct depuis la base de données) =====
+    let catalogLoaded = false;
     async function loadCatalog() {
       try {
         const res = await fetch("./catalog.json", { cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) PRODUCTS = data;
+          if (Array.isArray(data) && data.length > 0) {
+            const changed = JSON.stringify(data) !== JSON.stringify(PRODUCTS);
+            PRODUCTS = data;
+            if (!catalogLoaded || changed) {
+              const firstLoad = !catalogLoaded;
+              catalogLoaded = true;
+              renderCategories();
+              renderGrid(PRODUCTS);
+              if (firstLoad) handleDeepLink();
+              // Refresh an open details modal so admin edits show up live.
+              if (currentModalId) {
+                for (var i = 0; i < PRODUCTS.length; i++) {
+                  if (PRODUCTS[i].id === currentModalId) { openDetailsModal(i); break; }
+                }
+              }
+            }
+          }
         }
       } catch (e) {
         // Réseau hors ligne -> fallback local
       }
-      initApp();
     }
+    // Auto-refresh: poll the live catalog so admin changes appear without reload.
+    setInterval(loadCatalog, 15000);
 
     document.getElementById("wa-link").href = "https://wa.me/" + CONFIG.phoneNumber;
 
@@ -376,11 +397,16 @@
         const message = buildWaMessage(p, priceStr, productUrl);
         const waUrl = "https://wa.me/" + CONFIG.phoneNumber + "?text=" + encodeURIComponent(message);
         const paragraphs = paragraphizeDescription(p.description);
+        // Prefer the live (uploaded / AI-generated, already watermarked) image;
+        // otherwise use the static pre-watermarked copy baked at build time.
+        const isLiveImg = String(p.imageUrl || "").charAt(0) === "/";
+        const cardImg = isLiveImg ? p.imageUrl : localImg;
+        const cardFallback = isLiveImg ? localImg : (p.imageUrl || "");
 
         grid.innerHTML +=
             '<div onclick="openDetailsModal(' + masterIndex + ')" class="bg-brand-card rounded-3xl overflow-hidden border border-zinc-800 flex flex-col h-full relative group hover:border-brand-red/40 transition-all duration-300 cursor-pointer">' +
               '<div class="relative aspect-video overflow-hidden">' +
-                '<img src="' + escapeHtml(localImg) + '" alt="' + escapeHtml(p.title) + '" loading="lazy" crossorigin="anonymous" data-fallback="' + escapeHtml(p.imageUrl) + '" onerror="handleImgError(this)" class="w-full h-full object-cover opacity-85 group-hover:scale-105 transition-transform duration-500">' +
+                '<img src="' + escapeHtml(cardImg) + '" alt="' + escapeHtml(p.title) + '" loading="lazy" crossorigin="anonymous" data-fallback="' + escapeHtml(cardFallback) + '" onerror="handleImgError(this)" class="w-full h-full object-cover opacity-85 group-hover:scale-105 transition-transform duration-500">' +
                 '<span class="absolute top-3 left-3 bg-brand-red text-white text-[9px] uppercase font-bold tracking-widest px-2.5 py-1 rounded">' + escapeHtml(p.category || "EXCLUSIF") + "</span>" +
               "</div>" +
             '<div class="p-6 flex flex-col flex-1 justify-between gap-4">' +
@@ -410,13 +436,68 @@
       var modalImg = document.getElementById("modal-image");
       delete modalImg.dataset.wm;
       currentModalId = p.id;
-      modalImg.onerror = function () {
-        modalImg.onerror = null;
-        modalImg.src = p.imageUrl;
-        modalImg.crossOrigin = "anonymous";
-        watermarkImage(modalImg);
+
+      // Build a media carousel: main image + gallery photos + optional video.
+      var media = [{ type: "image", src: p.imageUrl || "" }];
+      (p.gallery || []).forEach(function (u) { if (u) media.push({ type: "image", src: u }); });
+      if (p.videoUrl) media.push({ type: "video", src: p.videoUrl });
+      window.__bmMedia = media;
+      window.__bmMediaIndex = 0;
+
+      function renderModalSlide(idx) {
+        var m = window.__bmMedia[Math.min(idx, window.__bmMedia.length - 1)];
+        if (!m) return;
+        window.__bmMediaIndex = Math.min(idx, window.__bmMedia.length - 1);
+        modalImg = document.getElementById("modal-image");
+        var dots = document.getElementById("modal-dots");
+        var prev = document.getElementById("modal-prev");
+        var next = document.getElementById("modal-next");
+        var multi = window.__bmMedia.length > 1;
+        if (multi) {
+          dots.innerHTML = window.__bmMedia.map(function (_, i) {
+            return '<span class="w-1.5 h-1.5 rounded-full ' + (i === window.__bmMediaIndex ? "bg-brand-red" : "bg-white/40") + '" style="display:inline-block"></span>';
+          }).join("");
+          dots.classList.remove("hidden");
+          prev.classList.remove("hidden");
+          next.classList.remove("hidden");
+        } else {
+          dots.classList.add("hidden");
+          prev.classList.add("hidden");
+          next.classList.add("hidden");
+        }
+        if (m.type === "video") {
+          modalImg.removeAttribute("src");
+          modalImg.outerHTML = '<video id="modal-image" src="' + escapeHtml(m.src) + '" controls playsinline preload="metadata" class="w-full h-full object-cover bg-black"></video>';
+          return;
+        }
+        if (modalImg.tagName === "VIDEO") {
+          var holder = document.createElement("img");
+          holder.id = "modal-image";
+          holder.className = "w-full h-full object-cover";
+          holder.crossOrigin = "anonymous";
+          modalImg.parentNode.replaceChild(holder, modalImg);
+          modalImg = document.getElementById("modal-image");
+        }
+        var isLive = String(m.src || "").charAt(0) === "/";
+        modalImg.src = isLive ? m.src : ("img/" + encodeURIComponent(p.id) + ".jpg");
+        modalImg.onerror = function () {
+          modalImg.onerror = null;
+          modalImg.src = m.src;
+          modalImg.crossOrigin = "anonymous";
+          watermarkImage(modalImg);
+        };
+        if (!isLive) {
+          modalImg.crossOrigin = "anonymous";
+          modalImg.onload = function () { watermarkImage(modalImg); };
+        }
+      }
+      window.bmModalMove = function (d) {
+        if (!window.__bmMedia || !window.__bmMedia.length) return;
+        renderModalSlide((window.__bmMediaIndex + d + window.__bmMedia.length) % window.__bmMedia.length);
       };
-      modalImg.src = "img/" + encodeURIComponent(p.id) + ".jpg";
+
+      renderModalSlide(0);
+
       document.getElementById("modal-category").innerText = p.category || "EXCLUSIF";
       document.getElementById("modal-title").innerText = p.title;
       document.getElementById("modal-price").innerText = priceStr;
