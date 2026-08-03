@@ -1,6 +1,6 @@
 [build]
   command = "npm run build"
-  publish = ".output/public"
+  publish = "dist"
 
 [functions]
   directory = ".netlify/functions-internal"
@@ -8,11 +8,17 @@
 # ---------------------------------------------------------------------------
 # REDIRECTS
 # ---------------------------------------------------------------------------
-# Nuxt SSR: route every request through the serverless function (serves both
-# SSR HTML and static assets from .output/public).
+# Nuxt SSR: serve static assets from dist directly (bypassing the function),
+# then route everything else through the serverless function.
+[[redirects]]
+  from = "/_nuxt/*"
+  to = "/_nuxt/:splat"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/*"
-  to = "/.netlify/functions/server/:splat"
+  to = "/.netlify/functions/server"
   status = 200
   force = true
 

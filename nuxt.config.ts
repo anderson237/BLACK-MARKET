@@ -19,7 +19,14 @@ export default defineNuxtConfig({
   },
   nitro: {
     preset: "netlify",
-    externals: { inline: ["@netlify/blobs"] },
+    // Pinia v4 imports `@vue/devtools-api` at runtime on the server. The
+    // serverless bundler was dropping it, causing ERR_MODULE_NOT_FOUND on every
+    // SSR page while API routes (which don't touch the Vue app) still worked.
+    // We force both pinia and its devtools dep to be BUNDLED into the function
+    // (inlined) so nothing resolves from node_modules at runtime.
+    externals: {
+      inline: ["@netlify/blobs", "pinia", "@vue/devtools-api"],
+    },
   },
   app: {
     head: {
