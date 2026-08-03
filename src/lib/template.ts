@@ -362,16 +362,16 @@ export function getHtmlTemplateCode(opts?: { siteUrl?: string }): string {
     }
 
     function sanitizeDescriptionHtml(raw) {
-      return String(raw || "")
-        .replace(/<(script|style|iframe|object|embed|form|input)[^>]*>.*?<\/\\1>/gis, "")
-        .replace(/on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-        .replace(/javascript:/gi, "")
-        .slice(0, 12000);
+      var s = String(raw || "")
+        .replace(/<\\/?(script|style|iframe|object|embed|form|input)(\\s[^>]*)?>/gi, "")
+        .replace(/on\\w+\\s*=\\s*("[^"]*"|'[^']*'|[^\\s>]+)/gi, "")
+        .replace(/javascript:/gi, "");
+      return s.slice(0, 12000);
     }
 
     function paragraphizeDescription(text) {
       var raw = String(text || "");
-      if (/<\/?[a-z][^>]*>/i.test(raw)) {
+      if (/<[a-z][^>]*>/i.test(raw)) {
         return sanitizeDescriptionHtml(raw);
       }
       var lines = raw.split(/\\n{2,}/);
