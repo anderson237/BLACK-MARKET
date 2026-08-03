@@ -81,7 +81,8 @@ const waUrl = computed(() => {
   const priceStr = formatPriceXof(p.priceXof)
   const pageUrl = `${config.public.siteUrl}/p/${p.id}.html`
   const msg = buildWaMessage(p, priceStr, pageUrl)
-  return 'https://wa.me/' + config.public.phoneNumber + '?text=' + encodeURIComponent(msg)
+  const num = p.waNumber || config.public.phoneNumber
+  return 'https://wa.me/' + num + '?text=' + encodeURIComponent(msg)
 })
 
 function trackClick() {

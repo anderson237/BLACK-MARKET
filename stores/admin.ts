@@ -13,12 +13,49 @@ interface AdminStats {
     clicks: number
     likes: number
     shares: number
+    copies: number
+    unlikes: number
     comments: number
     events: number
   }
   salesByCategory: { category: string; orders: number; revenueXof: number }[]
   revenueSeries: { label: string; revenueXof: number; revenueEur: number; orders: number }[]
   topProducts: { id: string; title: string; imageUrl: string; clicks: number; revenueXof: number; revenueEur: number }[]
+  analytics: {
+    totalUsers: number
+    engagedUsers: number
+    products: {
+      viewed: TopItem[]
+      clicked: TopItem[]
+      liked: TopItem[]
+      commented: TopItem[]
+      preordered: TopItem[]
+      whatsapp: TopItem[]
+    }
+    users: {
+      likers: TopUser[]
+      commenters: TopUser[]
+      preorders: TopUser[]
+      viewers: TopUser[]
+      sharers: TopUser[]
+      engaged: TopUser[]
+    }
+  }
+}
+
+interface TopItem {
+  id: string
+  title: string
+  imageUrl: string
+  count: number
+}
+
+interface TopUser {
+  id: string
+  name: string
+  pseudo: string
+  picture: string
+  count: number
 }
 
 export interface AdminOrder {

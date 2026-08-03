@@ -3,11 +3,15 @@ import { COUNTRIES, countryByCode, type Country } from '~/data/countries'
 import { ANIMAL_AVATARS, avatarDataUri } from '~/data/avatars'
 import { MOODS, moodOf } from '~/data/moods'
 import { useAuthStore } from '~/stores/auth'
+import { useInteractionsStore } from '~/stores/interactions'
+import { useTrack } from '~/composables/useTrack'
 
 useSeoMeta({ title: 'Mon espace — BLACK MARKET' })
 
 const auth = useAuthStore()
 const config = useRuntimeConfig()
+const inter = useInteractionsStore()
+const { like } = useTrack()
 
 // Guard: must be logged in to reach the client space.
 onMounted(() => {
@@ -216,6 +220,46 @@ const displayName = computed(() => auth.user?.pseudo || auth.user?.name || 'Clie
 const initials = computed(() => displayName.value.slice(0, 2).toUpperCase())
 const currentMood = computed(() => moodOf(auth.user?.mood))
 const productUrl = (id?: string) => (id ? `/p/${id}.html` : '/')
+
+// ---- CRUD: delete your own interactions ----
+const deleting = ref<string | null>(null)
+
+async function deleteOwnComment(id: string) {
+  if (!window.confirm('Supprimer définitivement ce commentaire ?')) return
+  deleting.value = id
+  try {
+    await auth.api('/api/me/comments/' + encodeURIComponent(id), { method: 'DELETE' })
+    if (data.value) data.value.comments = data.value.comments.filter((c) => c.id !== id)
+    window.dispatchEvent(new CustomEvent('bm:track', { detail: { type: 'comment' } }))
+  } catch (e: any) {
+    window.alert(e?.message || 'Impossible de supprimer le commentaire.')
+  } finally {
+    deleting.value = null
+  }
+}
+
+async function deleteOwnEvent(ts: number) {
+  if (!window.confirm('Retirer cette activité de votre historique ?')) return
+  deleting.value = 'e' + ts
+  try {
+    await auth.api('/api/me/events/' + encodeURIComponent(String(ts)), { method: 'DELETE' })
+    if (data.value) data.value.events = data.value.events.filter((e) => e.ts !== ts)
+  } catch (e: any) {
+    window.alert(e?.message || 'Impossible de retirer cet événement.')
+  } finally {
+    deleting.value = null
+  }
+}
+
+function unlikeProduct(productId: string) {
+  like({ id: productId }, false)
+  inter.toggleLike(productId)
+  if (data.value) {
+    data.value.liked = data.value.liked.filter((l) => l.productId !== productId)
+    data.value.stats.likes = Math.max(0, data.value.stats.likes - 1)
+  }
+  loadInteractions()
+}
 </script>
 
 <template>
@@ -270,6 +314,16 @@ const productUrl = (id?: string) => (id ? `/p/${id}.html` : '/')
               <AppIcon name="plus" :size="12" /> Photo manuelle
               <input type="file" accept="image/*" class="hidden" @change="onAvatarFile" />
             </label>
+          </div>
+
+          <div>
+            <label class="text-[9px] text-zinc-500 font-mono uppercase tracking-widest">Humeur (optionnel)</label>
+            <div class="flex flex-wrap gap-1.5 mt-2">
+              <button v-for="m in MOODS" :key="m.emoji" type="button"
+                class="w-9 h-9 rounded-xl border text-lg flex items-center justify-center transition-all"
+                :class="mood === m.emoji ? 'bg-[#ff2a2a]/20 border-[#ff2a2a]/60 scale-110' : 'bg-black/30 border-zinc-800 hover:border-zinc-600'"
+                :title="m.label" @click="mood = mood === m.emoji ? '' : m.emoji">{{ m.emoji }}</button>
+            </div>
           </div>
 
           <div>
@@ -358,52 +412,116 @@ const productUrl = (id?: string) => (id ? `/p/${id}.html` : '/')
       <div v-if="data && data.liked.length" class="mt-8">
         <p class="text-[9px] text-[#ff2a2a] font-mono uppercase font-bold tracking-wider mb-3">PRODUITS QUE VOUS AIMEZ ({{ data.stats.likes }})</p>
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          <NuxtLink v-for="l in data.liked" :key="'L' + l.productId" :to="productUrl(l.productId)"
-            class="bg-black/30 border border-zinc-900 rounded-xl overflow-hidden hover:border-[#ff2a2a]/40 transition-all group">
-            <img v-if="l.productImage" :src="l.productImage" alt="" class="w-full h-24 object-cover" />
-            <div v-else class="w-full h-24 bg-[#16161d] flex items-center justify-center text-[#ff2a2a]">
-              <AppIcon name="heart" :size="20" />
-            </div>
-            <p class="text-[10px] font-mono text-slate-300 px-2 py-2 truncate">{{ l.productTitle || 'Produit' }}</p>
-          </NuxtLink>
+          <div v-for="l in data.liked" :key="'L' + l.productId" class="relative">
+            <NuxtLink :to="productUrl(l.productId)"
+              class="block bg-black/30 border border-zinc-900 rounded-xl overflow-hidden hover:border-[#ff2a2a]/40 transition-all group">
+              <img v-if="l.productImage" :src="l.productImage" alt="" class="w-full h-24 object-cover" />
+              <div v-else class="w-full h-24 bg-[#16161d] flex items-center justify-center text-[#ff2a2a]">
+                <AppIcon name="heart" :size="20" />
+              </div>
+              <p class="text-[10px] font-mono text-slate-300 px-2 py-2 truncate">{{ l.productTitle || 'Produit' }}</p>
+            </NuxtLink>
+            <button @click.stop="unlikeProduct(l.productId)"
+              class="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/70 hover:bg-[#ff2a2a] border border-white/20 text-[#ff2a2a] hover:text-white flex items-center justify-center transition-all"
+              title="Retirer le like">
+              <AppIcon name="heart" :size="13" />
+            </button>
+          </div>
         </div>
       </div>
 
-      <!-- Edit profile inline -->
-      <div v-if="editOpen" class="bg-[#12121a] border border-zinc-800 rounded-2xl p-6 mt-6 space-y-3">
-        <p class="text-[9px] text-[#ff2a2a] font-mono uppercase font-bold tracking-wider">MODIFIER MON PROFIL</p>
-        <div class="flex items-center gap-3">
-          <div class="relative shrink-0">
-            <img v-if="avatarUrl" :src="avatarUrl" alt="avatar" class="w-14 h-14 rounded-full object-cover border-2 border-[#ff2a2a]/50" />
-            <div v-else class="w-14 h-14 rounded-full bg-[#ff2a2a]/15 border-2 border-[#ff2a2a]/50 flex items-center justify-center text-[#ff2a2a] font-black">{{ initials }}</div>
-            <label class="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#ff2a2a] hover:bg-red-600 flex items-center justify-center cursor-pointer border border-black" title="Téléverser une photo">
-              <AppIcon name="edit" :size="11" />
-              <input type="file" accept="image/*" class="hidden" @change="onAvatarFile" />
-            </label>
+      <!-- Edit profile modal -->
+      <Teleport to="body">
+        <div v-if="editOpen" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
+          <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" @click="editOpen = false" />
+          <div class="relative w-full sm:max-w-md bg-[#12121a] border border-zinc-800 sm:rounded-3xl rounded-t-3xl max-h-[92vh] flex flex-col overflow-hidden shadow-2xl">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-zinc-800 bg-[#0d0d14] shrink-0">
+              <p class="text-sm font-extrabold text-white font-mono uppercase tracking-widest">Modifier mon profil</p>
+              <button @click="editOpen = false" aria-label="Fermer" class="w-8 h-8 rounded-lg border border-zinc-800 flex items-center justify-center text-zinc-300 hover:text-white hover:border-[#ff2a2a]/50 transition-all">✕</button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-5 space-y-4">
+              <div class="flex items-center gap-3">
+                <div class="relative shrink-0">
+                  <img v-if="avatarUrl" :src="avatarUrl" alt="avatar" class="w-16 h-16 rounded-full object-cover border-2 border-[#ff2a2a]/50" />
+                  <div v-else class="w-16 h-16 rounded-full bg-[#ff2a2a]/15 border-2 border-[#ff2a2a]/50 flex items-center justify-center text-[#ff2a2a] font-black text-lg">{{ initials }}</div>
+                  <label class="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#ff2a2a] hover:bg-red-600 flex items-center justify-center cursor-pointer border border-black" title="Téléverser une photo">
+                    <AppIcon name="edit" :size="11" />
+                    <input type="file" accept="image/*" class="hidden" @change="onAvatarFile" />
+                  </label>
+                </div>
+                <p class="text-[10px] font-mono text-zinc-500 leading-relaxed">Avatar : choisissez un animal par défaut ou téléversez votre propre photo.</p>
+              </div>
+
+              <div>
+                <label class="text-[9px] text-zinc-500 font-mono uppercase tracking-widest">Avatar animal</label>
+                <div class="grid grid-cols-6 gap-1.5 mt-2">
+                  <button v-for="a in ANIMAL_AVATARS" :key="a.key" type="button"
+                    class="aspect-square rounded-xl overflow-hidden border transition-all"
+                    :class="selectedAvatar === a.key ? 'border-[#ff2a2a] ring-2 ring-[#ff2a2a]/40' : 'border-zinc-800 hover:border-zinc-600'"
+                    :title="a.label" @click="selectedAvatar = a.key === selectedAvatar ? '' : a.key">
+                    <img :src="avatarDataUri(a.key)" :alt="a.label" class="w-full h-full object-cover" />
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label class="text-[9px] text-zinc-500 font-mono uppercase tracking-widest">Pseudo</label>
+                <input v-model="pseudo" type="text" placeholder="Votre pseudonyme" class="mt-1 w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 font-mono focus:outline-none focus:border-[#ff2a2a]/60 transition-colors" />
+              </div>
+
+              <div>
+                <label class="text-[9px] text-zinc-500 font-mono uppercase tracking-widest">Nom & prénom (optionnel)</label>
+                <input v-model="name" type="text" placeholder="Nom & prénom" class="mt-1 w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 font-mono focus:outline-none focus:border-[#ff2a2a]/60 transition-colors" />
+              </div>
+
+              <div>
+                <label class="text-[9px] text-zinc-500 font-mono uppercase tracking-widest">Humeur</label>
+                <div class="flex flex-wrap gap-1.5 mt-2">
+                  <button v-for="m in MOODS" :key="m.emoji" type="button"
+                    class="w-9 h-9 rounded-xl border text-lg flex items-center justify-center transition-all"
+                    :class="mood === m.emoji ? 'bg-[#ff2a2a]/20 border-[#ff2a2a]/60 scale-110' : 'bg-black/30 border-zinc-800 hover:border-zinc-600'"
+                    :title="m.label" @click="mood = mood === m.emoji ? '' : m.emoji">{{ m.emoji }}</button>
+                </div>
+              </div>
+
+              <div>
+                <label class="text-[9px] text-zinc-500 font-mono uppercase tracking-widest">Pays</label>
+                <div class="relative mt-1">
+                  <button type="button" @click="showCountry = !showCountry" class="w-full flex items-center justify-between bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-slate-200 font-mono hover:border-zinc-600 transition-colors">
+                    <span v-if="selectedCountry">{{ selectedCountry.flag }} {{ selectedCountry.name }} {{ selectedCountry.prefix }}</span>
+                    <span class="text-zinc-500 text-[10px]">▼</span>
+                  </button>
+                  <div v-if="showCountry" class="absolute z-20 w-full mt-1 bg-[#1a1a24] border border-zinc-700 rounded-xl overflow-hidden shadow-2xl">
+                    <input v-model="countrySearch" placeholder="Rechercher un pays…" class="w-full bg-black/30 border-b border-zinc-800 px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none" />
+                    <div class="max-h-44 overflow-y-auto">
+                      <button v-for="c in filteredCountries" :key="c.code" type="button" @click="pickCountry(c)" class="w-full text-left px-3 py-2 text-xs text-slate-300 font-mono hover:bg-[#ff2a2a]/10 transition-colors">
+                        {{ c.flag }} {{ c.name }} <span class="text-zinc-500">{{ c.prefix }}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label class="text-[9px] text-zinc-500 font-mono uppercase tracking-widest">Numéro WhatsApp</label>
+                <div class="flex gap-1.5 mt-1">
+                  <span class="shrink-0 bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-300 font-mono">{{ prefix }}</span>
+                  <input v-model="phoneNumber" type="tel" inputmode="numeric" placeholder="Numéro WhatsApp" class="flex-1 bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 font-mono focus:outline-none focus:border-[#ff2a2a]/60 transition-colors" />
+                </div>
+              </div>
+
+              <p v-if="error" class="text-[11px] text-[#ff2a2a] font-mono">{{ error }}</p>
+              <p v-if="ok" class="text-[11px] text-emerald-400 font-mono">{{ ok }}</p>
+            </div>
+
+            <div class="border-t border-zinc-800 bg-[#0d0d14] px-5 py-4 flex items-center gap-2 shrink-0">
+              <button @click="editOpen = false" class="flex-1 text-[11px] font-mono text-zinc-400 hover:text-white border border-zinc-800 px-4 py-2.5 rounded-xl transition-all">Annuler</button>
+              <button @click="saveProfile" :disabled="saving" class="flex-1 bg-[#ff2a2a] hover:bg-red-600 text-white text-xs font-bold font-mono px-4 py-2.5 rounded-xl transition-all disabled:opacity-50">{{ saving ? '…' : 'Enregistrer' }}</button>
+            </div>
           </div>
-          <p class="text-[10px] font-mono text-zinc-500 leading-relaxed">Choisissez un avatar animal par défaut ou téléversez votre propre photo.</p>
         </div>
-        <div class="grid grid-cols-6 gap-1.5">
-          <button v-for="a in ANIMAL_AVATARS" :key="a.key" type="button"
-            class="aspect-square rounded-xl overflow-hidden border transition-all"
-            :class="selectedAvatar === a.key ? 'border-[#ff2a2a] ring-2 ring-[#ff2a2a]/40' : 'border-zinc-800 hover:border-zinc-600'"
-            :title="a.label" @click="selectedAvatar = a.key === selectedAvatar ? '' : a.key">
-            <img :src="avatarDataUri(a.key)" :alt="a.label" class="w-full h-full object-cover" />
-          </button>
-        </div>
-        <input v-model="pseudo" type="text" placeholder="Pseudo" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 font-mono focus:outline-none focus:border-[#ff2a2a]/60 transition-colors" />
-        <input v-model="name" type="text" placeholder="Nom & prénom" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 font-mono focus:outline-none focus:border-[#ff2a2a]/60 transition-colors" />
-        <div class="flex gap-1.5">
-          <span class="shrink-0 bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-300 font-mono">{{ prefix }}</span>
-          <input v-model="phoneNumber" type="tel" inputmode="numeric" placeholder="Numéro WhatsApp" class="flex-1 bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 font-mono focus:outline-none focus:border-[#ff2a2a]/60 transition-colors" />
-        </div>
-        <p v-if="error" class="text-[11px] text-[#ff2a2a] font-mono">{{ error }}</p>
-        <p v-if="ok" class="text-[11px] text-emerald-400 font-mono">{{ ok }}</p>
-        <div class="flex gap-2">
-          <button @click="saveProfile" :disabled="saving" class="flex-1 bg-[#ff2a2a] hover:bg-red-600 text-white font-bold text-sm px-4 py-2.5 rounded-xl transition-all font-mono disabled:opacity-50">{{ saving ? '…' : 'Enregistrer' }}</button>
-          <button @click="editOpen = false" class="text-[11px] font-mono text-zinc-400 border border-zinc-800 px-4 py-2.5 rounded-xl transition-all hover:text-white">Annuler</button>
-        </div>
-      </div>
+      </Teleport>
 
       <!-- Interactions -->
       <div class="mt-8">
@@ -436,6 +554,11 @@ const productUrl = (id?: string) => (id ? `/p/${id}.html` : '/')
                 <p class="text-xs text-zinc-300"><span class="text-slate-100 font-bold">Vous avez commenté</span> {{ c.text }}</p>
                 <NuxtLink :to="productUrl(c.productId)" class="text-[10px] text-zinc-500 font-mono hover:text-[#ff2a2a] transition-colors">{{ c.productTitle || 'Produit' }} · {{ timeAgo(c.createdAt) }}</NuxtLink>
               </div>
+              <button @click="deleteOwnComment(c.id)" :disabled="deleting === c.id"
+                class="shrink-0 w-8 h-8 rounded-lg border border-zinc-800 hover:border-red-500/60 text-zinc-500 hover:text-red-400 flex items-center justify-center transition-all disabled:opacity-40"
+                title="Supprimer ce commentaire">
+                <AppIcon name="trash" :size="13" />
+              </button>
             </div>
 
             <div v-for="(e, i) in data.events" :key="'e' + i" class="flex items-center gap-3 bg-black/30 border border-zinc-900 rounded-xl p-3">
@@ -448,6 +571,11 @@ const productUrl = (id?: string) => (id ? `/p/${id}.html` : '/')
                 </p>
                 <p class="text-[10px] text-zinc-500 font-mono mt-0.5">{{ timeAgo(e.ts) }}</p>
               </div>
+              <button @click="deleteOwnEvent(e.ts)" :disabled="deleting === 'e' + e.ts"
+                class="shrink-0 w-8 h-8 rounded-lg border border-zinc-800 hover:border-red-500/60 text-zinc-500 hover:text-red-400 flex items-center justify-center transition-all disabled:opacity-40"
+                title="Retirer de mon historique">
+                <AppIcon name="trash" :size="13" />
+              </button>
             </div>
           </div>
         </template>

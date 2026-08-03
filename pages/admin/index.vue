@@ -12,7 +12,7 @@ onMounted(async () => {
 
 const resetting = ref(false)
 async function resetStats() {
-  if (!window.confirm('Remettre à ZÉRO les stats de tous les utilisateurs (vues, précommandes, likes, partages, commentaires) ? Les produits et commandes sont conservés.')) return
+  if (!window.confirm('Remettre à ZÉRO les stats de tous les utilisateurs (vues, précommandes, likes, partages, commentaires) et les compteurs de clics WhatsApp produits ? Les produits et commandes sont conservés.')) return
   resetting.value = true
   try {
     const auth = useAuthStore()
@@ -133,6 +133,57 @@ const trends = {
   clicks: { up: true, value: '+15.7%' },
   products: { up: false, value: '-2.1%' },
 }
+
+/* ---------------- Interaction analytics ---------------- */
+const inter = computed(() => stats.value?.interactions)
+const analytics = computed(() => stats.value?.analytics)
+
+const INTER_CARDS = computed(() => {
+  const i = inter.value
+  if (!i) return []
+  return [
+    { label: 'Vues', value: i.views, color: '#22d3ee', icon: 'eye' },
+    { label: 'Clics PRÉCOMMANDER', value: i.clicks, color: '#34d399', icon: 'whatsapp' },
+    { label: 'Likes', value: i.likes, color: '#ff2a2a', icon: 'heart' },
+    { label: 'Partages', value: i.shares, color: '#a78bfa', icon: 'share' },
+    { label: 'Copies lien', value: i.copies, color: '#facc15', icon: 'link' },
+    { label: 'Commentaires', value: i.comments, color: '#60a5fa', icon: 'comment' },
+    { label: 'Retraits like', value: i.unlikes, color: '#fb7185', icon: 'heart' },
+    { label: 'Événements', value: i.events, color: '#f59e0b', icon: 'sparkles' },
+  ]
+})
+
+function shortTitle(t: string, n = 16) {
+  return t.length > n ? t.slice(0, n) + '…' : t
+}
+
+function displayName(u: { name: string; pseudo: string }) {
+  return u.pseudo || u.name || 'Anonyme'
+}
+
+const PROD_TOP_CONFIG = computed(() => {
+  const p = analytics.value?.products
+  return [
+    { key: 'viewed', title: 'PLUS VUS', color: '#22d3ee' },
+    { key: 'clicked', title: 'PLUS CLIQUÉS', color: '#34d399' },
+    { key: 'liked', title: 'PLUS AIMÉS', color: '#ff2a2a' },
+    { key: 'commented', title: 'PLUS COMMENTÉS', color: '#60a5fa' },
+    { key: 'preordered', title: 'PLUS PRÉCOMMANDÉS', color: '#f59e0b' },
+    { key: 'whatsapp', title: 'CLICS WHATSAPP', color: '#a78bfa' },
+  ].map((c) => ({ ...c, items: p ? p[c.key as keyof typeof p] : [] }))
+})
+
+const USER_TOP_CONFIG = computed(() => {
+  const u = analytics.value?.users
+  return [
+    { key: 'likers', title: 'TOP LIKEURS', color: '#ff2a2a', icon: 'heart' },
+    { key: 'commenters', title: 'TOP COMMENTATEURS', color: '#60a5fa', icon: 'comment' },
+    { key: 'preorders', title: 'TOP PRÉCOMMANDEURS', color: '#34d399', icon: 'whatsapp' },
+    { key: 'viewers', title: 'TOP CONSULTANTS', color: '#22d3ee', icon: 'eye' },
+    { key: 'sharers', title: 'TOP SHAREURS', color: '#a78bfa', icon: 'share' },
+    { key: 'engaged', title: 'TOP ENGAGÉS', color: '#facc15', icon: 'sparkles' },
+  ].map((c) => ({ ...c, items: u ? u[c.key as keyof typeof u] : [] }))
+})
 </script>
 
 <template>
@@ -381,6 +432,60 @@ const trends = {
               </tr>
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ANALYSE DES INTERACTIONS -->
+    <div v-if="stats && inter" class="mt-2">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h3 class="text-sm font-extrabold text-white font-mono uppercase tracking-wider">ANALYSE DES INTERACTIONS</h3>
+          <p class="text-[10px] font-mono text-zinc-500">
+            {{ analytics?.engagedUsers ?? 0 }} utilisateurs engagés · {{ analytics?.totalUsers ?? 0 }} comptes clients
+          </p>
+        </div>
+      </div>
+
+      <!-- Mini-cards per interaction type -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+        <div v-for="c in INTER_CARDS" :key="c.label" class="bg-[#0d0d14] rounded-xl p-3 border border-zinc-800">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[8px] font-mono text-zinc-500 uppercase tracking-wider leading-tight">{{ c.label }}</span>
+            <AppIcon :name="c.icon" :size="13" :style="{ color: c.color }" />
+          </div>
+          <p class="text-lg font-black font-mono leading-none" :style="{ color: c.color }">{{ c.value }}</p>
+        </div>
+      </div>
+
+      <!-- Top products by interaction -->
+      <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+        <div v-for="cfg in PROD_TOP_CONFIG" :key="cfg.key" class="bg-[#0d0d14] rounded-2xl p-4 border border-zinc-800">
+          <p class="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mb-3" :style="{ color: cfg.color }">{{ cfg.title }}</p>
+          <div v-if="cfg.items.length" class="space-y-2">
+            <div v-for="it in cfg.items.slice(0, 5)" :key="cfg.key + it.id" class="flex items-center gap-2">
+              <img :src="it.imageUrl" alt="" class="w-7 h-7 rounded-md object-cover bg-zinc-900 border border-zinc-800 shrink-0" @error="($event.target as HTMLImageElement).style.display='none'" />
+              <span class="flex-1 text-[10px] font-mono text-zinc-300 truncate" :title="it.title">{{ shortTitle(it.title) }}</span>
+              <span class="text-[10px] font-mono font-bold" :style="{ color: cfg.color }">{{ it.count }}</span>
+            </div>
+          </div>
+          <div v-else class="text-[10px] font-mono text-zinc-600 py-3 text-center">Aucune donnée</div>
+        </div>
+      </div>
+
+      <!-- Top users by interaction -->
+      <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+        <div v-for="cfg in USER_TOP_CONFIG" :key="'u' + cfg.key" class="bg-[#0d0d14] rounded-2xl p-4 border border-zinc-800">
+          <p class="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mb-3" :style="{ color: cfg.color }">{{ cfg.title }}</p>
+          <div v-if="cfg.items.length" class="space-y-2">
+            <div v-for="u in cfg.items.slice(0, 5)" :key="cfg.key + u.id" class="flex items-center gap-2">
+              <img v-if="u.picture" :src="u.picture" alt="" class="w-7 h-7 rounded-full object-cover border border-zinc-800 shrink-0" @error="($event.target as HTMLImageElement).style.display='none'" />
+              <div v-else class="w-7 h-7 rounded-full bg-[#ff2a2a]/15 border border-[#ff2a2a]/40 flex items-center justify-center text-[#ff2a2a] text-[9px] font-black shrink-0">{{ displayName(u).slice(0, 2).toUpperCase() }}</div>
+              <span class="flex-1 text-[10px] font-mono text-zinc-300 truncate" :title="u.name">{{ displayName(u) }}</span>
+              <span class="text-[10px] font-mono font-bold" :style="{ color: cfg.color }">{{ u.count }}</span>
+            </div>
+          </div>
+          <div v-else class="text-[10px] font-mono text-zinc-600 py-3 text-center">Aucune donnée</div>
         </div>
       </div>
     </div>

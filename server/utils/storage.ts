@@ -134,7 +134,7 @@ export interface PublicAccount {
   provider: 'google' | 'password' | 'phone'
   passwordHash?: string
   salt?: string
-  role: 'user' | 'admin'
+  role: 'user' | 'editor' | 'publisher' | 'admin'
   status: 'active' | 'blocked'
   createdAt: string
   lastLoginAt?: string
@@ -273,6 +273,27 @@ export async function deleteComment(id: string): Promise<boolean> {
   const before = social.comments.length
   social.comments = social.comments.filter((c) => c.id !== id)
   if (social.comments.length === before) return false
+  await saveSocial(social)
+  return true
+}
+
+// Client space: a user may delete only their own comment.
+export async function deleteCommentIfOwner(id: string, userId: string): Promise<boolean> {
+  const social = await loadSocial()
+  const target = social.comments.find((c) => c.id === id)
+  if (!target) return false
+  if (String(target.userId || '') !== String(userId)) throw new Error('Ce commentaire ne vous appartient pas.')
+  social.comments = social.comments.filter((c) => c.id !== id)
+  await saveSocial(social)
+  return true
+}
+
+// Client space: a user may remove one of their own tracked events.
+export async function deleteUserEvent(userId: string, ts: number): Promise<boolean> {
+  const social = await loadSocial()
+  const before = social.events.length
+  social.events = social.events.filter((e) => !(String(e.userId || '') === String(userId) && Number(e.ts) === Number(ts)))
+  if (social.events.length === before) return false
   await saveSocial(social)
   return true
 }

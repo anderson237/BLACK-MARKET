@@ -1,5 +1,5 @@
 import crypto from 'node:crypto'
-import { findAccount, upsertAccount, loadAccounts, SESSION_TTL_MS } from '~~/server/utils/storage'
+import { findAccount, upsertAccount, loadAccounts, loadUsers, SESSION_TTL_MS } from '~~/server/utils/storage'
 import { requireAuth, signToken, rateLimit } from '~~/server/utils/auth'
 
 const normalizeEmail = (e: unknown) => String(e ?? '').trim().toLowerCase()
@@ -32,9 +32,15 @@ export default defineEventHandler(async (event) => {
 
   let account = await findAccount({ email })
 
-  // Existing admin (declared via env) still logs in through Google as admin.
-  const adminEmails = (process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || 'elomopatrick.pn@gmail.com')
-    .toLowerCase().split(',').map((s) => s.trim()).filter(Boolean)
+  // Anyone can sign in with Google (open registration). Admin is granted for
+  // env-declared emails OR accounts listed in the admin panel's admin list OR
+  // accounts whose stored role is already admin.
+  const users = await loadUsers()
+  const adminEmails = Array.from(new Set([
+    ...(process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || 'elomopatrick.pn@gmail.com')
+      .toLowerCase().split(',').map((s) => s.trim()).filter(Boolean),
+    ...(users.admins || []).map((s) => String(s).toLowerCase()),
+  ]))
   const isAdmin = adminEmails.includes(email) || (await loadAccounts()).some((a) => a.email === email && a.role === 'admin')
 
   if (!account) {

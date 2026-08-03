@@ -23,6 +23,7 @@ export function sanitizeProduct(body: any): any {
     priceXof: Number(body?.priceXof) || 0,
     sourceRmb: body?.sourceRmb ? Number(body.sourceRmb) : undefined,
     whatsappClicks: Number(body?.whatsappClicks) || 0,
+    waNumber: body?.waNumber ? String(body.waNumber).replace(/[^0-9]/g, '').slice(0, 20) : undefined,
     deleted: body?.deleted === true,
     deletedAt: body?.deleted ? clean(body?.deletedAt) || new Date().toISOString() : undefined,
     createdAt: clean(body?.createdAt) || new Date().toISOString(),

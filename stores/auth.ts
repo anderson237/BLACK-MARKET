@@ -10,7 +10,7 @@ export interface AuthUser {
   phone?: string
   phonePrefix?: string
   country?: string
-  role?: 'admin' | 'user'
+  role?: 'user' | 'editor' | 'publisher' | 'admin'
   status?: string
   createdAt?: string
 }

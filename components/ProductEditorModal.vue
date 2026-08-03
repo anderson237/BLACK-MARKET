@@ -7,6 +7,9 @@ const emit = defineEmits<{ saved: [p: Product]; deleted: [id: string]; close: []
 const store = useAdminStore()
 const isNew = !props.product
 
+const config = useRuntimeConfig()
+const phoneNumberHint = config.public.phoneNumber || '—'
+
 const draft = reactive({
   id: props.product?.id || '',
   title: props.product?.title || '',
@@ -22,6 +25,7 @@ const draft = reactive({
   videoUrl: props.product?.videoUrl || '',
   category: props.product?.category || 'Techwear',
   whatsappClicks: props.product?.whatsappClicks || 0,
+  waNumber: props.product?.waNumber || '',
   sourceRmb: props.product?.sourceRmb || undefined,
 })
 
@@ -297,6 +301,13 @@ async function generateAiVideo() {
             <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Source ¥ RMB</label>
             <input v-model.number="draft.sourceRmb" type="number" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="200" />
           </div>
+        </div>
+
+        <!-- WhatsApp per product (fallback: site number) -->
+        <div class="space-y-2">
+          <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">WhatsApp (numéro du produit)</label>
+          <input v-model="draft.waNumber" type="tel" inputmode="numeric" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="ex: 237691234567 — vide = numéro du site" />
+          <p class="text-[9px] text-zinc-600 font-mono">Si vide, la précommande part vers le numéro du site ({{ phoneNumberHint }}).</p>
         </div>
 
         <!-- Image upload + filigrane -->

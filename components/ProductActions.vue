@@ -8,6 +8,7 @@ const props = defineProps<{ product: Product; compact?: boolean }>()
 const { track, like, share } = useTrack()
 const inter = useInteractionsStore()
 const auth = useAuthStore()
+const config = useRuntimeConfig()
 
 const liked = computed(() => inter.getLike(props.product.id).liked)
 const likeCount = computed(() => inter.getLike(props.product.id).count)
@@ -28,8 +29,9 @@ function onLike() {
 function onShareWa() {
   const msg = `📦 ${props.product.title}\n💰 ${props.product.priceXof} F CFA\nDécouvrez ce drop exclusif BLACK MARKET :`
   const url = window.location.origin + '/p/' + props.product.id + '.html'
+  const num = props.product.waNumber || config.public.phoneNumber
   window.open(
-    'https://wa.me/?text=' + encodeURIComponent(msg + '\n' + url),
+    'https://wa.me/' + num + '?text=' + encodeURIComponent(msg + '\n' + url),
     '_blank',
     'noopener,noreferrer',
   )

@@ -16,7 +16,7 @@ interface SessionPayload {
   email?: string
   name?: string
   picture?: string
-  role?: 'admin' | 'user'
+  role?: 'user' | 'editor' | 'publisher' | 'admin'
   userId?: string
   exp: number
 }

@@ -6,11 +6,21 @@ const error = ref('')
 const savedMsg = ref('')
 const newEmail = ref('')
 const saving = ref(false)
+const roleBusy = ref('')
 
 const data = computed(() => store.users)
 const isOwner = computed(() => !!data.value?.currentEmail && data.value?.currentEmail === data.value?.owner)
 
 onMounted(() => store.loadUsers())
+
+const ROLES = [
+  { value: 'user', label: 'Membre', color: 'text-zinc-400 border-zinc-700' },
+  { value: 'editor', label: 'Éditeur', color: 'text-cyan-400 border-cyan-500/40' },
+  { value: 'publisher', label: 'Publieur', color: 'text-violet-400 border-violet-500/40' },
+  { value: 'admin', label: 'Admin', color: 'text-[#ff2a2a] border-[#ff2a2a]/40' },
+]
+const roleLabel = (r?: string) => ROLES.find((x) => x.value === r)?.label || 'Membre'
+const roleColor = (r?: string) => ROLES.find((x) => x.value === r)?.color || 'text-zinc-400 border-zinc-700'
 
 function formatDate(iso: string) {
   try {
@@ -20,13 +30,14 @@ function formatDate(iso: string) {
   }
 }
 
+// ---- admin promotion (owner only) ----
 async function promote(email: string) {
   if (!data.value || !isOwner.value || saving.value) return
   saving.value = true
   savedMsg.value = ''
   error.value = ''
   try {
-    const next = await store.saveAdmins([...store.admins, email])
+    await store.saveAdmins([...store.admins, email])
     savedMsg.value = `« ${email} » est désormais administrateur.`
   } catch (e: any) {
     error.value = e?.message || 'Erreur lors de la promotion.'
@@ -41,7 +52,7 @@ async function demote(email: string) {
   savedMsg.value = ''
   error.value = ''
   try {
-    const next = await store.saveAdmins(store.admins.filter((a) => a !== email))
+    await store.saveAdmins(store.admins.filter((a) => a !== email))
     savedMsg.value = `« ${email} » n'est plus administrateur.`
   } catch (e: any) {
     error.value = e?.message || 'Erreur lors de la rétrogradation.'
@@ -70,6 +81,31 @@ async function addByEmail() {
     saving.value = false
   }
 }
+
+// ---- role elevation (any admin can set editor/publisher/member) ----
+async function setRole(login: any, role: string) {
+  const key = login.id || login.email
+  roleBusy.value = key
+  error.value = ''
+  const prev = login.role
+  login.role = role // optimistic
+  try {
+    const res = await fetch('/api/users/' + encodeURIComponent(login.id || '') + '/role', {
+      method: 'PUT',
+      headers: store.headers(),
+      body: JSON.stringify({ role, email: login.email }),
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(json?.statusMessage || `Erreur ${res.status}`)
+    savedMsg.value = `Rôle de « ${login.name} » → ${roleLabel(role)}.`
+    await store.loadUsers()
+  } catch (e: any) {
+    login.role = prev
+    error.value = e?.message || "Erreur lors de la mise à jour du rôle."
+  } finally {
+    roleBusy.value = ''
+  }
+}
 </script>
 
 <template>
@@ -82,8 +118,8 @@ async function addByEmail() {
         </h3>
         <p class="text-[10px] font-mono text-zinc-500 mt-1">
           {{ isOwner
-            ? 'Propriétaire — vous pouvez promouvoir ou rétrograder les administrateurs.'
-            : (data?.currentEmail ? 'Connecté en tant qu\'administrateur (lecture seule).' : 'Connecté via mot de passe (lecture seule).') }}
+            ? 'Propriétaire — vous pouvez promouvoir/rétrograder les administrateurs et élever les rôles.'
+            : (data?.currentEmail ? 'Connecté en tant qu\'administrateur (rôles modifiables).' : 'Connecté via mot de passe (lecture seule).') }}
         </p>
       </div>
       <button
@@ -98,17 +134,17 @@ async function addByEmail() {
     <div v-if="error" class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-2xl px-4 py-3 text-xs font-mono">{{ error }}</div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <!-- Connexions Google -->
+      <!-- Tous les comptes connectés -->
       <div class="bg-[#0d0d14] rounded-3xl p-5 md:p-6 border border-zinc-800 space-y-4">
         <div>
           <h4 class="text-sm font-extrabold text-white font-mono uppercase tracking-wider flex items-center gap-2">
-            <AppIcon name="refresh" :size="14" class="text-zinc-500" /> CONNEXIONS GOOGLE
+            <AppIcon name="refresh" :size="14" class="text-zinc-500" /> COMPTES CONNECTÉS
           </h4>
-          <p class="text-[10px] font-mono text-zinc-500">Comptes Gmail qui se sont connectés</p>
+          <p class="text-[10px] font-mono text-zinc-500">Toute personne connectée (Google, WhatsApp, email) apparaît ici.</p>
         </div>
 
-        <div class="space-y-2">
-          <div v-if="!data?.logins?.length" class="py-8 text-center text-xs font-mono text-zinc-500">Aucune connexion Google enregistrée.</div>
+        <div class="space-y-2 max-h-[480px] overflow-y-auto pr-1">
+          <div v-if="!data?.logins?.length" class="py-8 text-center text-xs font-mono text-zinc-500">Aucun compte connecté pour l'instant.</div>
           <div v-for="u in data?.logins || []" :key="u.email" class="flex items-center gap-3 bg-black/40 border border-zinc-900 rounded-xl px-3 py-2.5">
             <img v-if="u.picture" :src="u.picture" alt="" class="w-9 h-9 rounded-full object-cover bg-zinc-900 border border-zinc-800" />
             <div v-else class="w-9 h-9 rounded-full bg-gradient-to-br from-[#ff2a2a] to-[#900] flex items-center justify-center text-white text-xs font-mono font-bold">
@@ -118,28 +154,52 @@ async function addByEmail() {
               <div class="text-xs font-mono text-slate-200 flex items-center gap-1.5 truncate">
                 <span class="truncate">{{ u.name }}</span>
                 <span v-if="u.email === data?.owner" title="Propriétaire"><AppIcon name="crown" :size="13" class="text-yellow-400" /></span>
-                <span v-if="store.admins.includes(u.email) && u.email !== data?.owner" title="Administrateur"><AppIcon name="settings" :size="13" class="text-[#ff2a2a]" /></span>
               </div>
               <div class="text-[9px] font-mono text-zinc-500 truncate">{{ u.email }}</div>
-              <div class="text-[9px] font-mono text-zinc-600">Dernière connexion : {{ formatDate(u.loggedInAt) }}</div>
+              <div class="text-[9px] font-mono text-zinc-600">
+                {{ u.phone ? u.phone + ' · ' : '' }}Dernière connexion : {{ formatDate(u.loggedInAt) }}
+              </div>
             </div>
-            <span v-if="u.email === data?.owner" class="text-[8px] font-mono font-bold uppercase text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 px-2 py-1 rounded-full shrink-0">Propriétaire</span>
-            <button
-              v-else-if="store.admins.includes(u.email)"
-              @click="demote(u.email)"
-              :disabled="!isOwner || saving"
-              class="inline-flex items-center gap-1 text-[9px] font-mono font-bold uppercase px-2 py-1 rounded-lg text-red-400 border border-red-500/30 bg-red-500/5 hover:bg-red-500/15 disabled:opacity-30 transition-all"
-            >
-              Rétrograder
-            </button>
-            <button
-              v-else
-              @click="promote(u.email)"
-              :disabled="!isOwner || saving"
-              class="inline-flex items-center gap-1 text-[9px] font-mono font-bold uppercase px-2 py-1 rounded-lg text-[#ff2a2a] border border-[#ff2a2a]/30 bg-[#ff2a2a]/5 hover:bg-[#ff2a2a]/15 disabled:opacity-30 transition-all"
-            >
-              Promouvoir
-            </button>
+
+            <div class="flex flex-col items-end gap-1 shrink-0">
+              <span class="text-[8px] font-mono font-bold uppercase px-2 py-0.5 rounded-full border" :class="roleColor(u.role)">
+                {{ roleLabel(u.role) }}
+              </span>
+              <select
+                v-if="u.email !== data?.owner"
+                :value="u.role || 'user'"
+                :disabled="roleBusy === (u.id || u.email)"
+                @change="setRole(u, ($event.target as HTMLSelectElement).value)"
+                class="bg-black/60 border border-zinc-800 rounded-lg px-1.5 py-1 text-[9px] font-mono text-slate-300 focus:outline-none focus:border-[#ff2a2a]/50 disabled:opacity-40"
+                title="Changer le rôle"
+              >
+                <option value="user">Membre</option>
+                <option value="editor">Éditeur</option>
+                <option value="publisher">Publieur</option>
+              </select>
+              <span v-else class="text-[8px] font-mono font-bold uppercase text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 px-2 py-1 rounded-full">Propriétaire</span>
+            </div>
+
+            <div class="flex flex-col gap-1 shrink-0">
+              <button
+                v-if="store.admins.includes(u.email) && u.email !== data?.owner"
+                @click="demote(u.email)"
+                :disabled="!isOwner || saving"
+                class="inline-flex items-center gap-1 text-[9px] font-mono font-bold uppercase px-2 py-1 rounded-lg text-red-400 border border-red-500/30 bg-red-500/5 hover:bg-red-500/15 disabled:opacity-30 transition-all"
+                title="Retirer les droits admin"
+              >
+                Rétrograder
+              </button>
+              <button
+                v-else-if="!store.admins.includes(u.email) && u.email !== data?.owner"
+                @click="promote(u.email)"
+                :disabled="!isOwner || saving"
+                class="inline-flex items-center gap-1 text-[9px] font-mono font-bold uppercase px-2 py-1 rounded-lg text-[#ff2a2a] border border-[#ff2a2a]/30 bg-[#ff2a2a]/5 hover:bg-[#ff2a2a]/15 disabled:opacity-30 transition-all"
+                title="Promouvoir au rang d'administrateur"
+              >
+                Promouvoir
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -191,7 +251,7 @@ async function addByEmail() {
             </button>
           </form>
           <p class="text-[9px] font-mono text-zinc-600 leading-relaxed">
-            L'email ajouté pourra ensuite se connecter avec « Se connecter avec Google » sur l'écran de connexion. Toute personne connectée apparaît dans la liste des connexions ci-contre.
+            Tout le monde peut se connecter avec « Se connecter avec Google ». L'email ajouté pourra ensuite accéder au panneau d'administration. Depuis la liste des comptes, élevez les rôles (Éditeur, Publieur…) quand vous le décidez.
           </p>
         </div>
       </div>

@@ -13,11 +13,19 @@ const imgHeight = computed(() => heights[props.index % heights.length] + 'px')
 
 const url = computed(() => `/p/${props.product.id}.html`)
 
+// Cards auto-play the product video (muted by default); a mute button lets the
+// visitor re-enable sound. Photos/videos keep showing in the product carousel.
+const videoMuted = ref(true)
+function toggleMute() {
+  videoMuted.value = !videoMuted.value
+}
+
 function preorder() {
   const msg = `📦 ${props.product.title}\n💰 ${formatPriceXof(props.product.priceXof)} F CFA\nDécouvrez ce drop exclusif BLACK MARKET :`
   const link = window.location.origin + url.value
+  const num = props.product.waNumber || config.public.phoneNumber
   auth.requireAuth(
-    () => window.open('https://wa.me/' + config.public.phoneNumber + '?text=' + encodeURIComponent(msg + '\n' + link), '_blank', 'noopener,noreferrer'),
+    () => window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(msg + '\n' + link), '_blank', 'noopener,noreferrer'),
     'Connectez-vous pour précommander',
   )
 }
@@ -27,14 +35,37 @@ function preorder() {
   <div class="group bg-[#12121a] rounded-2xl overflow-hidden border border-zinc-800 hover:border-[#ff2a2a]/40 transition-all duration-300 cursor-pointer">
     <NuxtLink :to="url" class="block" :aria-label="product.title">
       <div class="relative overflow-hidden" :style="{ height: imgHeight }">
+        <video
+          v-if="product.videoUrl"
+          :src="product.videoUrl"
+          :muted="videoMuted"
+          autoplay
+          loop
+          playsinline
+          :poster="product.imageUrl || undefined"
+          class="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-500"
+        ></video>
         <img
+          v-else
           :src="product.imageUrl || `/api/img/${encodeURIComponent(product.id)}.jpg`"
           :alt="product.title"
           loading="lazy"
           class="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-500"
         />
+        <button
+          v-if="product.videoUrl"
+          @click.stop.prevent="toggleMute"
+          class="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-black/60 hover:bg-[#ff2a2a]/80 border border-white/20 text-white flex items-center justify-center z-10 transition-colors"
+          :title="videoMuted ? 'Activer le son' : 'Couper le son'"
+          :aria-label="videoMuted ? 'Activer le son' : 'Couper le son'"
+        >
+          <AppIcon :name="videoMuted ? 'muted' : 'sound'" :size="14" />
+        </button>
         <span class="absolute top-3 left-3 bg-[#ff2a2a] text-white text-[9px] uppercase font-bold tracking-widest px-2.5 py-1 rounded">
           {{ product.category || 'EXCLUSIF' }}
+        </span>
+        <span v-if="product.videoUrl" class="absolute top-3 right-3 bg-black/60 text-white text-[8px] uppercase font-bold tracking-widest px-2 py-1 rounded border border-white/20 flex items-center gap-1">
+          <AppIcon name="video" :size="10" /> VIDEO
         </span>
       </div>
     </NuxtLink>

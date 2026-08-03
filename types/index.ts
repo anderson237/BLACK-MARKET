@@ -14,6 +14,7 @@ export interface Product {
   videoUrl?: string
   category: string
   whatsappClicks: number
+  waNumber?: string
   sourceRmb?: number
   deleted?: boolean
   deletedAt?: string
