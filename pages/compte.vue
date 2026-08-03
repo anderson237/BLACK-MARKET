@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { COUNTRIES, countryByCode, type Country } from '~/data/countries'
+import { ANIMAL_AVATARS, avatarDataUri } from '~/data/avatars'
 import { useAuthStore } from '~/stores/auth'
 
 useSeoMeta({ title: 'Mon espace — BLACK MARKET' })
@@ -30,6 +31,7 @@ const showCountry = ref(false)
 const saving = ref(false)
 const error = ref('')
 const ok = ref('')
+const selectedAvatar = ref('')
 
 const filteredCountries = computed(() => {
   const q = countrySearch.value.trim().toLowerCase()
@@ -50,6 +52,7 @@ function fillForm() {
   pseudo.value = u?.pseudo || ''
   name.value = u?.name || ''
   phoneNumber.value = u?.phone || ''
+  selectedAvatar.value = ANIMAL_AVATARS.find((a) => u?.picture === avatarDataUri(a.key))?.key || ''
   if (u?.phonePrefix) prefix.value = u.phonePrefix
   if (u?.country) {
     const c = COUNTRIES.find((x) => x.name === u.country)
@@ -73,10 +76,12 @@ async function saveProfile() {
         phone: phone || undefined,
         phonePrefix: prefix.value,
         country: selectedCountry.value?.name,
+        picture: selectedAvatar.value ? avatarDataUri(selectedAvatar.value) : undefined,
       }),
     })
     if (data?.user) auth.updateUser(data.user)
     ok.value = 'Profil enregistré ✓'
+    if (needsCompletion.value) navigateTo('/compte')
   } catch (e: any) {
     error.value = e?.message || 'Erreur lors de l\'enregistrement.'
   } finally {
@@ -107,6 +112,7 @@ async function onAvatarFile(ev: Event) {
       body: JSON.stringify({ picture: data.url }),
     })
     if (me?.user) auth.updateUser(me.user)
+    selectedAvatar.value = ''
     ok.value = 'Photo de profil mise à jour ✓'
   } catch (e: any) {
     error.value = e?.message || 'Upload de la photo échoué.'
@@ -129,16 +135,19 @@ function readAsDataURL(file: File): Promise<string> {
 interface CommentItem { id: string; productId: string; text: string; createdAt: string; productTitle?: string; productImage?: string }
 interface EventItem { type: string; productId?: string; productTitle?: string; productImage?: string; ts: number; url?: string }
 interface OrderItem { id: string; productTitle?: string; productImage?: string; quantity: number; priceXof: number; status: string; createdAt: string }
+interface LikedItem { productId: string; productTitle?: string; productImage?: string }
 interface InteractionsData {
   user?: any
   comments: CommentItem[]
   events: EventItem[]
+  liked: LikedItem[]
   orders: OrderItem[]
   stats: { comments: number; likes: number; views: number; clicks: number; shares: number; orders: number }
 }
 
 const data = ref<InteractionsData | null>(null)
 const loadingData = ref(false)
+let refreshTimer: ReturnType<typeof setTimeout> | null = null
 
 async function loadInteractions() {
   if (!auth.isAuthed) return
@@ -150,6 +159,21 @@ async function loadInteractions() {
   } finally {
     loadingData.value = false
   }
+}
+
+// Two-way binding: any like/comment/share fires `bm:track` -> refresh stats live.
+onMounted(() => {
+  window.addEventListener('bm:track', onTrackRefresh)
+})
+onUnmounted(() => {
+  window.removeEventListener('bm:track', onTrackRefresh)
+  if (refreshTimer) clearTimeout(refreshTimer)
+})
+function onTrackRefresh() {
+  if (refreshTimer) clearTimeout(refreshTimer)
+  refreshTimer = setTimeout(() => {
+    if (auth.isAuthed && !needsCompletion.value) loadInteractions()
+  }, 600)
 }
 
 onMounted(fillForm)
@@ -220,6 +244,22 @@ const productUrl = (id?: string) => (id ? `/p/${id}.html` : '/')
                 </div>
               </div>
             </div>
+          </div>
+
+          <div>
+            <label class="text-[9px] text-zinc-500 font-mono uppercase tracking-widest">Avatar (choisissez un animal)</label>
+            <div class="grid grid-cols-6 gap-1.5 mt-2">
+              <button v-for="a in ANIMAL_AVATARS" :key="a.key" type="button"
+                class="aspect-square rounded-xl overflow-hidden border transition-all"
+                :class="selectedAvatar === a.key ? 'border-[#ff2a2a] ring-2 ring-[#ff2a2a]/40' : 'border-zinc-800 hover:border-zinc-600'"
+                :title="a.label" @click="selectedAvatar = a.key === selectedAvatar ? '' : a.key">
+                <img :src="avatarDataUri(a.key)" :alt="a.label" class="w-full h-full object-cover" />
+              </button>
+            </div>
+            <label class="inline-flex items-center gap-1.5 mt-2 text-[10px] font-mono text-zinc-400 hover:text-white cursor-pointer transition-colors">
+              <AppIcon name="plus" :size="12" /> Photo manuelle
+              <input type="file" accept="image/*" class="hidden" @change="onAvatarFile" />
+            </label>
           </div>
 
           <div>
@@ -304,9 +344,43 @@ const productUrl = (id?: string) => (id ? `/p/${id}.html` : '/')
         </div>
       </div>
 
+      <!-- Liked products -->
+      <div v-if="data && data.liked.length" class="mt-8">
+        <p class="text-[9px] text-[#ff2a2a] font-mono uppercase font-bold tracking-wider mb-3">PRODUITS QUE VOUS AIMEZ ({{ data.stats.likes }})</p>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          <NuxtLink v-for="l in data.liked" :key="'L' + l.productId" :to="productUrl(l.productId)"
+            class="bg-black/30 border border-zinc-900 rounded-xl overflow-hidden hover:border-[#ff2a2a]/40 transition-all group">
+            <img v-if="l.productImage" :src="l.productImage" alt="" class="w-full h-24 object-cover" />
+            <div v-else class="w-full h-24 bg-[#16161d] flex items-center justify-center text-[#ff2a2a]">
+              <AppIcon name="heart" :size="20" />
+            </div>
+            <p class="text-[10px] font-mono text-slate-300 px-2 py-2 truncate">{{ l.productTitle || 'Produit' }}</p>
+          </NuxtLink>
+        </div>
+      </div>
+
       <!-- Edit profile inline -->
       <div v-if="editOpen" class="bg-[#12121a] border border-zinc-800 rounded-2xl p-6 mt-6 space-y-3">
         <p class="text-[9px] text-[#ff2a2a] font-mono uppercase font-bold tracking-wider">MODIFIER MON PROFIL</p>
+        <div class="flex items-center gap-3">
+          <div class="relative shrink-0">
+            <img v-if="avatarUrl" :src="avatarUrl" alt="avatar" class="w-14 h-14 rounded-full object-cover border-2 border-[#ff2a2a]/50" />
+            <div v-else class="w-14 h-14 rounded-full bg-[#ff2a2a]/15 border-2 border-[#ff2a2a]/50 flex items-center justify-center text-[#ff2a2a] font-black">{{ initials }}</div>
+            <label class="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#ff2a2a] hover:bg-red-600 flex items-center justify-center cursor-pointer border border-black" title="Téléverser une photo">
+              <AppIcon name="edit" :size="11" />
+              <input type="file" accept="image/*" class="hidden" @change="onAvatarFile" />
+            </label>
+          </div>
+          <p class="text-[10px] font-mono text-zinc-500 leading-relaxed">Choisissez un avatar animal par défaut ou téléversez votre propre photo.</p>
+        </div>
+        <div class="grid grid-cols-6 gap-1.5">
+          <button v-for="a in ANIMAL_AVATARS" :key="a.key" type="button"
+            class="aspect-square rounded-xl overflow-hidden border transition-all"
+            :class="selectedAvatar === a.key ? 'border-[#ff2a2a] ring-2 ring-[#ff2a2a]/40' : 'border-zinc-800 hover:border-zinc-600'"
+            :title="a.label" @click="selectedAvatar = a.key === selectedAvatar ? '' : a.key">
+            <img :src="avatarDataUri(a.key)" :alt="a.label" class="w-full h-full object-cover" />
+          </button>
+        </div>
         <input v-model="pseudo" type="text" placeholder="Pseudo" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 font-mono focus:outline-none focus:border-[#ff2a2a]/60 transition-colors" />
         <input v-model="name" type="text" placeholder="Nom & prénom" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 font-mono focus:outline-none focus:border-[#ff2a2a]/60 transition-colors" />
         <div class="flex gap-1.5">

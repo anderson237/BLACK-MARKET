@@ -18,10 +18,18 @@ export default defineEventHandler(async (event) => {
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, MAX)
 
-  const events = (social.events || [])
+  // Full event history for this user (stats must NOT be sliced by the timeline cap).
+  const mine = (social.events || [])
     .filter((e) => e.userId === userId)
     .sort((a, b) => (b.ts || 0) - (a.ts || 0))
-    .slice(0, MAX)
+
+  // Current like state per product: last like/unlike event wins.
+  const likeState = new Map<string, boolean>()
+  for (const e of mine) {
+    if (e.type === 'like') likeState.set(e.productId, true)
+    else if (e.type === 'unlike') likeState.set(e.productId, false)
+  }
+  const likedIds = [...likeState.entries()].filter(([, liked]) => liked).map(([productId]) => productId)
 
   const orders = (await loadOrders())
     .filter((o) =>
@@ -45,12 +53,25 @@ export default defineEventHandler(async (event) => {
     }
   })
 
+  // Timeline: latest events, then make sure currently-liked products always
+  // show their like even if the event fell outside the slice.
+  const timeline = mine.slice(0, MAX)
+  const seenProducts = new Set(timeline.map((e) => e.productId))
+  for (const e of mine) {
+    if (e.type === 'like' && likedIds.includes(e.productId) && !seenProducts.has(e.productId)) {
+      timeline.push(e)
+      seenProducts.add(e.productId)
+    }
+    if (timeline.length >= MAX + 24) break
+  }
+  timeline.sort((a, b) => (b.ts || 0) - (a.ts || 0))
+
   const stats = {
     comments: comments.length,
-    likes: events.filter((e) => e.type === 'like').length,
-    views: events.filter((e) => e.type === 'view').length,
-    clicks: events.filter((e) => e.type === 'click').length,
-    shares: events.filter((e) => e.type === 'share' || e.type === 'copy').length,
+    likes: likedIds.length,
+    views: mine.filter((e) => e.type === 'view').length,
+    clicks: mine.filter((e) => e.type === 'click').length,
+    shares: mine.filter((e) => e.type === 'share' || e.type === 'copy').length,
     orders: orders.length,
   }
 
@@ -71,7 +92,8 @@ export default defineEventHandler(async (event) => {
         }
       : null,
     comments: enrich(comments),
-    events: enrich(events),
+    events: enrich(timeline),
+    liked: enrich(likedIds.map((id) => ({ productId: id }))),
     orders: enrich(orders),
     stats,
   }

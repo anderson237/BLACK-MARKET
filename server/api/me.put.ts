@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
   const pseudo = clean(body?.pseudo, 40)
   if (body?.pseudo !== undefined) next.pseudo = pseudo
 
-  const picture = clean(body?.picture, 500)
+  const picture = clean(body?.picture, 8000)
   if (body?.picture !== undefined) next.picture = picture
 
   const phone = clean(body?.phone, 20).replace(/[^0-9]/g, '')
