@@ -234,9 +234,14 @@ const productUrl = (id?: string) => (id ? `/p/${id}.html` : '/')
           <p v-if="error" class="text-[11px] text-[#ff2a2a] font-mono">{{ error }}</p>
           <p v-if="ok" class="text-[11px] text-emerald-400 font-mono">{{ ok }}</p>
 
-          <button @click="saveProfile" :disabled="saving" class="w-full bg-[#ff2a2a] hover:bg-red-600 text-white font-bold text-sm px-4 py-3 rounded-xl transition-all font-mono disabled:opacity-50">
-            {{ saving ? '…' : 'Activer mon espace' }}
-          </button>
+          <div class="flex gap-2">
+            <button @click="saveProfile" :disabled="saving" class="flex-1 bg-[#ff2a2a] hover:bg-red-600 text-white font-bold text-sm px-4 py-3 rounded-xl transition-all font-mono disabled:opacity-50">
+              {{ saving ? '…' : 'Activer mon espace' }}
+            </button>
+            <NuxtLink to="/" class="inline-flex items-center justify-center gap-1.5 border border-zinc-800 hover:border-[#ff2a2a]/60 hover:text-white text-zinc-400 text-[11px] font-mono px-4 py-3 rounded-xl transition-all" title="Retour à l'accueil">
+              <AppIcon name="chevronLeft" :size="14" /> Accueil
+            </NuxtLink>
+          </div>
         </div>
       </div>
     </div>
