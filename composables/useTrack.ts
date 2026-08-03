@@ -62,9 +62,11 @@ export function useTrack() {
 
     // Best-effort push to backend (fire and forget)
     if (import.meta.client) {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (auth.token) headers.Authorization = `Bearer ${auth.token}`
       fetch('/api/events', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(event),
         keepalive: true,
       }).catch(() => {})

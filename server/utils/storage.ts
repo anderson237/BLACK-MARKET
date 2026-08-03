@@ -288,6 +288,18 @@ export async function deleteCommentIfOwner(id: string, userId: string): Promise<
   return true
 }
 
+// Client space: a user may edit the text of their own comment.
+export async function updateCommentIfOwner(id: string, userId: string, text: string): Promise<Comment | null> {
+  const social = await loadSocial()
+  const idx = social.comments.findIndex((c) => c.id === id)
+  if (idx < 0) return null
+  const target = social.comments[idx]
+  if (String(target.userId || '') !== String(userId)) throw new Error('Ce commentaire ne vous appartient pas.')
+  social.comments[idx] = { ...target, text }
+  await saveSocial(social)
+  return social.comments[idx]
+}
+
 // Client space: a user may remove one of their own tracked events.
 export async function deleteUserEvent(userId: string, ts: number): Promise<boolean> {
   const social = await loadSocial()

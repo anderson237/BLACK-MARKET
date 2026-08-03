@@ -1,4 +1,6 @@
+import crypto from 'node:crypto'
 import { safeEqual, signToken, rateLimit, SESSION_TTL_MS } from '~~/server/utils/auth'
+import { findAccount, upsertAccount, type PublicAccount } from '~~/server/utils/storage'
 
 const adminEmails = (process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || 'elomopatrick.pn@gmail.com')
   .toLowerCase()
@@ -17,9 +19,39 @@ export default defineEventHandler(async (event) => {
   if (email && !adminEmails.includes(email)) {
     throw createError({ statusCode: 401, statusMessage: 'Email administrateur non reconnu.' })
   }
-  if (safeEqual(password, adminPassword)) {
-    const token = await signToken({ email: email || undefined, role: 'admin', exp: Date.now() + SESSION_TTL_MS })
-    return { success: true, token, role: 'admin', expiresIn: SESSION_TTL_MS }
+  if (!safeEqual(password, adminPassword)) {
+    throw createError({ statusCode: 401, statusMessage: 'Clé d\'accès incorrecte.' })
   }
-  throw createError({ statusCode: 401, statusMessage: 'Clé d\'accès incorrecte.' })
+
+  // The admin login must resolve to a real client account so the connected
+  // session carries a stable userId. Create the account on first login if the
+  // admin email has not signed in through Google yet.
+  const adminEmail = email || adminEmails[0] || 'elomopatrick.pn@gmail.com'
+  let account = adminEmail ? await findAccount({ email: adminEmail }) : null
+  if (!account) {
+    account = {
+      id: `usr_${crypto.randomBytes(8).toString('hex')}`,
+      email: adminEmail,
+      name: 'Administrateur',
+      provider: 'password',
+      role: 'admin',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      lastLoginAt: new Date().toISOString(),
+    }
+  } else {
+    account = await upsertAccount({ ...account, lastLoginAt: new Date().toISOString() })
+  }
+  const saved = await upsertAccount(account)
+
+  const token = await signToken({
+    email: saved.email,
+    name: saved.name,
+    picture: saved.picture,
+    userId: saved.id,
+    role: 'admin',
+    exp: Date.now() + SESSION_TTL_MS,
+  })
+  const { passwordHash, salt, ...pub } = saved as PublicAccount
+  return { success: true, token, role: 'admin', user: pub, expiresIn: SESSION_TTL_MS }
 })

@@ -177,10 +177,16 @@ async function loadInteractions() {
 // Two-way binding: any like/comment/share fires `bm:track` -> refresh stats live.
 onMounted(() => {
   window.addEventListener('bm:track', onTrackRefresh)
+  window.addEventListener('focus', onTrackRefresh)
+  document.addEventListener('visibilitychange', onVisibility)
+  autoRefresh = setInterval(onTrackRefresh, 15_000)
 })
 onUnmounted(() => {
   window.removeEventListener('bm:track', onTrackRefresh)
+  window.removeEventListener('focus', onTrackRefresh)
+  document.removeEventListener('visibilitychange', onVisibility)
   if (refreshTimer) clearTimeout(refreshTimer)
+  if (autoRefresh) clearInterval(autoRefresh)
 })
 function onTrackRefresh() {
   if (refreshTimer) clearTimeout(refreshTimer)
@@ -188,6 +194,10 @@ function onTrackRefresh() {
     if (auth.isAuthed && !needsCompletion.value) loadInteractions()
   }, 600)
 }
+function onVisibility() {
+  if (document.visibilityState === 'visible') onTrackRefresh()
+}
+let autoRefresh: ReturnType<typeof setInterval> | null = null
 
 onMounted(fillForm)
 watch(() => auth.isAuthed, (v) => { if (v) { fillForm(); loadInteractions() } }, { immediate: true })
@@ -223,6 +233,9 @@ const productUrl = (id?: string) => (id ? `/p/${id}.html` : '/')
 
 // ---- CRUD: delete your own interactions ----
 const deleting = ref<string | null>(null)
+const editingId = ref<string | null>(null)
+const editingText = ref('')
+const savingEdit = ref(false)
 
 async function deleteOwnComment(id: string) {
   if (!window.confirm('Supprimer définitivement ce commentaire ?')) return
@@ -235,6 +248,38 @@ async function deleteOwnComment(id: string) {
     window.alert(e?.message || 'Impossible de supprimer le commentaire.')
   } finally {
     deleting.value = null
+  }
+}
+
+function startEditComment(c: CommentItem) {
+  editingId.value = c.id
+  editingText.value = c.text
+}
+
+function cancelEditComment() {
+  editingId.value = null
+  editingText.value = ''
+}
+
+async function saveEditComment(id: string) {
+  const text = editingText.value.trim()
+  if (!text) return
+  savingEdit.value = true
+  try {
+    const res = await auth.api('/api/me/comments/' + encodeURIComponent(id), {
+      method: 'PUT',
+      body: JSON.stringify({ text }),
+    })
+    if (data.value) {
+      const idx = data.value.comments.findIndex((c) => c.id === id)
+      if (idx >= 0) data.value.comments[idx].text = res.comment?.text || text
+    }
+    editingId.value = null
+    window.dispatchEvent(new CustomEvent('bm:track', { detail: { type: 'comment' } }))
+  } catch (e: any) {
+    window.alert(e?.message || 'Impossible de modifier le commentaire.')
+  } finally {
+    savingEdit.value = false
   }
 }
 
@@ -551,14 +596,35 @@ function unlikeProduct(productId: string) {
                 <img v-if="c.productImage" :src="c.productImage" alt="" class="w-11 h-11 rounded-lg object-cover border border-zinc-800 shrink-0" />
               </NuxtLink>
               <div class="flex-1 min-w-0">
-                <p class="text-xs text-zinc-300"><span class="text-slate-100 font-bold">Vous avez commenté</span> {{ c.text }}</p>
-                <NuxtLink :to="productUrl(c.productId)" class="text-[10px] text-zinc-500 font-mono hover:text-[#ff2a2a] transition-colors">{{ c.productTitle || 'Produit' }} · {{ timeAgo(c.createdAt) }}</NuxtLink>
+                <template v-if="editingId === c.id">
+                  <textarea v-model="editingText" rows="2" maxlength="1000"
+                    class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-[#ff2a2a]/60 transition-colors resize-none" />
+                  <div class="flex items-center gap-2 mt-2">
+                    <button @click="saveEditComment(c.id)" :disabled="savingEdit || !editingText.trim()"
+                      class="shrink-0 bg-[#ff2a2a] hover:bg-red-600 text-white text-[10px] font-bold font-mono px-3 py-1.5 rounded-lg transition-all disabled:opacity-40">
+                      {{ savingEdit ? '…' : 'Enregistrer' }}
+                    </button>
+                    <button @click="cancelEditComment"
+                      class="shrink-0 text-[10px] font-mono text-zinc-400 hover:text-white border border-zinc-800 px-3 py-1.5 rounded-lg transition-all">Annuler</button>
+                  </div>
+                </template>
+                <template v-else>
+                  <p class="text-xs text-zinc-300"><span class="text-slate-100 font-bold">Vous avez commenté</span> {{ c.text }}</p>
+                  <NuxtLink :to="productUrl(c.productId)" class="text-[10px] text-zinc-500 font-mono hover:text-[#ff2a2a] transition-colors">{{ c.productTitle || 'Produit' }} · {{ timeAgo(c.createdAt) }}</NuxtLink>
+                </template>
               </div>
-              <button @click="deleteOwnComment(c.id)" :disabled="deleting === c.id"
-                class="shrink-0 w-8 h-8 rounded-lg border border-zinc-800 hover:border-red-500/60 text-zinc-500 hover:text-red-400 flex items-center justify-center transition-all disabled:opacity-40"
-                title="Supprimer ce commentaire">
-                <AppIcon name="trash" :size="13" />
-              </button>
+              <div class="flex flex-col gap-1.5 shrink-0">
+                <button @click="startEditComment(c.id)" :disabled="editingId === c.id"
+                  class="w-8 h-8 rounded-lg border border-zinc-800 hover:border-sky-500/60 text-zinc-500 hover:text-sky-400 flex items-center justify-center transition-all disabled:opacity-40"
+                  title="Modifier ce commentaire">
+                  <AppIcon name="edit" :size="13" />
+                </button>
+                <button @click="deleteOwnComment(c.id)" :disabled="deleting === c.id"
+                  class="w-8 h-8 rounded-lg border border-zinc-800 hover:border-red-500/60 text-zinc-500 hover:text-red-400 flex items-center justify-center transition-all disabled:opacity-40"
+                  title="Supprimer ce commentaire">
+                  <AppIcon name="trash" :size="13" />
+                </button>
+              </div>
             </div>
 
             <div v-for="(e, i) in data.events" :key="'e' + i" class="flex items-center gap-3 bg-black/30 border border-zinc-900 rounded-xl p-3">

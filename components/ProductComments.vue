@@ -24,6 +24,40 @@ const loading = ref(false)
 const submitting = ref(false)
 const error = ref('')
 const loaded = ref(false)
+const editingId = ref<string | null>(null)
+const editingText = ref('')
+const editingError = ref('')
+
+const isMine = (c: CommentItem) => auth.isAuthed && !!c.userId && c.userId === auth.user?.id
+
+function startEdit(c: CommentItem) {
+  editingId.value = c.id
+  editingText.value = c.text
+  editingError.value = ''
+}
+
+async function saveEdit(c: CommentItem) {
+  const body = editingText.value.trim()
+  if (!body) return
+  editingError.value = ''
+  try {
+    const res = await fetch(`/api/me/comments/${encodeURIComponent(c.id)}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${auth.token}`,
+      },
+      body: JSON.stringify({ text: body }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data?.statusMessage || data?.error || `Erreur ${res.status}`)
+    c.text = data.comment?.text || body
+    editingId.value = null
+    track({ type: 'comment', productId: props.productId })
+  } catch (e: any) {
+    editingError.value = e?.message || 'Impossible de modifier le commentaire.'
+  }
+}
 
 async function load() {
   try {
@@ -150,12 +184,30 @@ onMounted(load)
         <div v-else class="w-8 h-8 rounded-full bg-black/40 border border-zinc-800 flex items-center justify-center text-slate-400 font-mono text-xs shrink-0">
           {{ (c.name || '?').slice(0, 1).toUpperCase() }}
         </div>
-        <div class="min-w-0">
+        <div class="min-w-0 flex-1">
           <div class="flex items-baseline gap-2">
             <span class="text-xs font-bold text-slate-200">{{ c.name }}</span>
             <span class="text-[9px] text-zinc-600 font-mono">{{ timeAgo(c.createdAt) }}</span>
           </div>
-          <p class="text-xs text-zinc-300 mt-0.5 break-words">{{ c.text }}</p>
+          <template v-if="editingId === c.id">
+            <textarea v-model="editingText" rows="2" maxlength="1000"
+              class="mt-1 w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-[#ff2a2a]/60 transition-colors resize-none" />
+            <p v-if="editingError" class="text-[10px] text-[#ff2a2a] font-mono mt-1">{{ editingError }}</p>
+            <div class="flex items-center gap-2 mt-1.5">
+              <button @click="saveEdit(c)" :disabled="!editingText.trim()"
+                class="shrink-0 bg-[#ff2a2a] hover:bg-red-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg transition-all font-mono disabled:opacity-40">Enregistrer</button>
+              <button @click="editingId = null; editingText = ''"
+                class="shrink-0 text-[10px] font-mono text-zinc-400 hover:text-white border border-zinc-800 px-3 py-1.5 rounded-lg transition-all">Annuler</button>
+            </div>
+          </template>
+          <p v-else class="text-xs text-zinc-300 mt-0.5 break-words">{{ c.text }}</p>
+        </div>
+        <div v-if="isMine(c)" class="flex flex-col gap-1.5 shrink-0">
+          <button @click="startEdit(c)" :disabled="editingId === c.id"
+            class="w-7 h-7 rounded-lg border border-zinc-800 hover:border-sky-500/60 text-zinc-500 hover:text-sky-400 flex items-center justify-center transition-all disabled:opacity-40"
+            title="Modifier mon commentaire">
+            <AppIcon name="edit" :size="11" />
+          </button>
         </div>
       </div>
     </div>
