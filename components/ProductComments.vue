@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useAuthStore } from '~/stores/auth'
 import { useTrack } from '~/composables/useTrack'
+import { useCommentsStore } from '~/stores/comments'
 
 interface CommentItem {
   id: string
@@ -15,6 +16,7 @@ interface CommentItem {
 const props = defineProps<{ productId: string }>()
 const auth = useAuthStore()
 const { track } = useTrack()
+const commentsStore = useCommentsStore()
 
 const comments = ref<CommentItem[]>([])
 const text = ref('')
@@ -31,6 +33,12 @@ async function load() {
     if (!res.ok) return
     const data = await res.json()
     comments.value = Array.isArray(data?.comments) ? data.comments : []
+    if (Number.isFinite(Number(data?.count))) {
+      commentsStore.counts[props.productId] = Number(data.count)
+      commentsStore.loaded[props.productId] = true
+    } else {
+      commentsStore.bump(props.productId, comments.value.length - commentsStore.getCount(props.productId))
+    }
   } catch {
   } finally {
     loaded.value = true
@@ -60,6 +68,7 @@ async function submit() {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.statusMessage || data?.error || `Erreur ${res.status}`)
       comments.value.unshift(data.comment)
+      commentsStore.bump(props.productId, 1)
       text.value = ''
       track({ type: 'comment', productId: props.productId })
     } catch (e: any) {

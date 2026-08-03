@@ -247,6 +247,13 @@ export async function getComments(productId?: string): Promise<Comment[]> {
   return comments.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 200)
 }
 
+export async function getCommentCount(productId?: string): Promise<number> {
+  const social = await loadSocial()
+  const comments = social.comments || []
+  if (!productId) return comments.length
+  return comments.reduce((n, c) => n + (c.productId === productId ? 1 : 0), 0)
+}
+
 export async function addComment(comment: Comment): Promise<Comment> {
   const social = await loadSocial()
   social.comments.unshift(comment)

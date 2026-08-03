@@ -2,6 +2,7 @@
 import type { Product } from '~/types'
 import { useTrack } from '~/composables/useTrack'
 import { useAuthStore } from '~/stores/auth'
+import { useCommentsStore } from '~/stores/comments'
 
 const props = defineProps<{ product: Product; compact?: boolean }>()
 const { track, like, share } = useTrack()
@@ -11,17 +12,10 @@ const auth = useAuthStore()
 const liked = computed(() => inter.getLike(props.product.id).liked)
 const likeCount = computed(() => inter.getLike(props.product.id).count)
 
-const commentCount = ref(0)
-onMounted(async () => {
-  try {
-    const res = await fetch(`/api/products/${encodeURIComponent(props.product.id)}/comments`, {
-      headers: { Accept: 'application/json' },
-    })
-    if (res.ok) {
-      const data = await res.json()
-      commentCount.value = Array.isArray(data?.comments) ? data.comments.length : 0
-    }
-  } catch {}
+const commentsStore = useCommentsStore()
+const commentCount = computed(() => commentsStore.getCount(props.product.id))
+onMounted(() => {
+  if (!commentsStore.loaded[props.product.id]) commentsStore.refresh(props.product.id)
 })
 
 function onLike() {
