@@ -216,6 +216,7 @@ export const useAuthStore = defineStore('auth', () => {
     requireAuth,
     replayPending,
     updateUser,
+    api,
     loginEmail,
     loginPhone,
     register,
