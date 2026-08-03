@@ -1,4 +1,4 @@
-import { getToken } from "./api";
+import { getToken, setToken } from "./api";
 
 // ---------------------------------------------------------------------------
 // AI-driven ad media generation (free tier: Pollinations.ai, no key required)
@@ -107,6 +107,12 @@ export async function uploadWatermarkedImage(dataUrl: string): Promise<string> {
     body: JSON.stringify({ imageBase64: dataUrl }),
   });
   const data = await res.json();
+  if (res.status === 401) {
+    // Session expired/revoked: drop the token so the app returns to login.
+    setToken(null);
+    try { localStorage.removeItem("admin_authenticated"); sessionStorage.removeItem("admin_authenticated"); } catch { /* ignore */ }
+    throw new Error("Votre session a expiré. Veuillez vous reconnecter puis relancer la génération.");
+  }
   if (!res.ok || !data.url) {
     throw new Error(data.error || "Erreur lors de l'upload de l'image générée.");
   }

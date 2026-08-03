@@ -2,21 +2,39 @@ import { Product, WebhookConfig, Order, DashboardStats, UsersData } from "../typ
 import { TOKEN_STORAGE_KEY, SESSION_STORAGE_KEY } from "./constants";
 
 export function getToken(): string | null {
-  return sessionStorage.getItem(TOKEN_STORAGE_KEY);
+  try {
+    return localStorage.getItem(TOKEN_STORAGE_KEY);
+  } catch {
+    return sessionStorage.getItem(TOKEN_STORAGE_KEY);
+  }
 }
 
 export function setToken(token: string | null) {
-  if (token) sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
-  else sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+  try {
+    if (token) localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    else localStorage.removeItem(TOKEN_STORAGE_KEY);
+  } catch {
+    if (token) sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+    else sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+  }
 }
 
 export function setAuthenticated(flag: boolean) {
-  if (flag) sessionStorage.setItem(SESSION_STORAGE_KEY, "true");
-  else sessionStorage.removeItem(SESSION_STORAGE_KEY);
+  try {
+    if (flag) localStorage.setItem(SESSION_STORAGE_KEY, "true");
+    else localStorage.removeItem(SESSION_STORAGE_KEY);
+  } catch {
+    if (flag) sessionStorage.setItem(SESSION_STORAGE_KEY, "true");
+    else sessionStorage.removeItem(SESSION_STORAGE_KEY);
+  }
 }
 
 export function isAuthenticated(): boolean {
-  return sessionStorage.getItem(SESSION_STORAGE_KEY) === "true";
+  try {
+    return localStorage.getItem(SESSION_STORAGE_KEY) === "true";
+  } catch {
+    return sessionStorage.getItem(SESSION_STORAGE_KEY) === "true";
+  }
 }
 
 async function request<T>(url: string, options: RequestInit = {}, needsAuth = false): Promise<T> {
@@ -36,6 +54,12 @@ async function request<T>(url: string, options: RequestInit = {}, needsAuth = fa
     body = null;
   }
   if (!res.ok) {
+    if (res.status === 401 && needsAuth) {
+      // Session expired/revoked server-side: clear the local token so the app
+      // returns to the login screen instead of surfacing cryptic errors.
+      setToken(null);
+      try { localStorage.removeItem(SESSION_STORAGE_KEY); sessionStorage.removeItem(SESSION_STORAGE_KEY); } catch { /* ignore */ }
+    }
     const err = new Error(body?.error || `Erreur HTTP ${res.status}`);
     (err as any).status = res.status;
     throw err;
@@ -59,9 +83,9 @@ export async function googleLogin(credential: string): Promise<void> {
   setToken(data.token);
   if (data.email) {
     try {
-      sessionStorage.setItem("bm_admin_email", data.email);
+      localStorage.setItem("bm_admin_email", data.email);
     } catch {
-      // ignore
+      sessionStorage.setItem("bm_admin_email", data.email);
     }
   }
 }

@@ -579,7 +579,10 @@ export function getHtmlTemplateCode(opts?: { siteUrl?: string }): string {
     function logoutAdmin() {
       var token = "";
       try {
-        token = sessionStorage.getItem("bm_admin_token") || "";
+        token = localStorage.getItem("bm_admin_token") || sessionStorage.getItem("bm_admin_token") || "";
+        localStorage.removeItem("bm_admin_token");
+        localStorage.removeItem("admin_authenticated");
+        localStorage.removeItem("bm_admin_email");
         sessionStorage.removeItem("bm_admin_token");
         sessionStorage.removeItem("admin_authenticated");
         sessionStorage.removeItem("bm_admin_email");
@@ -628,9 +631,9 @@ export function getHtmlTemplateCode(opts?: { siteUrl?: string }): string {
         .then(function (r) {
           if (r.ok && r.data.token) {
             try {
-              sessionStorage.setItem("bm_admin_token", r.data.token);
-              sessionStorage.setItem("admin_authenticated", "true");
-              sessionStorage.setItem("bm_admin_email", r.data.email || "");
+              localStorage.setItem("bm_admin_token", r.data.token);
+              localStorage.setItem("admin_authenticated", "true");
+              localStorage.setItem("bm_admin_email", r.data.email || "");
             } catch (e2) {}
             closeLoginModal();
             showDashboard();
@@ -659,7 +662,7 @@ export function getHtmlTemplateCode(opts?: { siteUrl?: string }): string {
     }
     // Déjà connecté (session en cours) -> bouton Dashboard visible
     try {
-      if (sessionStorage.getItem("bm_admin_token")) showDashboard();
+      if (localStorage.getItem("bm_admin_token") || sessionStorage.getItem("bm_admin_token")) showDashboard();
     } catch (e2) {}
   </script>
 </body>

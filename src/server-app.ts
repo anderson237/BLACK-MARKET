@@ -380,21 +380,63 @@ export function createApp() {
   // The token is an HMAC-signed payload (email, name, picture, exp). Because it
   // is self-contained, it survives the serverless cold starts that wiped the
   // old in-memory Map and caused "Session invalide ou expirée" errors.
+  //
+  // The HMAC secret is PERSISTED in the blob store (key "session-secret") so it
+  // survives redeploys and env-var changes. If ADMIN_PASSWORD ever changed, the
+  // old fallback secret would invalidate every active token; persisting a
+  // dedicated secret fixes that permanently.
   // ---------------------------------------------------------------------------
-  const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
-  const SESSION_SECRET = process.env.SESSION_SECRET || process.env.ADMIN_PASSWORD || "bm-dev-session-secret";
+  const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-  function signToken(payload: { email?: string; name?: string; picture?: string; exp: number }): string {
+  async function getSessionSecret(): Promise<string> {
+    const envSecret = process.env.SESSION_SECRET;
+    if (envSecret) return envSecret;
+    try {
+      if (isNetlifyRuntime()) {
+        const store = getStore({ name: BLOBS_STORE_NAME });
+        const raw = await store.get("session-secret", { type: "text" });
+        if (raw) return raw;
+        const generated = crypto.randomBytes(32).toString("hex");
+        await store.set("session-secret", generated);
+        return generated;
+      }
+      const file = path.join(DATA_DIR, "session-secret");
+      try {
+        const existing = await fs.promises.readFile(file, "utf-8");
+        if (existing.trim()) return existing.trim();
+      } catch {
+        // file does not exist yet
+      }
+      const generated = crypto.randomBytes(32).toString("hex");
+      await fs.promises.mkdir(DATA_DIR, { recursive: true });
+      await fs.promises.writeFile(file, generated, "utf-8");
+      return generated;
+    } catch {
+      // Blob layer unavailable: fall back to a stable-enough derivation that does
+      // not break existing sessions when ADMIN_PASSWORD is unchanged.
+      return process.env.ADMIN_PASSWORD || "bm-dev-session-secret";
+    }
+  }
+
+  let sessionSecretPromise: Promise<string> | null = null;
+  function sessionSecret(): Promise<string> {
+    if (!sessionSecretPromise) sessionSecretPromise = getSessionSecret();
+    return sessionSecretPromise;
+  }
+
+  async function signToken(payload: { email?: string; name?: string; picture?: string; exp: number }): Promise<string> {
     const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
-    const sig = crypto.createHmac("sha256", SESSION_SECRET).update(body).digest("base64url");
+    const secret = await sessionSecret();
+    const sig = crypto.createHmac("sha256", secret).update(body).digest("base64url");
     return `${body}.${sig}`;
   }
 
-  function verifyToken(token: string): { email?: string; name?: string; picture?: string; exp: number } | null {
+  async function verifyToken(token: string): Promise<{ email?: string; name?: string; picture?: string; exp: number } | null> {
     try {
       const [body, sig] = token.split(".");
       if (!body || !sig) return null;
-      const expected = crypto.createHmac("sha256", SESSION_SECRET).update(body).digest("base64url");
+      const secret = await sessionSecret();
+      const expected = crypto.createHmac("sha256", secret).update(body).digest("base64url");
       const a = Buffer.from(sig);
       const b = Buffer.from(expected);
       if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
@@ -423,14 +465,14 @@ export function createApp() {
     return header.startsWith("Bearer ") ? header.slice(7).trim() : "";
   }
 
-  function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  async function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
     const token = extractToken(req);
     const revokedAt = revokedTokens.get(token);
     if (revokedAt && revokedAt > Date.now()) {
       return res.status(401).json({ error: "Session invalide ou expirée. Veuillez vous reconnecter." });
     }
     if (revokedAt) revokedTokens.delete(token);
-    const session = verifyToken(token);
+    const session = await verifyToken(token);
     if (!session || session.exp < Date.now()) {
       return res.status(401).json({ error: "Session invalide ou expirée. Veuillez vous reconnecter." });
     }
@@ -471,7 +513,7 @@ export function createApp() {
   // ---------------------------------------------------------------------------
   // AUTH ENDPOINTS
   // ---------------------------------------------------------------------------
-  app.post("/api/auth/login", rateLimit(6, 60_000), (req, res) => {
+  app.post("/api/auth/login", rateLimit(6, 60_000), async (req, res) => {
     const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
     const password = typeof req.body?.password === "string" ? req.body.password.trim() : "";
     if (!password) {
@@ -481,7 +523,7 @@ export function createApp() {
       return res.status(401).json({ error: "Email administrateur non reconnu." });
     }
     if (safeEqual(password, adminPassword)) {
-      const token = signToken({ email: email || undefined, exp: Date.now() + SESSION_TTL_MS });
+      const token = await signToken({ email: email || undefined, exp: Date.now() + SESSION_TTL_MS });
       return res.json({ success: true, token, expiresIn: SESSION_TTL_MS });
     }
     return res.status(401).json({ error: "Clé d'accès incorrecte." });
@@ -522,7 +564,7 @@ export function createApp() {
         return res.status(401).json({ error: "Email non reconnu comme administrateur." });
       }
       await recordLogin(email, name, picture);
-      const token = signToken({ email, name, picture, exp: Date.now() + SESSION_TTL_MS });
+      const token = await signToken({ email, name, picture, exp: Date.now() + SESSION_TTL_MS });
       return res.json({ success: true, token, email, name, picture, expiresIn: SESSION_TTL_MS });
     } catch (err: any) {
       console.error("Google auth error:", err);
