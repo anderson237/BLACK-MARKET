@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { formatPriceXof } from '~/composables/useCatalog'
+import { useAuthStore } from '~/stores/auth'
 
 definePageMeta({ layout: 'admin' })
 
@@ -8,6 +9,26 @@ const store = useAdminStore()
 onMounted(async () => {
   await Promise.all([store.loadStats(), store.loadOrders(), store.loadCustomers()])
 })
+
+const resetting = ref(false)
+async function resetStats() {
+  if (!window.confirm('Remettre à ZÉRO les stats de tous les utilisateurs (vues, précommandes, likes, partages, commentaires) ? Les produits et commandes sont conservés.')) return
+  resetting.value = true
+  try {
+    const auth = useAuthStore()
+    const res = await fetch('/api/admin/stats/reset', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${auth.token}` },
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data?.statusMessage || `Erreur ${res.status}`)
+    await store.loadStats()
+  } catch (e: any) {
+    window.alert(e?.message || 'Erreur lors de la réinitialisation.')
+  } finally {
+    resetting.value = false
+  }
+}
 
 const CATEGORY_COLORS = ['#ff2a2a', '#f59e0b', '#22d3ee', '#a78bfa', '#34d399', '#fb7185', '#facc15', '#818cf8']
 
@@ -116,6 +137,13 @@ const trends = {
 
 <template>
   <div class="space-y-6">
+    <div class="flex items-center justify-between">
+      <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">Vue d'ensemble</p>
+      <button @click="resetStats" :disabled="resetting"
+        class="text-[10px] font-mono text-red-400 hover:text-red-300 border border-red-500/30 hover:border-red-500/60 px-3 py-1.5 rounded-xl transition-all disabled:opacity-50">
+        {{ resetting ? 'Réinitialisation…' : 'Réinitialiser les stats' }}
+      </button>
+    </div>
     <!-- KPI Widgets -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
       <div v-if="stats" class="bg-[#0d0d14] rounded-2xl p-5 border border-zinc-800 space-y-3 relative overflow-hidden group hover:border-[#ff2a2a]/40 transition-all">

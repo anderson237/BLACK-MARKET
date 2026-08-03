@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
     productId: id,
     userId: String(body?.userId || ''),
     name: String(body?.name || 'Utilisateur').slice(0, 80),
-    picture: body?.picture ? String(body.picture).slice(0, 500) : undefined,
+    picture: body?.picture ? String(body.picture).slice(0, 8000) : undefined,
     text,
     createdAt: new Date().toISOString(),
   })

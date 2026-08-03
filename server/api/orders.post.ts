@@ -24,7 +24,15 @@ export default defineEventHandler(async (event) => {
   const orders = await loadOrders()
   const idx = orders.findIndex((o) => o.id === id)
   if (idx >= 0) orders[idx] = order
-  else orders.unshift(order)
+  else {
+    // Dedupe: a logged-in user preordering the same product twice keeps one
+    // pending order instead of spamming the admin console.
+    const dup = order.userId
+      ? orders.findIndex((o) => o.userId === order.userId && o.productId === order.productId && o.status === 'pending')
+      : -1
+    if (dup >= 0) orders[dup] = { ...orders[dup], ...order }
+    else orders.unshift(order)
+  }
   await saveOrders(orders)
-  return { success: true, order }
+  return { success: true, order: idx >= 0 ? orders[idx] : order }
 })

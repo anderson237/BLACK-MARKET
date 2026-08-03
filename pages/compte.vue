@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { COUNTRIES, countryByCode, type Country } from '~/data/countries'
 import { ANIMAL_AVATARS, avatarDataUri } from '~/data/avatars'
+import { MOODS, moodOf } from '~/data/moods'
 import { useAuthStore } from '~/stores/auth'
 
 useSeoMeta({ title: 'Mon espace — BLACK MARKET' })
@@ -23,6 +24,7 @@ const editOpen = ref(false)
 // ---- completion / edit profile ----
 const pseudo = ref('')
 const name = ref('')
+const mood = ref('')
 const phoneNumber = ref('')
 const prefix = ref<string>(COUNTRIES[0].prefix)
 const countryCode = ref<string>(COUNTRIES[0].code)
@@ -51,6 +53,7 @@ function fillForm() {
   const u = auth.user
   pseudo.value = u?.pseudo || ''
   name.value = u?.name || ''
+  mood.value = u?.mood || ''
   phoneNumber.value = u?.phone || ''
   selectedAvatar.value = ANIMAL_AVATARS.find((a) => u?.picture === avatarDataUri(a.key))?.key || ''
   if (u?.phonePrefix) prefix.value = u.phonePrefix
@@ -58,6 +61,11 @@ function fillForm() {
     const c = COUNTRIES.find((x) => x.name === u.country)
     if (c) { countryCode.value = c.code; prefix.value = c.prefix }
   }
+}
+
+function openEdit() {
+  fillForm()
+  editOpen.value = true
 }
 
 async function saveProfile() {
@@ -73,6 +81,7 @@ async function saveProfile() {
       body: JSON.stringify({
         pseudo: pseudo.value,
         name: name.value || undefined,
+        mood: mood.value || undefined,
         phone: phone || undefined,
         phonePrefix: prefix.value,
         country: selectedCountry.value?.name,
@@ -205,6 +214,7 @@ const eventLabel: Record<string, string> = {
 const avatarUrl = computed(() => auth.user?.picture || '')
 const displayName = computed(() => auth.user?.pseudo || auth.user?.name || 'Client BLACK MARKET')
 const initials = computed(() => displayName.value.slice(0, 2).toUpperCase())
+const currentMood = computed(() => moodOf(auth.user?.mood))
 const productUrl = (id?: string) => (id ? `/p/${id}.html` : '/')
 </script>
 
@@ -301,7 +311,7 @@ const productUrl = (id?: string) => (id ? `/p/${id}.html` : '/')
           </label>
         </div>
         <div class="flex-1 text-center sm:text-left min-w-0">
-          <h1 class="text-lg font-extrabold text-slate-100 font-mono">{{ displayName }}</h1>
+          <h1 class="text-lg font-extrabold text-slate-100 font-mono">{{ displayName }} <span v-if="currentMood" :title="currentMood.label" class="align-middle">{{ currentMood.emoji }}</span></h1>
           <p class="text-[11px] text-zinc-400 font-mono">{{ auth.user?.email || '—' }}</p>
           <p class="text-[11px] text-zinc-500 font-mono mt-1">
             {{ auth.user?.phone ? (auth.user.phonePrefix || '') + ' ' + auth.user.phone : '—' }}
@@ -310,7 +320,7 @@ const productUrl = (id?: string) => (id ? `/p/${id}.html` : '/')
           <p class="text-[10px] text-zinc-600 font-mono mt-1">Membre depuis {{ auth.user?.createdAt ? new Date(auth.user.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—' }}</p>
         </div>
         <div class="flex flex-col gap-2">
-          <button @click="fillForm" class="text-[10px] font-mono text-zinc-300 hover:text-white border border-zinc-800 hover:border-[#ff2a2a]/60 px-3 py-2 rounded-xl transition-all inline-flex items-center gap-1.5">
+          <button @click="openEdit" class="text-[10px] font-mono text-zinc-300 hover:text-white border border-zinc-800 hover:border-[#ff2a2a]/60 px-3 py-2 rounded-xl transition-all inline-flex items-center gap-1.5">
             <AppIcon name="edit" :size="13" /> Modifier
           </button>
         </div>

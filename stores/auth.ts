@@ -6,6 +6,7 @@ export interface AuthUser {
   name?: string
   pseudo?: string
   picture?: string
+  mood?: string
   phone?: string
   phonePrefix?: string
   country?: string

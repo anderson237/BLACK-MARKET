@@ -1,5 +1,6 @@
 import { findAccount, upsertAccount, type PublicAccount } from '~~/server/utils/storage'
 import { requireAuth } from '~~/server/utils/auth'
+import { MOOD_EMOJIS } from '../../data/moods'
 
 const clean = (v: unknown, max = 200) => String(v ?? '').trim().slice(0, max)
 
@@ -19,6 +20,12 @@ export default defineEventHandler(async (event) => {
 
   const pseudo = clean(body?.pseudo, 40)
   if (body?.pseudo !== undefined) next.pseudo = pseudo
+
+  const mood = clean(body?.mood, 20)
+  if (body?.mood !== undefined) {
+    if (mood && !MOOD_EMOJIS.includes(mood)) throw createError({ statusCode: 400, statusMessage: 'Humeur invalide.' })
+    next.mood = mood
+  }
 
   const picture = clean(body?.picture, 8000)
   if (body?.picture !== undefined) next.picture = picture

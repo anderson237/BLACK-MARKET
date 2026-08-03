@@ -2,10 +2,12 @@
 import type { Product } from '~/types'
 import { formatPriceXof, buildWaMessage } from '~/composables/useCatalog'
 import { useAuthStore } from '~/stores/auth'
+import { useTrack } from '~/composables/useTrack'
 
 const route = useRoute()
 const config = useRuntimeConfig()
 const auth = useAuthStore()
+const { viewProduct, clickPreorder } = useTrack()
 const productId = computed(() => String(route.params.id || '').replace(/\.html$/i, ''))
 
 const { data: product, error } = await useAsyncData<Product | null>(
@@ -88,11 +90,40 @@ function trackClick() {
   } catch {}
 }
 
+// Record the visit as a user event (drives the client space "Vues" stat).
+onMounted(() => {
+  if (import.meta.client && product.value) {
+    viewProduct({ id: product.value.id, title: product.value.title })
+  }
+})
+
+// Preorder: fire the click event + create a pending order linked to the
+// account (deduped), then open WhatsApp. Fire-and-forget so the tab opens fast.
 function preorder() {
   const url = waUrl.value
   if (!url) return
   auth.requireAuth(() => {
     trackClick()
+    const p = product.value!
+    clickPreorder({ id: p.id, title: p.title })
+    fetch('/api/orders', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${auth.token}`,
+      },
+      body: JSON.stringify({
+        productId: p.id,
+        productTitle: p.title,
+        productImage: p.imageUrl,
+        customerName: auth.user?.name || auth.user?.pseudo || 'Client WhatsApp',
+        customerPhone: auth.user?.phone || '',
+        customerLocation: auth.user?.country || '—',
+        quantity: 1,
+        priceXof: p.priceXof,
+        priceEur: p.priceEur,
+      }),
+    }).catch(() => {})
     window.open(url, '_blank', 'noopener,noreferrer')
   }, 'Connectez-vous pour précommander ce drop')
 }

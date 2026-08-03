@@ -127,6 +127,7 @@ export interface PublicAccount {
   name?: string
   pseudo?: string
   picture?: string
+  mood?: string
   phone?: string
   country?: string
   phonePrefix?: string
@@ -203,6 +204,10 @@ async function saveSocial(data: any): Promise<void> {
     return blobSet('bm-social', 'social.json', JSON.stringify(data, null, 2))
   }
   return writeJSON(path.join(DATA_DIR, 'social.json'), data)
+}
+
+export async function resetSocial(): Promise<void> {
+  return saveSocial({ comments: [], likes: {}, events: [] })
 }
 
 export interface MarketEvent {

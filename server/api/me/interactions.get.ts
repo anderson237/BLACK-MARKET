@@ -84,6 +84,7 @@ export default defineEventHandler(async (event) => {
           name: account.name,
           pseudo: account.pseudo,
           picture: account.picture,
+          mood: account.mood,
           phone: account.phone,
           phonePrefix: account.phonePrefix,
           country: account.country,
