@@ -11,3 +11,11 @@ data/
 
 # Local Netlify folder
 .netlify
+
+# Nuxt build outputs
+.nuxt/
+.output/
+.swc/
+
+# Legacy React backup
+vite.config.ts.react-backup

@@ -3,44 +3,44 @@
   publish = "dist"
 
 [functions]
-  directory = "netlify/functions"
+  directory = ".netlify/functions-internal"
 
 # ---------------------------------------------------------------------------
 # REDIRECTS
 # ---------------------------------------------------------------------------
 [[redirects]]
-  from = "/admin"
-  to = "/admin.html"
-  status = 200
-
-[[redirects]]
-  from = "/admin/*"
-  to = "/admin.html"
-  status = 200
-
-[[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/api/:splat"
+  to = "/.netlify/functions/server/:splat"
   status = 200
 
 [[redirects]]
   from = "/catalog.json"
-  to = "/.netlify/functions/api/catalog.json"
+  to = "/.netlify/functions/server/catalog.json"
   status = 200
 
-# Dynamic product pages: static /p/*.html files are served directly when they
-# exist (fast, pre-watermarked); any other /p/<id> is rendered live by the API
-# function from the current catalog (new products appear without a rebuild).
+[[redirects]]
+  from = "/sitemap.xml"
+  to = "/.netlify/functions/server/sitemap.xml"
+  status = 200
+
+[[redirects]]
+  from = "/robots.txt"
+  to = "/.netlify/functions/server/robots.txt"
+  status = 200
+
+# Dynamic product pages: Nuxt SSR renders them live from the catalog.
 [[redirects]]
   from = "/p/*"
-  to = "/.netlify/functions/api/p/:splat"
+  to = "/.netlify/functions/server/:splat"
   status = 200
   force = true
 
+# Admin: Nuxt SSR.
 [[redirects]]
-  from = "/*"
-  to = "/index.html"
+  from = "/admin/*"
+  to = "/.netlify/functions/server/admin/:splat"
   status = 200
+  force = true
 
 # ---------------------------------------------------------------------------
 # SECURITY HEADERS — applied to every response
@@ -54,13 +54,13 @@
     X-XSS-Protection = "1; mode=block"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
     Strict-Transport-Security = "max-age=31536000; includeSubDomains"
-    Content-Security-Policy = "default-src 'self'; img-src 'self' data: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; connect-src 'self' https:; font-src 'self' data: https:; frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
+    Content-Security-Policy = "default-src 'self'; img-src 'self' data: https: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; connect-src 'self' https: ws:; font-src 'self' data: https:; media-src 'self' https: blob:; frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
 
 # ---------------------------------------------------------------------------
-# CACHING — long-lived for static, immutable assets; short for HTML/catalog
+# CACHING — long-lived for immutable assets; short for HTML/catalog
 # ---------------------------------------------------------------------------
 [[headers]]
-  for = "/assets/*"
+  for = "/_nuxt/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
@@ -70,19 +70,14 @@
     Cache-Control = "public, max-age=31536000, immutable"
 
 [[headers]]
+  for = "/api/img/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
+
+[[headers]]
   for = "/p/*"
   [headers.values]
     Cache-Control = "public, max-age=3600"
-
-[[headers]]
-  for = "/index.html"
-  [headers.values]
-    Cache-Control = "public, max-age=0, must-revalidate"
-
-[[headers]]
-  for = "/admin.html"
-  [headers.values]
-    Cache-Control = "public, max-age=0, must-revalidate"
 
 [[headers]]
   for = "/catalog.json"

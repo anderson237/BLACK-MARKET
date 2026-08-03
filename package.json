@@ -4,21 +4,26 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx server.ts",
-    "build": "tsx scripts/build-site.ts && vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs && node scripts/copy-site.mjs",
-    "start": "node dist/server.cjs",
-    "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "build:legacy": "tsx scripts/build-site.ts && vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs && node scripts/copy-site.mjs",
+    "start": "nuxt preview",
+    "clean": "rm -rf dist .output .netlify/functions-internal",
+    "lint": "nuxi typecheck"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
     "@netlify/blobs": "^10.7.11",
+    "@nuxtjs/tailwindcss": "^6.14.0",
+    "@pinia/nuxt": "^1.0.1",
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
+    "nuxt": "^3.21.10",
+    "pinia": "^4.0.2",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "recharts": "^3.10.1",
@@ -37,7 +42,8 @@
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.3"
+    "vite": "^6.2.3",
+    "vue-tsc": "^3.3.9"
   },
   "optionalDependencies": {
     "@img/sharp-linux-x64": "0.35.3",

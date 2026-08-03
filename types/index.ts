@@ -1,0 +1,57 @@
+export interface Product {
+  id: string
+  title: string
+  chineseTitle?: string
+  description: string
+  originalDescription?: string
+  chineseDescription?: string
+  features: string[]
+  priceEur: number
+  priceXof: number
+  currency?: string
+  imageUrl: string
+  gallery?: string[]
+  videoUrl?: string
+  category: string
+  whatsappClicks: number
+  sourceRmb?: number
+  deleted?: boolean
+  deletedAt?: string
+  createdAt: string
+}
+
+export type OrderStatus = 'pending' | 'processing' | 'completed' | 'shipped' | 'cancelled'
+
+export interface Order {
+  id: string
+  productId: string
+  productTitle: string
+  productImage: string
+  customerName: string
+  customerPhone: string
+  customerLocation: string
+  quantity: number
+  priceXof: number
+  priceEur: number
+  status: OrderStatus
+  createdAt: string
+}
+
+export interface DashboardStats {
+  totalProducts: number
+  totalOrders: number
+  totalClicks: number
+  totalRevenueXof: number
+  totalRevenueEur: number
+  topProducts: { id: string; title: string; imageUrl: string; clicks: number; revenueXof: number; revenueEur: number }[]
+  salesByCategory: { category: string; orders: number; revenueXof: number }[]
+  revenueSeries: { label: string; revenueXof: number; revenueEur: number; orders: number }[]
+}
+
+export const CATEGORIES = [
+  'Techwear',
+  'Streetwear',
+  'Cyber Gadgets',
+  'Gaming Room',
+  'Accessoires',
+]

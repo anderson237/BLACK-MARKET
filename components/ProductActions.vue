@@ -1,0 +1,105 @@
+<script setup lang="ts">
+import type { Product } from '~/types'
+import { useTrack } from '~/composables/useTrack'
+import { useAuthStore } from '~/stores/auth'
+
+const props = defineProps<{ product: Product; compact?: boolean }>()
+const { track, like, share } = useTrack()
+const inter = useInteractionsStore()
+const auth = useAuthStore()
+
+const liked = computed(() => inter.getLike(props.product.id).liked)
+const likeCount = computed(() => inter.getLike(props.product.id).count)
+
+const commentCount = ref(0)
+onMounted(async () => {
+  try {
+    const res = await fetch(`/api/products/${encodeURIComponent(props.product.id)}/comments`, {
+      headers: { Accept: 'application/json' },
+    })
+    if (res.ok) {
+      const data = await res.json()
+      commentCount.value = Array.isArray(data?.comments) ? data.comments.length : 0
+    }
+  } catch {}
+})
+
+function onLike() {
+  auth.requireAuth(() => {
+    like(props.product, !liked.value)
+    inter.toggleLike(props.product.id)
+  }, 'Connectez-vous pour liker ce drop')
+}
+
+function onShareWa() {
+  const msg = `📦 ${props.product.title}\n💰 ${props.product.priceXof} F CFA\nDécouvrez ce drop exclusif BLACK MARKET :`
+  const url = window.location.origin + '/p/' + props.product.id + '.html'
+  window.open(
+    'https://wa.me/?text=' + encodeURIComponent(msg + '\n' + url),
+    '_blank',
+    'noopener,noreferrer',
+  )
+  share(props.product, 'wa')
+}
+
+async function onCopy() {
+  share(props.product, 'copy')
+  await navigator.clipboard?.writeText(window.location.origin + '/p/' + props.product.id + '.html').catch(() => {})
+  // toast
+  window.dispatchEvent(new CustomEvent('bm:copied', { detail: 'Lien copié dans le presse-papiers !' }))
+}
+
+function onComment() {
+  const url = '/p/' + props.product.id + '.html#commentaires'
+  if (window.location.pathname.startsWith('/p/')) {
+    document.getElementById('commentaires')?.scrollIntoView({ behavior: 'smooth' })
+  } else {
+    window.location.href = url
+  }
+}
+</script>
+
+<template>
+  <div :class="compact ? 'grid grid-cols-4 gap-1.5' : 'flex items-center gap-1.5'">
+    <!-- Like -->
+    <button
+      @click="onLike"
+      class="group/act flex items-center justify-center gap-1.5 px-2 py-2 rounded-xl border transition-all text-[11px] font-mono font-bold"
+      :class="liked
+        ? 'bg-[#ff2a2a]/15 border-[#ff2a2a]/50 text-[#ff2a2a]'
+        : 'bg-black/30 border-zinc-800 text-zinc-400 hover:border-[#ff2a2a]/40 hover:text-slate-100'"
+      :aria-label="liked ? 'Retirer le like' : 'J\'aime'"
+    >
+      <AppIcon name="heart" :size="15" :class="like ? 'fill-[#ff2a2a] text-[#ff2a2a]' : ''" />
+      <span>{{ likeCount }}</span>
+    </button>
+
+    <!-- Comment -->
+    <button
+      @click="onComment"
+      class="flex items-center justify-center gap-1.5 px-2 py-2 rounded-xl border bg-black/30 border-zinc-800 text-zinc-400 hover:border-sky-400/40 hover:text-sky-300 transition-all text-[11px] font-mono font-bold"
+      aria-label="Commenter"
+    >
+      <AppIcon name="comment" :size="15" />
+      <span>{{ commentCount }}</span>
+    </button>
+
+    <!-- Share WhatsApp -->
+    <button
+      @click="onShareWa"
+      class="flex items-center justify-center gap-1.5 px-2 py-2 rounded-xl border bg-black/30 border-zinc-800 text-zinc-400 hover:border-green-500/40 hover:text-green-400 transition-all text-[11px] font-mono font-bold"
+      aria-label="Partager sur WhatsApp"
+    >
+      <AppIcon name="share" :size="15" />
+    </button>
+
+    <!-- Copy link -->
+    <button
+      @click="onCopy"
+      class="flex items-center justify-center gap-1.5 px-2 py-2 rounded-xl border bg-black/30 border-zinc-800 text-zinc-400 hover:border-sky-400/40 hover:text-sky-300 transition-all text-[11px] font-mono font-bold"
+      aria-label="Copier le lien"
+    >
+      <AppIcon name="link" :size="15" />
+    </button>
+  </div>
+</template>
