@@ -17,31 +17,29 @@ export function apiUrl(path: string): string {
   return path
 }
 
-/**
- * Fetches the live catalog (served by the API from Netlify Blobs).
- * The API already sanitizes and serves data; client only renders.
- */
 export async function fetchCatalog(): Promise<Product[]> {
-  const res = await fetch(apiUrl('/catalog.json'), { cache: 'no-store' })
-  if (!res.ok) throw new Error(`catalog: ${res.status}`)
-  const data = await res.json()
+  const data = await $fetch('/catalog.json', { cache: 'no-store' })
   return Array.isArray(data) ? data : []
 }
 
 /**
  * Fetches a single product by id from the API.
  * Returns null when the product does not exist (renders 404).
+ *
+ * Uses `$fetch`/`useRequestFetch`: on the server this is handled locally
+ * (in-process) by Nuxt instead of a real outgoing HTTP self-fetch, which can
+ * fail transiently on serverless (Netlify) cold starts and could otherwise
+ * produce a bogus 404.
  */
 export async function fetchProduct(id: string): Promise<Product | null> {
   try {
-    const res = await fetch(apiUrl(`/api/products/${encodeURIComponent(id)}`), { headers: { Accept: 'application/json' } })
-    if (res.status === 404) return null
-    if (!res.ok) throw new Error(`product: ${res.status}`)
-    const json = await res.json()
+    const json = await $fetch(`/api/products/${encodeURIComponent(id)}`, { headers: { Accept: 'application/json' } })
     return json?.product || json || null
-  } catch {
-    // Fallback: the /api/products route is admin-only; read the public catalog
-    // and match by id when the direct call is not authorized.
+  } catch (err: any) {
+    // 404 -> product genuinely not found.
+    if (err?.response?.status === 404) return null
+    // Anything else (network hiccup): fall back to the public catalog so a
+    // transient failure never turns a real product into "Produit introuvable".
     const all = await fetchCatalog()
     return all.find((p) => p.id === id) || null
   }
