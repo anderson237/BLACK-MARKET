@@ -282,9 +282,16 @@ export default function AIGenerator({
 
               <div className="space-y-1">
                 <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest block">COPYWRITING DE VENTE PREMIUM</span>
-                <div className="bg-brand-red/5 p-4 rounded-xl border border-brand-red/20 text-xs text-slate-300 leading-relaxed font-sans">
-                  {generatedProduct.description}
-                </div>
+                <div
+                  className="bg-brand-red/5 p-4 rounded-xl border border-brand-red/20 text-xs text-slate-300 leading-relaxed font-sans [&_p]:mb-2 [&_h3]:text-slate-100 [&_h3]:font-bold [&_h3]:mt-3 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:mb-1"
+                  dangerouslySetInnerHTML={{
+                    __html: String(generatedProduct.description || "")
+                      .replace(/<(script|style|iframe|object|embed|form|input)[^>]*>.*?<\/\1>/gis, "")
+                      .replace(/on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+                      .replace(/javascript:/gi, "")
+                      .slice(0, 12000),
+                  }}
+                />
               </div>
 
               {generatedProduct.originalDescription && (

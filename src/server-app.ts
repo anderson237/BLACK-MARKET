@@ -901,6 +901,7 @@ export function createApp() {
     if (!buffer) {
       return res.status(404).json({ error: "Image introuvable." });
     }
+    res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Content-Type", "image/jpeg");
     res.setHeader("Cache-Control", "public, max-age=86400");
     res.send(buffer);
@@ -947,6 +948,7 @@ export function createApp() {
       buffer[2] === 0xdf &&
       buffer[3] === 0xa3;
     res.setHeader("Content-Type", isWebM ? "video/webm" : "video/mp4");
+    res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Cache-Control", "public, max-age=86400");
     res.send(buffer);
   });

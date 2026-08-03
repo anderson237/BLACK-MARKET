@@ -48,6 +48,13 @@ interface CatalogProps {
   config: WebhookConfig;
 }
 
+const sanitizeDescriptionHtml = (raw: string): string =>
+  String(raw || "")
+    .replace(/<(script|style|iframe|object|embed|form|input)[^>]*>.*?<\/\1>/gis, "")
+    .replace(/on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/javascript:/gi, "")
+    .slice(0, 12000);
+
 const createBlankProduct = (): Product => ({
   id: `prod_${Date.now()}`,
   title: "",
@@ -953,7 +960,7 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
 
                   {/* Translated sales pitch */}
                   <p className="text-xs text-zinc-400 leading-relaxed line-clamp-3">
-                    {product.description}
+                    {product.description.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()}
                   </p>
 
                   {/* Features badges list */}
@@ -1470,9 +1477,10 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
                     {/* Main Description */}
                     <div className="space-y-1">
                       <p className="text-[10px] text-brand-red font-mono uppercase tracking-widest font-bold">DESCRIPTION & ARGUMENTAIRE</p>
-                      <p className="text-sm text-zinc-300 leading-relaxed bg-black/30 p-4 rounded-xl border border-zinc-900 font-sans">
-                        {selectedProductForDetails.description}
-                      </p>
+                      <div
+                        className="text-sm text-zinc-300 leading-relaxed bg-black/30 p-4 rounded-xl border border-zinc-900 font-sans [&_p]:mb-2 [&_h3]:text-zinc-100 [&_h3]:font-bold [&_h3]:mt-3 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:mb-1"
+                        dangerouslySetInnerHTML={{ __html: sanitizeDescriptionHtml(selectedProductForDetails.description) }}
+                      />
                     </div>
 
                     {/* Tech specs (Features) */}

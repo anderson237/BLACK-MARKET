@@ -357,8 +357,23 @@ export function getHtmlTemplateCode(opts?: { siteUrl?: string }): string {
     }
 
     // ===== DESCRIPTION PARAGRAPHEE (formatée pour la lecture) =====
+    function stripTags(text) {
+      return String(text || "").replace(/<[^>]*>/g, "");
+    }
+
+    function sanitizeDescriptionHtml(raw) {
+      return String(raw || "")
+        .replace(/<(script|style|iframe|object|embed|form|input)[^>]*>.*?<\/\\1>/gis, "")
+        .replace(/on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+        .replace(/javascript:/gi, "")
+        .slice(0, 12000);
+    }
+
     function paragraphizeDescription(text) {
       var raw = String(text || "");
+      if (/<\/?[a-z][^>]*>/i.test(raw)) {
+        return sanitizeDescriptionHtml(raw);
+      }
       var lines = raw.split(/\\n{2,}/);
       if (lines.length <= 1) lines = raw.split(/\\n/).filter(Boolean);
       return lines
@@ -414,13 +429,13 @@ export function getHtmlTemplateCode(opts?: { siteUrl?: string }): string {
         grid.innerHTML +=
             '<div onclick="openDetailsModal(' + masterIndex + ')" class="bg-brand-card rounded-3xl overflow-hidden border border-zinc-800 flex flex-col h-full relative group hover:border-brand-red/40 transition-all duration-300 cursor-pointer">' +
               '<div class="relative aspect-video overflow-hidden">' +
-                '<img src="' + escapeHtml(cardImg) + '" alt="' + escapeHtml(p.title) + '" loading="lazy" crossorigin="anonymous" data-fallback="' + escapeHtml(cardFallback) + '" onerror="handleImgError(this)" class="w-full h-full object-cover opacity-85 group-hover:scale-105 transition-transform duration-500">' +
+                '<img src="' + escapeHtml(cardImg) + '" alt="' + escapeHtml(p.title) + '" loading="lazy" data-fallback="' + escapeHtml(cardFallback) + '" onerror="handleImgError(this)" class="w-full h-full object-cover opacity-85 group-hover:scale-105 transition-transform duration-500">' +
                 '<span class="absolute top-3 left-3 bg-brand-red text-white text-[9px] uppercase font-bold tracking-widest px-2.5 py-1 rounded">' + escapeHtml(p.category || "EXCLUSIF") + "</span>" +
               "</div>" +
             '<div class="p-6 flex flex-col flex-1 justify-between gap-4">' +
               '<div class="space-y-1.5">' +
                 '<h3 class="font-extrabold text-sm text-slate-100 group-hover:text-brand-red transition-colors">' + escapeHtml(p.title) + "</h3>" +
-                '<div class="text-xs text-zinc-400 leading-relaxed line-clamp-3">' + escapeHtml(p.description) + "</div>" +
+                '<div class="text-xs text-zinc-400 leading-relaxed line-clamp-3">' + escapeHtml(stripTags(p.description)) + "</div>" +
               "</div>" +
               '<div class="flex items-center justify-between pt-2 border-t border-zinc-900">' +
                 '<div class="flex flex-col"><span class="text-[8px] text-zinc-500 font-mono">PRIX FACTORY</span><span class="font-extrabold text-slate-100 text-sm font-mono">' + priceStr + "</span></div>" +
