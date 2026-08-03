@@ -55,6 +55,10 @@ function doLogout() {
             class="inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-300 hover:text-white border border-zinc-800 px-3 py-2 rounded-xl transition-all" title="Ouvrir le dashboard admin">
             <AppIcon name="dashboard" :size="14" /><span class="hidden sm:inline">Dashboard Admin</span>
           </NuxtLink>
+          <button v-if="!auth.isAuthed" @click="auth.openModal('Connectez-vous pour continuer')"
+            class="hidden md:inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-300 hover:text-white border border-zinc-800 hover:border-[#ff2a2a]/60 px-3 py-2 rounded-xl transition-all" title="Se connecter">
+            <AppIcon name="login" :size="14" /><span class="hidden lg:inline">Connexion</span>
+          </button>
           <button v-if="auth.isAuthed" @click="doLogout"
             class="hidden md:inline-flex items-center gap-1.5 text-[10px] font-mono text-red-400 hover:text-red-300 border border-red-500/30 hover:border-red-500/60 px-3 py-2 rounded-xl transition-all" title="Se déconnecter">
             <AppIcon name="logout" :size="14" /><span class="hidden lg:inline">Déconnexion</span>
@@ -98,6 +102,10 @@ function doLogout() {
           <button @click="preorder; closeDrawer()"
              class="block w-full text-center bg-[#ff2a2a] hover:bg-red-600 text-white text-xs px-3 py-2.5 rounded-xl font-bold font-mono transition-all cursor-pointer">
             PRÉCOMMANDER
+          </button>
+          <button v-if="!auth.isAuthed" @click="auth.openModal('Connectez-vous pour continuer'); closeDrawer()"
+             class="block w-full text-center text-[11px] font-mono text-zinc-300 border border-zinc-800 px-3 py-2.5 rounded-xl transition-all uppercase tracking-widest">
+            Connexion
           </button>
           <button v-if="auth.isAuthed" @click="doLogout"
              class="block w-full text-center text-[11px] font-mono text-red-400 border border-red-500/30 px-3 py-2.5 rounded-xl transition-all uppercase tracking-widest">
