@@ -1,6 +1,6 @@
 [build]
   command = "npm run build"
-  publish = "dist"
+  publish = ".output/public"
 
 [functions]
   directory = ".netlify/functions-internal"
@@ -8,37 +8,11 @@
 # ---------------------------------------------------------------------------
 # REDIRECTS
 # ---------------------------------------------------------------------------
+# Nuxt SSR: route every request through the serverless function (serves both
+# SSR HTML and static assets from .output/public).
 [[redirects]]
-  from = "/api/*"
+  from = "/*"
   to = "/.netlify/functions/server/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/catalog.json"
-  to = "/.netlify/functions/server/catalog.json"
-  status = 200
-
-[[redirects]]
-  from = "/sitemap.xml"
-  to = "/.netlify/functions/server/sitemap.xml"
-  status = 200
-
-[[redirects]]
-  from = "/robots.txt"
-  to = "/.netlify/functions/server/robots.txt"
-  status = 200
-
-# Dynamic product pages: Nuxt SSR renders them live from the catalog.
-[[redirects]]
-  from = "/p/*"
-  to = "/.netlify/functions/server/:splat"
-  status = 200
-  force = true
-
-# Admin: Nuxt SSR.
-[[redirects]]
-  from = "/admin/*"
-  to = "/.netlify/functions/server/admin/:splat"
   status = 200
   force = true
 
@@ -61,11 +35,6 @@
 # ---------------------------------------------------------------------------
 [[headers]]
   for = "/_nuxt/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
-
-[[headers]]
-  for = "/img/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
