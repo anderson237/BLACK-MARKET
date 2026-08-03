@@ -51,6 +51,10 @@ function doLogout() {
           </div>
         </NuxtLink>
         <div class="flex items-center gap-2">
+          <NuxtLink v-if="auth.isAuthed" to="/compte"
+            class="hidden md:inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-300 hover:text-white border border-zinc-800 hover:border-[#ff2a2a]/60 px-3 py-2 rounded-xl transition-all" title="Mon espace client">
+            <AppIcon name="users" :size="14" /><span class="hidden lg:inline">Mon espace</span>
+          </NuxtLink>
           <NuxtLink v-if="isAdmin" to="/admin"
             class="inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-300 hover:text-white border border-zinc-800 px-3 py-2 rounded-xl transition-all" title="Ouvrir le dashboard admin">
             <AppIcon name="dashboard" :size="14" /><span class="hidden sm:inline">Dashboard Admin</span>
@@ -89,6 +93,9 @@ function doLogout() {
         <nav class="flex-1 overflow-y-auto p-4 space-y-1">
           <NuxtLink v-for="item in nav" :key="item.label" :to="item.to" @click="closeDrawer" class="block px-3 py-3 rounded-lg text-[12px] font-mono font-bold text-zinc-300 hover:text-white hover:bg-zinc-800/60 transition-all uppercase tracking-widest">
             {{ item.label }}
+          </NuxtLink>
+          <NuxtLink v-if="auth.isAuthed" to="/compte" @click="closeDrawer" class="flex items-center gap-2 px-3 py-3 rounded-lg text-[12px] font-mono font-bold text-zinc-300 hover:text-white hover:bg-zinc-800/60 transition-all uppercase tracking-widest">
+            <AppIcon name="users" :size="15" /> Mon espace
           </NuxtLink>
           <NuxtLink v-if="isAdmin" to="/admin" @click="closeDrawer" class="flex items-center gap-2 px-3 py-3 rounded-lg text-[12px] font-mono font-bold text-zinc-500 hover:text-white hover:bg-zinc-800/60 transition-all uppercase tracking-widest">
             <AppIcon name="dashboard" :size="15" /> Dashboard Admin

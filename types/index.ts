@@ -30,6 +30,7 @@ export interface Order {
   customerName: string
   customerPhone: string
   customerLocation: string
+  userId?: string
   quantity: number
   priceXof: number
   priceEur: number

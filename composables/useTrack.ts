@@ -1,4 +1,5 @@
 import { useRuntimeConfig } from '#app'
+import { useAuthStore } from '~/stores/auth'
 
 export interface TrackEvent {
   type: 'view' | 'click' | 'like' | 'unlike' | 'share' | 'copy' | 'comment'
@@ -42,9 +43,11 @@ export function useTrack() {
 
   // ---- fire an event: local queue + global Vue event + best-effort push ----
   function track(ev: Partial<TrackEvent>) {
+    const auth = useAuthStore()
     const event: TrackEvent = {
       type: 'view',
       ...ev,
+      userId: ev.userId || auth.user?.id,
       url: ev.url || window.location.pathname,
       ts: Date.now(),
     }

@@ -4,12 +4,14 @@ export interface AuthUser {
   id?: string
   email?: string
   name?: string
+  pseudo?: string
   picture?: string
   phone?: string
   phonePrefix?: string
   country?: string
   role?: 'admin' | 'user'
   status?: string
+  createdAt?: string
 }
 
 interface PendingAction {
@@ -60,6 +62,13 @@ export const useAuthStore = defineStore('auth', () => {
   function setSession(t: string, u: AuthUser) {
     token.value = t
     user.value = u
+    persist()
+  }
+
+  /** Merge a server-side user patch into the local session (keeps token). */
+  function updateUser(patch: Partial<AuthUser>) {
+    if (!user.value) return
+    user.value = { ...user.value, ...patch }
     persist()
   }
 
@@ -206,6 +215,7 @@ export const useAuthStore = defineStore('auth', () => {
     closeModal,
     requireAuth,
     replayPending,
+    updateUser,
     loginEmail,
     loginPhone,
     register,

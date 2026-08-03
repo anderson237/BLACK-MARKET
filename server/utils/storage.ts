@@ -125,6 +125,7 @@ export interface PublicAccount {
   id: string
   email?: string
   name?: string
+  pseudo?: string
   picture?: string
   phone?: string
   country?: string
