@@ -1,4 +1,4 @@
-import { pushEvent } from '~~/server/utils/storage'
+import { pushEvent, findAccount } from '~~/server/utils/storage'
 import { rateLimit, clientIP, verifyToken, extractToken } from '~~/server/utils/auth'
 
 export default defineEventHandler(async (event) => {
@@ -10,7 +10,12 @@ export default defineEventHandler(async (event) => {
   // Authoritative identity comes from the signed session when present,
   // otherwise fall back to whatever the client reported (anonymous views).
   const session = await verifyToken(extractToken(event))
-  const userId = String(session?.userId || body?.userId || '')
+  let userId = String(session?.userId || body?.userId || '')
+  // Legacy tokens (no userId) still resolve to the real account via email.
+  if (!userId && session?.email) {
+    const account = await findAccount({ email: session.email })
+    if (account) userId = account.id
+  }
   await pushEvent({
     type,
     productId: body?.productId ? String(body.productId).slice(0, 120) : undefined,

@@ -2,7 +2,7 @@ import crypto from 'node:crypto'
 import { getStore } from '@netlify/blobs'
 import fs from 'node:fs'
 import path from 'node:path'
-import { isNetlifyRuntime, SESSION_TTL_MS } from './storage'
+import { isNetlifyRuntime, SESSION_TTL_MS, findAccount } from './storage'
 
 export { SESSION_TTL_MS }
 
@@ -104,6 +104,13 @@ export async function requireAuth(event: any): Promise<SessionPayload> {
   const session = await verifyToken(token)
   if (!session || session.exp < Date.now()) {
     throw createError({ statusCode: 401, statusMessage: 'Session invalide ou expirée. Veuillez vous reconnecter.' })
+  }
+  // Sessions minted before account-id attribution carry no `userId`. Resolve it
+  // from the account (by email) so comments/orders/events are always attributed
+  // to the real account: visible in the client space and editable/deletable.
+  if (!session.userId && session.email) {
+    const account = await findAccount({ email: session.email })
+    if (account) session.userId = account.id
   }
   return session
 }

@@ -79,6 +79,26 @@ async function load() {
   }
 }
 
+// ---- live auto-refresh: new comments + counters appear without a manual reload
+let autoTimer: ReturnType<typeof setInterval> | null = null
+
+function onVisible() {
+  if (document.visibilityState === 'visible') load()
+}
+
+onMounted(() => {
+  load()
+  autoTimer = setInterval(load, 12_000)
+  window.addEventListener('focus', onVisible)
+  document.addEventListener('visibilitychange', onVisible)
+})
+
+onUnmounted(() => {
+  if (autoTimer) clearInterval(autoTimer)
+  window.removeEventListener('focus', onVisible)
+  document.removeEventListener('visibilitychange', onVisible)
+})
+
 async function submit() {
   const body = text.value.trim()
   if (!body) return
@@ -125,10 +145,7 @@ function timeAgo(iso: string): string {
   return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 }
 
-onMounted(load)
-</script>
-
-<template>
+</script><template>
   <div class="space-y-4">
     <div class="flex items-center justify-between">
       <p class="text-[9px] text-[#ff2a2a] font-mono uppercase font-bold tracking-wider">COMMENTAIRES ({{ comments.length }})</p>

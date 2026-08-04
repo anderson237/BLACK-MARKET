@@ -305,6 +305,148 @@ export function createApp() {
     await saveUsers(users);
   }
 
+  // ---------------------------------------------------------------------------
+  // SOCIAL DATA (comments, likes, events) — shared with the Nuxt layer so the
+  // client space and product comments persist across refresh / redeploys.
+  // Production: Netlify Blobs store "bm-social"; local: data/social.json.
+  // ---------------------------------------------------------------------------
+  const SOCIAL_FILE = path.join(DATA_DIR, "social.json");
+  const BLOBS_SOCIAL_STORE = "bm-social";
+  const BLOBS_SOCIAL_KEY = "social.json";
+
+  async function loadSocial(): Promise<{ comments: any[]; likes: Record<string, number>; events: any[] }> {
+    const seed = { comments: [], likes: {}, events: [] };
+    if (isNetlifyRuntime()) {
+      try {
+        const store = getStore({ name: BLOBS_SOCIAL_STORE });
+        const raw = await store.get(BLOBS_SOCIAL_KEY, { type: "text", consistency: "strong" });
+        if (raw != null) {
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.comments)) return parsed;
+        }
+        await store.set(BLOBS_SOCIAL_KEY, JSON.stringify(seed, null, 2));
+        return seed;
+      } catch (err) {
+        console.error("[BLOBS] social load failed:", err);
+        return seed;
+      }
+    }
+    try {
+      const raw = await fs.promises.readFile(SOCIAL_FILE, "utf-8");
+      const parsed = JSON.parse(raw.replace(/^\uFEFF/, ""));
+      return parsed && Array.isArray(parsed.comments) ? parsed : seed;
+    } catch {
+      return seed;
+    }
+  }
+
+  async function saveSocial(data: any): Promise<void> {
+    if (isNetlifyRuntime()) {
+      const store = getStore({ name: BLOBS_SOCIAL_STORE });
+      await store.set(BLOBS_SOCIAL_KEY, JSON.stringify(data, null, 2));
+      return;
+    }
+    await fs.promises.mkdir(DATA_DIR, { recursive: true });
+    await fs.promises.writeFile(SOCIAL_FILE, JSON.stringify(data, null, 2), "utf-8");
+  }
+
+  // Public customer accounts (same store as the Nuxt layer) so a user who logs
+  // in on one server keeps the same identity on the other.
+  const ACCOUNTS_FILE = path.join(DATA_DIR, "accounts.json");
+  const BLOBS_ACCOUNTS_STORE = "bm-accounts";
+  const BLOBS_ACCOUNTS_KEY = "accounts.json";
+
+  async function loadAccounts(): Promise<any[]> {
+    if (isNetlifyRuntime()) {
+      try {
+        const store = getStore({ name: BLOBS_ACCOUNTS_STORE });
+        const raw = await store.get(BLOBS_ACCOUNTS_KEY, { type: "text" });
+        if (raw != null) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) return parsed;
+        }
+        await store.set(BLOBS_ACCOUNTS_KEY, JSON.stringify([], null, 2));
+        return [];
+      } catch {
+        return [];
+      }
+    }
+    try {
+      const raw = await fs.promises.readFile(ACCOUNTS_FILE, "utf-8");
+      const parsed = JSON.parse(raw.replace(/^\uFEFF/, ""));
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+      console.error("loadAccounts failed for", ACCOUNTS_FILE, "->", err);
+      return [];
+    }
+  }
+
+  // Serialize read-modify-write on the social store within this process so a
+  // view/like event racing a comment POST cannot drop the freshly added comment.
+  let socialLock: Promise<unknown> = Promise.resolve();
+  async function withSocialLock<T>(fn: () => Promise<T>): Promise<T> {
+    const run = socialLock.then(() => fn());
+    socialLock = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
+
+  // Atomic read-modify-write on the social store, safe across serverless
+  // instances: Netlify Blobs' `set` accepts an ETag precondition
+  // (`onlyIfMatch`). On a conflict (`modified: false`) we re-read and retry,
+  // which closes the lost-update race that made comments silently disappear.
+  async function mutateSocial<T>(
+    mutate: (social: any) => { next: any | null; value: T },
+  ): Promise<T> {
+    if (isNetlifyRuntime()) {
+      const store = getStore({ name: BLOBS_SOCIAL_STORE });
+      for (let attempt = 0; attempt < 10; attempt++) {
+        let current: { etag?: string; data?: any } | null = null;
+        try {
+          current = await store.getWithMetadata(BLOBS_SOCIAL_KEY, { type: "text", consistency: "strong" });
+        } catch (err) {
+          console.error("[BLOBS] social read failed:", err);
+        }
+        let data: any = { comments: [], likes: {}, events: [] };
+        if (current?.data != null) {
+          try {
+            const parsed = JSON.parse(String(current.data));
+            if (parsed && Array.isArray(parsed.comments)) data = parsed;
+          } catch {
+            // ignore
+          }
+        }
+        const { next, value } = mutate(JSON.parse(JSON.stringify(data)));
+        if (next == null) return value;
+        const write = await store.set(BLOBS_SOCIAL_KEY, JSON.stringify(next, null, 2), { onlyIfMatch: current?.etag } as any);
+        if (write?.modified !== false) return value;
+      }
+      throw new Error("[BLOBS] CAS conflict on bm-social/social.json");
+    }
+    return withSocialLock(async () => {
+      const social = await loadSocial();
+      const { next, value } = mutate(social);
+      if (next != null) await saveSocial(social);
+      return value;
+    });
+  }
+
+  // Resolve the real account id for a session: the signed token carries userId
+  // when available (Nuxt-issued), otherwise fall back to the account by email.
+  async function resolveAccountId(session: { userId?: string; email?: string } | undefined): Promise<string> {
+    if (!session) return "";
+    if (session.userId) return String(session.userId);
+    if (session.email) {
+      const email = String(session.email).toLowerCase();
+      const accounts = await loadAccounts();
+      const acc = accounts.find((a: any) => String(a?.email || "").toLowerCase() === email);
+      if (acc?.id) return String(acc.id);
+    }
+    return "";
+  }
+
   function sanitizeProduct(body: any): any {
     const clean = (v: unknown) => String(v ?? "").slice(0, 4000);
     const id = clean(body?.id);
@@ -728,6 +870,195 @@ export function createApp() {
     if (next.length === orders.length) return res.status(404).json({ error: "Commande introuvable." });
     await saveOrders(next);
     res.json({ success: true });
+  });
+
+  // ---------------------------------------------------------------------------
+  // SOCIAL API (comments, likes, events) — persisted in the shared social store
+  // (bm-social blob / data/social.json) so product comments survive a refresh
+  // and appear in the client space, exactly like the Nuxt (dev) routes do.
+  // ---------------------------------------------------------------------------
+
+  app.get("/api/products/:id/comments", async (req, res) => {
+    const social = await loadSocial();
+    const productId = String(req.params.id);
+    const comments = (social.comments || [])
+      .filter((c) => String(c.productId) === productId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    res.json({ success: true, comments, count: comments.length });
+  });
+
+  app.post("/api/products/:id/comments", requireAuth, rateLimit(20, 60_000), async (req, res) => {
+    const userId = await resolveAccountId((res as any).locals?.session || null);
+    const text = String(req.body?.text || "").replace(/<[^>]*>/g, "").slice(0, 1000).trim();
+    if (!text) return res.status(400).json({ error: "Commentaire vide." });
+    const comment = await mutateSocial((social) => {
+      const item = {
+        id: "cm_" + crypto.randomBytes(8).toString("hex"),
+        productId: String(req.params.id),
+        userId,
+        name: String(req.body?.name || "Utilisateur").slice(0, 80),
+        picture: req.body?.picture ? String(req.body.picture).slice(0, 8000) : undefined,
+        text,
+        createdAt: new Date().toISOString(),
+      };
+      social.comments.unshift(item);
+      social.comments = social.comments.slice(0, 1000);
+      return { next: social, value: item };
+    });
+    res.json({ success: true, comment });
+  });
+
+  app.put("/api/me/comments/:id", requireAuth, rateLimit(20, 60_000), async (req, res) => {
+    const userId = await resolveAccountId((res as any).locals?.session || null);
+    const text = String(req.body?.text || "").replace(/<[^>]*>/g, "").slice(0, 1000).trim();
+    if (!text) return res.status(400).json({ error: "Commentaire vide." });
+    const comment = await mutateSocial((social) => {
+      const idx = social.comments.findIndex((c) => c.id === String(req.params.id));
+      if (idx < 0) return { next: null, value: null };
+      const target = social.comments[idx];
+      if (String(target.userId || "") !== String(userId)) throw new Error("Ce commentaire ne vous appartient pas.");
+      social.comments[idx] = { ...target, text };
+      return { next: social, value: social.comments[idx] };
+    });
+    if (!comment) return res.status(404).json({ error: "Commentaire introuvable ou déjà supprimé." });
+    res.json({ success: true, comment });
+  });
+
+  app.delete("/api/me/comments/:id", requireAuth, async (req, res) => {
+    const userId = await resolveAccountId((res as any).locals?.session || null);
+    const deleted = await mutateSocial((social) => {
+      const target = social.comments.find((c) => c.id === String(req.params.id));
+      if (!target) return { next: null, value: false };
+      if (String(target.userId || "") !== String(userId)) throw new Error("Ce commentaire ne vous appartient pas.");
+      const before = social.comments.length;
+      social.comments = social.comments.filter((c) => c.id !== String(req.params.id));
+      return { next: before === social.comments.length ? null : social, value: before !== social.comments.length };
+    });
+    if (!deleted) return res.status(404).json({ error: "Commentaire introuvable ou déjà supprimé." });
+    res.json({ success: true });
+  });
+
+  app.post("/api/events", rateLimit(300, 60_000), async (req, res) => {
+    const body = req.body || {};
+    const type = ["view", "click", "like", "unlike", "share", "copy", "comment"].includes(body?.type) ? body.type : "view";
+    const session = await verifyToken(extractToken(req));
+    const userId = await resolveAccountId(session);
+    await mutateSocial((social) => {
+      social.events = social.events || [];
+      social.events.push({
+        type,
+        productId: body?.productId ? String(body.productId).slice(0, 120) : undefined,
+        productTitle: body?.productTitle ? String(body.productTitle).slice(0, 300) : undefined,
+        url: body?.url ? String(body.url).slice(0, 500) : undefined,
+        ts: Date.now(),
+        userId,
+        ip: req.ip || req.socket.remoteAddress || "unknown",
+      });
+      social.events = social.events.slice(-10000);
+      return { next: social, value: undefined };
+    });
+    res.json({ success: true });
+  });
+
+  app.delete("/api/me/events/:ts", requireAuth, async (req, res) => {
+    const userId = await resolveAccountId((res as any).locals?.session || null);
+    const ts = Number(req.params.ts || "");
+    if (!ts || !Number.isFinite(ts)) return res.status(400).json({ error: "Événement invalide." });
+    const deleted = await mutateSocial((social) => {
+      const before = social.events.length;
+      social.events = social.events.filter(
+        (e) => !(String(e.userId || "") === String(userId) && Number(e.ts) === Number(ts)),
+      );
+      return { next: before === social.events.length ? null : social, value: before !== social.events.length };
+    });
+    if (!deleted) return res.status(404).json({ error: "Événement introuvable ou déjà supprimé." });
+    res.json({ success: true });
+  });
+
+  app.get("/api/me/interactions", requireAuth, async (req, res) => {
+    const userId = await resolveAccountId((res as any).locals?.session || null);
+    const accounts = await loadAccounts();
+    const account = userId ? accounts.find((a) => String(a.id) === String(userId)) : null;
+    const phone = String(account?.phone || "").replace(/\D/g, "");
+    const social = await loadSocial();
+    const MAX = 120;
+
+    const comments = (social.comments || [])
+      .filter((c) => String(c.userId || "") === String(userId))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, MAX);
+
+    const mine = (social.events || [])
+      .filter((e) => String(e.userId || "") === String(userId))
+      .sort((a, b) => (b.ts || 0) - (a.ts || 0));
+
+    const likeState = new Map<string, boolean>();
+    for (const e of mine) {
+      if (e.type === "like") likeState.set(e.productId, true);
+      else if (e.type === "unlike") likeState.set(e.productId, false);
+    }
+    const likedIds = [...likeState.entries()].filter(([, liked]) => liked).map(([productId]) => productId);
+
+    const orders = (await loadOrders())
+      .filter(
+        (o: any) =>
+          (o.userId && String(o.userId) === String(userId)) ||
+          (phone && o.customerPhone && String(o.customerPhone).replace(/\D/g, "") === phone),
+      )
+      .slice(0, MAX);
+
+    const products = await loadProducts();
+    const productIndex = new Map<string, { title?: string; imageUrl?: string }>();
+    for (const p of products) productIndex.set(p.id, { title: p.title, imageUrl: p.imageUrl });
+    const enrich = (items: any[]) =>
+      items.map((it) => {
+        const meta = productIndex.get(it.productId) || {};
+        return { ...it, productTitle: it.productTitle || meta.title || "", productImage: it.productImage || meta.imageUrl || "" };
+      });
+
+    const timeline = mine.slice(0, MAX);
+    const seenProducts = new Set(timeline.map((e) => e.productId));
+    for (const e of mine) {
+      if (e.type === "like" && likedIds.includes(e.productId) && !seenProducts.has(e.productId)) {
+        timeline.push(e);
+        seenProducts.add(e.productId);
+      }
+      if (timeline.length >= MAX + 24) break;
+    }
+    timeline.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+
+    const stats = {
+      comments: comments.length,
+      likes: likedIds.length,
+      views: mine.filter((e) => e.type === "view").length,
+      clicks: mine.filter((e) => e.type === "click").length,
+      shares: mine.filter((e) => e.type === "share" || e.type === "copy").length,
+      orders: orders.length,
+    };
+
+    res.json({
+      success: true,
+      user: account
+        ? {
+            id: account.id,
+            email: account.email,
+            name: account.name,
+            pseudo: account.pseudo,
+            picture: account.picture,
+            mood: account.mood,
+            phone: account.phone,
+            phonePrefix: account.phonePrefix,
+            country: account.country,
+            role: account.role,
+            createdAt: account.createdAt,
+          }
+        : null,
+      comments: enrich(comments),
+      events: enrich(timeline),
+      liked: enrich(likedIds.map((id) => ({ productId: id }))),
+      orders: enrich(orders),
+      stats,
+    });
   });
 
   // ---------------------------------------------------------------------------

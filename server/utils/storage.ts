@@ -22,7 +22,8 @@ export function isNetlifyRuntime(): boolean {
 async function readJSON(file: string): Promise<any | null> {
   try {
     const raw = await fs.promises.readFile(file, 'utf-8')
-    return JSON.parse(raw)
+    // Some editors/scripts save UTF-8 files with a BOM, which breaks JSON.parse.
+    return JSON.parse(raw.replace(/^\uFEFF/, ''))
   } catch {
     return null
   }
@@ -33,12 +34,27 @@ async function writeJSON(file: string, data: any): Promise<void> {
   await fs.promises.writeFile(file, JSON.stringify(data, null, 2), 'utf-8')
 }
 
-async function blobGet(store: string, key: string, type: 'text'): Promise<string | null>
-async function blobGet(store: string, key: string, type: 'arrayBuffer'): Promise<ArrayBuffer | null>
-async function blobGet(store: string, key: string, type: 'text' | 'arrayBuffer'): Promise<any> {
+// ---- in-process serialization for shared JSON stores ----
+// Mutations do a read-modify-write on one file/blob. Without serialization two
+// concurrent requests (page view/like/share events racing a comment POST) can
+// overwrite each other's changes — a freshly posted comment silently disappears
+// (then editing it fails with "commentaire introuvable"). This queue makes each
+// mutation atomic within the process.
+const mutexes = new Map<string, Promise<unknown>>()
+
+export function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const prev = mutexes.get(key) || Promise.resolve()
+  const run = prev.then(() => fn())
+  mutexes.set(key, run.then(() => undefined, () => undefined))
+  return run
+}
+
+async function blobGet(store: string, key: string, type: 'text', consistency?: 'eventual' | 'strong'): Promise<string | null>
+async function blobGet(store: string, key: string, type: 'arrayBuffer', consistency?: 'eventual' | 'strong'): Promise<ArrayBuffer | null>
+async function blobGet(store: string, key: string, type: 'text' | 'arrayBuffer', consistency: 'eventual' | 'strong' = 'eventual'): Promise<any> {
   try {
     const s = getStore({ name: store })
-    return await s.get(key, { type } as any)
+    return await s.get(key, { type, consistency } as any)
   } catch (err) {
     console.error(`[BLOBS] get ${store}/${key} failed:`, err)
     return null
@@ -184,19 +200,23 @@ export async function upsertAccount(account: PublicAccount): Promise<PublicAccou
 }
 
 // ---- social data (comments, likes, events) ----
-async function loadSocial(): Promise<{ comments: any[]; likes: Record<string, number>; events: any[] }> {
-  const seed = { comments: [], likes: {}, events: [] }
+type SocialShape = { comments: any[]; likes: Record<string, number>; events: any[] }
+const SOCIAL_SEED: SocialShape = { comments: [], likes: {}, events: [] }
+
+async function loadSocial(): Promise<SocialShape> {
   if (isNetlifyRuntime()) {
-    const raw = await blobGet('bm-social', 'social.json', 'text')
+    // Strong consistency so a comment POST is immediately visible on the very
+    // next GET, even across different serverless instances.
+    const raw = await blobGet('bm-social', 'social.json', 'text', 'strong')
     if (raw != null) {
       const p = JSON.parse(raw)
       if (p && Array.isArray(p.comments)) return p
     }
-    await blobSet('bm-social', 'social.json', JSON.stringify(seed, null, 2))
-    return seed
+    await blobSet('bm-social', 'social.json', JSON.stringify(SOCIAL_SEED, null, 2))
+    return SOCIAL_SEED
   }
   const p = await readJSON(path.join(DATA_DIR, 'social.json'))
-  return p && Array.isArray(p.comments) ? p : seed
+  return p && Array.isArray(p.comments) ? p : { ...SOCIAL_SEED }
 }
 
 async function saveSocial(data: any): Promise<void> {
@@ -206,8 +226,59 @@ async function saveSocial(data: any): Promise<void> {
   return writeJSON(path.join(DATA_DIR, 'social.json'), data)
 }
 
+// Atomic read-modify-write on the social store.
+//  - Local dev: in-process mutex (`withLock`) serializes every mutation.
+//  - Production (Netlify Blobs, multiple function instances): Netlify Blobs has
+//    no atomic RMW, but `set` supports an ETag precondition. We read the
+//    current ETag + data, compute the next state, and write with
+//    `onlyIfMatch`. If another instance wrote in between, the write is refused
+//    (`modified: false`) and we re-read + retry. This closes the lost-update
+//    race where a page view event racing a comment POST silently dropped the
+//    freshly posted comment.
+async function mutateSocial<T>(
+  mutate: (social: SocialShape) => { next: SocialShape | null; value: T },
+): Promise<T> {
+  if (isNetlifyRuntime()) {
+    const s = getStore({ name: 'bm-social' })
+    for (let attempt = 0; attempt < 10; attempt++) {
+      let current: { etag?: string; data?: any } | null = null
+      try {
+        current = await s.getWithMetadata('social.json', { type: 'text', consistency: 'strong' } as any)
+      } catch (err) {
+        console.error('[BLOBS] social read failed:', err)
+      }
+      let data: SocialShape = { ...SOCIAL_SEED }
+      if (current?.data != null) {
+        try {
+          const parsed = JSON.parse(String(current.data))
+          if (parsed && Array.isArray(parsed.comments)) data = parsed
+        } catch {
+          // corrupted payload -> start from seed
+        }
+      }
+      const { next, value } = mutate(JSON.parse(JSON.stringify(data)))
+      if (next == null) return value
+      const write = await s.set('social.json', JSON.stringify(next, null, 2), { onlyIfMatch: current?.etag } as any)
+      if (write?.modified !== false) return value
+      // CAS conflict: another instance committed a newer version -> retry.
+    }
+    throw new Error('[BLOBS] CAS conflict on bm-social/social.json')
+  }
+  return withLock('social', async () => {
+    const social = await loadSocial()
+    const { next, value } = mutate(social)
+    if (next != null) await saveSocial(social)
+    return value
+  })
+}
+
 export async function resetSocial(): Promise<void> {
-  return saveSocial({ comments: [], likes: {}, events: [] })
+  await mutateSocial((social) => {
+    social.comments = []
+    social.likes = {}
+    social.events = []
+    return { next: social, value: undefined }
+  })
 }
 
 export interface MarketEvent {
@@ -221,19 +292,20 @@ export interface MarketEvent {
 }
 
 export async function pushEvent(ev: MarketEvent): Promise<void> {
-  const social = await loadSocial()
-  social.events.push(ev)
-  social.events = social.events.slice(-20000)
-  if (ev.type === 'like' || ev.type === 'unlike') {
-    const id = ev.productId || 'global'
-    const cur = social.likes[id] || 0
-    social.likes[id] = Math.max(0, cur + (ev.type === 'like' ? 1 : -1))
-  }
-  await saveSocial(social)
+  await mutateSocial((social) => {
+    social.events.push(ev)
+    social.events = social.events.slice(-20000)
+    if (ev.type === 'like' || ev.type === 'unlike') {
+      const id = ev.productId || 'global'
+      const cur = social.likes[id] || 0
+      social.likes[id] = Math.max(0, cur + (ev.type === 'like' ? 1 : -1))
+    }
+    return { next: social, value: undefined }
+  })
 }
 
 export async function getSocial() {
-  return loadSocial()
+  return withLock('social', () => loadSocial())
 }
 
 export interface Comment {
@@ -247,72 +319,77 @@ export interface Comment {
 }
 
 export async function getComments(productId?: string): Promise<Comment[]> {
-  const social = await loadSocial()
-  let comments = social.comments || []
-  if (productId) comments = comments.filter((c) => c.productId === productId)
-  return comments.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 200)
+  return withLock('social', async () => {
+    const social = await loadSocial()
+    let comments = social.comments || []
+    if (productId) comments = comments.filter((c) => c.productId === productId)
+    return comments.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 200)
+  })
 }
 
 export async function getCommentCount(productId?: string): Promise<number> {
-  const social = await loadSocial()
-  const comments = social.comments || []
-  if (!productId) return comments.length
-  return comments.reduce((n, c) => n + (c.productId === productId ? 1 : 0), 0)
+  return withLock('social', async () => {
+    const social = await loadSocial()
+    const comments = social.comments || []
+    if (!productId) return comments.length
+    return comments.reduce((n, c) => n + (c.productId === productId ? 1 : 0), 0)
+  })
 }
 
 export async function addComment(comment: Comment): Promise<Comment> {
-  const social = await loadSocial()
-  social.comments.unshift(comment)
-  social.comments = social.comments.slice(0, 1000)
-  await saveSocial(social)
-  return comment
+  return mutateSocial((social) => {
+    social.comments.unshift(comment)
+    social.comments = social.comments.slice(0, 1000)
+    return { next: social, value: comment }
+  })
 }
 
 export async function deleteComment(id: string): Promise<boolean> {
-  const social = await loadSocial()
-  const before = social.comments.length
-  social.comments = social.comments.filter((c) => c.id !== id)
-  if (social.comments.length === before) return false
-  await saveSocial(social)
-  return true
+  return mutateSocial((social) => {
+    const before = social.comments.length
+    social.comments = social.comments.filter((c) => c.id !== id)
+    return { next: before === social.comments.length ? null : social, value: before !== social.comments.length }
+  })
 }
 
 // Client space: a user may delete only their own comment.
 export async function deleteCommentIfOwner(id: string, userId: string): Promise<boolean> {
-  const social = await loadSocial()
-  const target = social.comments.find((c) => c.id === id)
-  if (!target) return false
-  if (String(target.userId || '') !== String(userId)) throw new Error('Ce commentaire ne vous appartient pas.')
-  social.comments = social.comments.filter((c) => c.id !== id)
-  await saveSocial(social)
-  return true
+  return mutateSocial((social) => {
+    const target = social.comments.find((c) => c.id === id)
+    if (!target) return { next: null, value: false }
+    if (String(target.userId || '') !== String(userId)) throw new Error('Ce commentaire ne vous appartient pas.')
+    const before = social.comments.length
+    social.comments = social.comments.filter((c) => c.id !== id)
+    return { next: before === social.comments.length ? null : social, value: before !== social.comments.length }
+  })
 }
 
 // Client space: a user may edit the text of their own comment.
 export async function updateCommentIfOwner(id: string, userId: string, text: string): Promise<Comment | null> {
-  const social = await loadSocial()
-  const idx = social.comments.findIndex((c) => c.id === id)
-  if (idx < 0) return null
-  const target = social.comments[idx]
-  if (String(target.userId || '') !== String(userId)) throw new Error('Ce commentaire ne vous appartient pas.')
-  social.comments[idx] = { ...target, text }
-  await saveSocial(social)
-  return social.comments[idx]
+  return mutateSocial((social) => {
+    const idx = social.comments.findIndex((c) => c.id === id)
+    if (idx < 0) return { next: null, value: null }
+    const target = social.comments[idx]
+    if (String(target.userId || '') !== String(userId)) throw new Error('Ce commentaire ne vous appartient pas.')
+    social.comments[idx] = { ...target, text }
+    return { next: social, value: social.comments[idx] }
+  })
 }
 
 // Client space: a user may remove one of their own tracked events.
 export async function deleteUserEvent(userId: string, ts: number): Promise<boolean> {
-  const social = await loadSocial()
-  const before = social.events.length
-  social.events = social.events.filter((e) => !(String(e.userId || '') === String(userId) && Number(e.ts) === Number(ts)))
-  if (social.events.length === before) return false
-  await saveSocial(social)
-  return true
+  return mutateSocial((social) => {
+    const before = social.events.length
+    social.events = social.events.filter((e) => !(String(e.userId || '') === String(userId) && Number(e.ts) === Number(ts)))
+    return { next: before === social.events.length ? null : social, value: before !== social.events.length }
+  })
 }
 
 export async function getLikeCount(productId: string): Promise<number> {
-  const social = await loadSocial()
-  return Number(social.likes[productId]) || 0
+  return withLock('social', async () => {
+    const social = await loadSocial()
+    return Number(social.likes[productId]) || 0
+  })
 }
 
 // ---- images / videos ----

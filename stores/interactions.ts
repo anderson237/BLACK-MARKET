@@ -6,14 +6,17 @@ export interface LikeState {
 }
 
 /**
- * Local-first interaction store. Likes are instant (optimistic), persisted in
- * localStorage so the user's likes survive reloads. When the accounts backend
- * lands (Pilier 2/3), counts are synced per-user from /api/likes.
+ * Interactions store, centralized on the server backend.
+ * Likes are optimistic locally (instant UI + survives reload), while the true
+ * count is authoritative on the server (`/api/products/:id/likes` ->
+ * social.likes). `refreshCount` syncs the global total so every visitor sees
+ * the same stats instead of a device-local number.
  */
 export const useInteractionsStore = defineStore('interactions', () => {
   const likes = ref<Record<string, LikeState>>({})
   const likedSet = ref<Set<string>>(new Set())
   const initialized = ref(false)
+  const refreshing = ref<Record<string, boolean>>({})
 
   function load() {
     if (initialized.value) return
@@ -42,12 +45,41 @@ export const useInteractionsStore = defineStore('interactions', () => {
 
   function getLike(id: string): LikeState {
     load()
-    return likes.value[id] || { liked: false, count: 0 }
+    return likes.value[id] || { liked: likedSet.value.has(id), count: 0 }
+  }
+
+  async function refreshCount(id: string): Promise<number> {
+    load()
+    if (refreshing.value[id]) return likes.value[id]?.count ?? 0
+    refreshing.value[id] = true
+    try {
+      const res = await fetch(`/api/products/${encodeURIComponent(id)}/likes`, {
+        headers: { Accept: 'application/json' },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const count = Number(data?.count)
+        if (Number.isFinite(count)) {
+          likes.value[id] = { liked: likedSet.value.has(id), count }
+        }
+      }
+    } catch {
+      /* keep previous value */
+    } finally {
+      refreshing.value[id] = false
+    }
+    return likes.value[id]?.count ?? 0
+  }
+
+  function bounceLike(id: string, delta: number) {
+    load()
+    const cur = likes.value[id] || { liked: likedSet.value.has(id), count: 0 }
+    likes.value[id] = { ...cur, count: Math.max(0, cur.count + delta) }
   }
 
   function toggleLike(id: string): LikeState {
     load()
-    const cur = likes.value[id] || { liked: false, count: 0 }
+    const cur = likes.value[id] || { liked: likedSet.value.has(id), count: 0 }
     const next: LikeState = {
       liked: !cur.liked,
       count: cur.count + (cur.liked ? -1 : 1),
@@ -59,5 +91,5 @@ export const useInteractionsStore = defineStore('interactions', () => {
     return next
   }
 
-  return { likes, likedSet, getLike, toggleLike }
+  return { likes, likedSet, getLike, toggleLike, bounceLike, refreshCount }
 })

@@ -15,9 +15,39 @@ const likeCount = computed(() => inter.getLike(props.product.id).count)
 
 const commentsStore = useCommentsStore()
 const commentCount = computed(() => commentsStore.getCount(props.product.id))
+
+function syncStats() {
+  // Always re-sync from the server so returning to a page (or re-focusing the
+  // tab) shows the centralized, up-to-date comment & like counts.
+  commentsStore.refresh(props.product.id)
+  inter.refreshCount(props.product.id)
+}
+
+function onVisible() {
+  if (document.visibilityState === 'visible') syncStats()
+}
+
 onMounted(() => {
-  if (!commentsStore.loaded[props.product.id]) commentsStore.refresh(props.product.id)
+  syncStats()
+  window.addEventListener('focus', onVisible)
+  document.addEventListener('visibilitychange', onVisible)
+  // React live to a comment/like made elsewhere while this control is mounted.
+  window.addEventListener('bm:track', onTrackEvent)
 })
+
+onUnmounted(() => {
+  window.removeEventListener('focus', onVisible)
+  document.removeEventListener('visibilitychange', onVisible)
+  window.removeEventListener('bm:track', onTrackEvent)
+})
+
+function onTrackEvent(e: Event) {
+  const ev = (e as CustomEvent).detail
+  if (!ev || !ev.productId) return
+  if (ev.productId !== props.product.id) return
+  if (ev.type === 'comment') commentsStore.refresh(props.product.id)
+  if (ev.type === 'like' || ev.type === 'unlike') inter.refreshCount(props.product.id)
+}
 
 function onLike() {
   auth.requireAuth(() => {
