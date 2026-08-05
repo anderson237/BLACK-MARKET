@@ -33,6 +33,13 @@ function preorder() {
 const isStock = computed(() => props.product.stockStatus === 'in_stock')
 const ctaLabel = computed(() => (isStock.value ? 'COMMANDER' : 'PRÉCOMMANDER'))
 const showFeaturedVideo = computed(() => props.product.featuredMedia === 'video' && !!props.product.videoUrl)
+
+// Titles are truncated at 100 chars with "…" to keep the grid clean; the full
+// title stays available on the product page itself.
+const truncatedTitle = computed(() => {
+  const t = String(props.product.title || '').trim()
+  return t.length > 100 ? t.slice(0, 100).trimEnd() + '…' : t
+})
 </script>
 
 <template>
@@ -88,8 +95,8 @@ const showFeaturedVideo = computed(() => props.product.featuredMedia === 'video'
 
     <div class="p-4">
       <NuxtLink :to="url">
-        <h3 class="font-extrabold text-sm text-slate-100 group-hover:text-[#ff2a2a] transition-colors leading-snug">
-          {{ product.title }}
+        <h3 class="font-extrabold text-sm text-slate-100 group-hover:text-[#ff2a2a] transition-colors leading-snug line-clamp-2">
+          {{ truncatedTitle }}
         </h3>
       </NuxtLink>
       <div class="mt-2 flex items-center justify-between pt-2 border-t border-zinc-900">
