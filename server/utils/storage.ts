@@ -316,6 +316,25 @@ export interface Comment {
   picture?: string
   text: string
   createdAt: string
+  editedAt?: string
+  likes?: number
+  dislikes?: number
+  reports?: number
+  likedBy?: string[]
+  dislikedBy?: string[]
+  reportedBy?: string[]
+}
+
+function withCommentDefaults(c: Comment): Comment {
+  return {
+    likes: 0,
+    dislikes: 0,
+    reports: 0,
+    likedBy: [],
+    dislikedBy: [],
+    reportedBy: [],
+    ...c,
+  }
 }
 
 export async function getComments(productId?: string): Promise<Comment[]> {
@@ -337,10 +356,11 @@ export async function getCommentCount(productId?: string): Promise<number> {
 }
 
 export async function addComment(comment: Comment): Promise<Comment> {
+  const full = withCommentDefaults(comment)
   return mutateSocial((social) => {
-    social.comments.unshift(comment)
+    social.comments.unshift(full)
     social.comments = social.comments.slice(0, 1000)
-    return { next: social, value: comment }
+    return { next: social, value: full }
   })
 }
 
@@ -371,8 +391,57 @@ export async function updateCommentIfOwner(id: string, userId: string, text: str
     if (idx < 0) return { next: null, value: null }
     const target = social.comments[idx]
     if (String(target.userId || '') !== String(userId)) throw new Error('Ce commentaire ne vous appartient pas.')
-    social.comments[idx] = { ...target, text }
-    return { next: social, value: social.comments[idx] }
+    const updated = withCommentDefaults({ ...target, text, editedAt: new Date().toISOString() })
+    social.comments[idx] = updated
+    return { next: social, value: updated }
+  })
+}
+
+// Any logged-in user may like/dislike any comment (toggle). Liking clears a
+// previous dislike and vice-versa. Counts are derived from the userId arrays.
+export async function toggleCommentReaction(id: string, userId: string, kind: 'like' | 'dislike'): Promise<Comment | null> {
+  return mutateSocial((social) => {
+    const idx = social.comments.findIndex((c) => c.id === id)
+    if (idx < 0) return { next: null, value: null }
+    const c = withCommentDefaults(social.comments[idx])
+    const likedBy = Array.isArray(c.likedBy) ? [...c.likedBy] : []
+    const dislikedBy = Array.isArray(c.dislikedBy) ? [...c.dislikedBy] : []
+    if (kind === 'like') {
+      const at = likedBy.indexOf(userId)
+      if (at >= 0) likedBy.splice(at, 1)
+      else {
+        likedBy.push(userId)
+        const di = dislikedBy.indexOf(userId)
+        if (di >= 0) dislikedBy.splice(di, 1)
+      }
+    } else {
+      const at = dislikedBy.indexOf(userId)
+      if (at >= 0) dislikedBy.splice(at, 1)
+      else {
+        dislikedBy.push(userId)
+        const li = likedBy.indexOf(userId)
+        if (li >= 0) likedBy.splice(li, 1)
+      }
+    }
+    const updated = { ...c, likedBy, dislikedBy, likes: likedBy.length, dislikes: dislikedBy.length }
+    social.comments[idx] = updated
+    return { next: social, value: updated }
+  })
+}
+
+// Any logged-in user may report a comment once; reports surface in the admin
+// analytics so a moderator can review them.
+export async function reportComment(id: string, userId: string): Promise<{ comment: Comment | null; alreadyReported: boolean }> {
+  return mutateSocial((social) => {
+    const idx = social.comments.findIndex((c) => c.id === id)
+    if (idx < 0) return { next: null, value: { comment: null, alreadyReported: false } }
+    const c = withCommentDefaults(social.comments[idx])
+    const reportedBy = Array.isArray(c.reportedBy) ? [...c.reportedBy] : []
+    if (reportedBy.includes(userId)) return { next: null, value: { comment: c, alreadyReported: true } }
+    reportedBy.push(userId)
+    const updated = { ...c, reportedBy, reports: reportedBy.length }
+    social.comments[idx] = updated
+    return { next: social, value: { comment: updated, alreadyReported: false } }
   })
 }
 

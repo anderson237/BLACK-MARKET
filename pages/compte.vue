@@ -145,7 +145,7 @@ function readAsDataURL(file: File): Promise<string> {
 }
 
 // ---- interactions ----
-interface CommentItem { id: string; productId: string; text: string; createdAt: string; productTitle?: string; productImage?: string }
+interface CommentItem { id: string; productId: string; text: string; createdAt: string; editedAt?: string; likes?: number; dislikes?: number; reports?: number; likedByMe?: boolean; dislikedByMe?: boolean; reportedByMe?: boolean; productTitle?: string; productImage?: string }
 interface EventItem { type: string; productId?: string; productTitle?: string; productImage?: string; ts: number; url?: string }
 interface OrderItem { id: string; productTitle?: string; productImage?: string; quantity: number; priceXof: number; status: string; createdAt: string }
 interface LikedItem { productId: string; productTitle?: string; productImage?: string }
@@ -721,7 +721,12 @@ const totalActivity = computed(() => {
                     </template>
                     <template v-else>
                       <p class="text-xs text-zinc-300"><span class="text-slate-100 font-bold">Vous avez commenté</span> {{ c.text }}</p>
-                      <NuxtLink :to="productUrl(c.productId)" class="text-[10px] text-zinc-500 font-mono hover:text-[#ff2a2a] transition-colors">{{ c.productTitle || 'Produit' }} · {{ timeAgo(c.createdAt) }}</NuxtLink>
+                      <NuxtLink :to="productUrl(c.productId)" class="text-[10px] text-zinc-500 font-mono hover:text-[#ff2a2a] transition-colors">{{ c.productTitle || 'Produit' }} · {{ timeAgo(c.createdAt) }}<span v-if="c.editedAt" class="text-zinc-500 italic"> · modifié</span></NuxtLink>
+                      <div class="flex items-center gap-3 mt-1.5">
+                        <span class="inline-flex items-center gap-1 text-[10px] font-mono text-zinc-500"><AppIcon name="thumbsUp" :size="11" /> {{ c.likes || 0 }}</span>
+                        <span class="inline-flex items-center gap-1 text-[10px] font-mono text-zinc-500"><AppIcon name="thumbsDown" :size="11" /> {{ c.dislikes || 0 }}</span>
+                        <span v-if="c.reports" class="inline-flex items-center gap-1 text-[10px] font-mono text-amber-400/80"><AppIcon name="flag" :size="11" /> {{ c.reports }}</span>
+                      </div>
                     </template>
                   </div>
                   <div class="flex flex-col gap-1.5 shrink-0">

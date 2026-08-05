@@ -180,6 +180,9 @@ export default defineEventHandler(async (event) => {
     copies: events.filter((e: any) => e.type === 'copy').length,
     unlikes: events.filter((e: any) => e.type === 'unlike').length,
     comments: comments.length,
+    commentLikes: comments.reduce((s: number, c: any) => s + (Number(c.likes) || 0), 0),
+    commentDislikes: comments.reduce((s: number, c: any) => s + (Number(c.dislikes) || 0), 0),
+    commentReports: comments.reduce((s: number, c: any) => s + (Number(c.reports) || 0), 0),
     events: events.length,
   }
 

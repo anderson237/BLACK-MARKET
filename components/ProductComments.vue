@@ -11,11 +11,21 @@ interface CommentItem {
   picture?: string
   text: string
   createdAt: string
+  editedAt?: string
+  likes?: number
+  dislikes?: number
+  reports?: number
+  likedBy?: string[]
+  dislikedBy?: string[]
+  reportedBy?: string[]
+  likedByMe?: boolean
+  dislikedByMe?: boolean
+  reportedByMe?: boolean
 }
 
 const props = defineProps<{ productId: string }>()
 const auth = useAuthStore()
-const { track } = useTrack()
+const { track, copyLink } = useTrack()
 const commentsStore = useCommentsStore()
 
 const comments = ref<CommentItem[]>([])
@@ -56,6 +66,64 @@ async function saveEdit(c: CommentItem) {
     track({ type: 'comment', productId: props.productId })
   } catch (e: any) {
     editingError.value = e?.message || 'Impossible de modifier le commentaire.'
+  }
+}
+
+// ---- comment reactions: like / dislike / share / report ----
+function guardAuth(): boolean {
+  if (auth.isAuthed) return true
+  auth.openModal('Connectez-vous pour réagir aux commentaires.')
+  return false
+}
+
+async function toggleReaction(c: CommentItem, kind: 'like' | 'dislike') {
+  if (!guardAuth()) return
+  try {
+    const res = await fetch(`/api/comments/${encodeURIComponent(c.id)}/${kind}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${auth.token}`,
+      },
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data?.statusMessage || data?.error || `Erreur ${res.status}`)
+    const upd = data.comment
+    if (upd) {
+      c.likes = upd.likes
+      c.dislikes = upd.dislikes
+      c.likedByMe = (upd.likedBy || []).includes(auth.user?.id)
+      c.dislikedByMe = (upd.dislikedBy || []).includes(auth.user?.id)
+    }
+    window.dispatchEvent(new CustomEvent('bm:track', { detail: { type: 'comment' } }))
+  } catch (e: any) {
+    window.alert(e?.message || 'Impossible de réagir à ce commentaire.')
+  }
+}
+
+function shareComment(c: CommentItem) {
+  track({ type: 'share', productId: c.productId })
+  copyLink(c.productId)
+}
+
+async function reportThis(c: CommentItem) {
+  if (!guardAuth()) return
+  if (c.reportedByMe) return
+  try {
+    const res = await fetch(`/api/comments/${encodeURIComponent(c.id)}/report`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${auth.token}`,
+      },
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data?.statusMessage || data?.error || `Erreur ${res.status}`)
+    c.reportedByMe = true
+    c.reports = (c.reports || 0) + 1
+    window.dispatchEvent(new CustomEvent('bm:track', { detail: { type: 'comment' } }))
+  } catch (e: any) {
+    window.alert(e?.message || 'Impossible de signaler ce commentaire.')
   }
 }
 
@@ -205,6 +273,7 @@ function timeAgo(iso: string): string {
           <div class="flex items-baseline gap-2">
             <span class="text-xs font-bold text-slate-200">{{ c.name }}</span>
             <span class="text-[9px] text-zinc-600 font-mono">{{ timeAgo(c.createdAt) }}</span>
+            <span v-if="c.editedAt" class="text-[9px] text-zinc-500 font-mono italic">· modifié</span>
           </div>
           <template v-if="editingId === c.id">
             <textarea v-model="editingText" rows="2" maxlength="1000"
@@ -218,6 +287,30 @@ function timeAgo(iso: string): string {
             </div>
           </template>
           <p v-else class="text-xs text-zinc-300 mt-0.5 break-words">{{ c.text }}</p>
+          <div v-if="editingId !== c.id" class="flex items-center gap-3 mt-2 flex-wrap">
+            <button @click="toggleReaction(c, 'like')"
+              class="inline-flex items-center gap-1 text-[10px] font-mono transition-colors"
+              :class="c.likedByMe ? 'text-[#ff2a2a]' : 'text-zinc-500 hover:text-[#ff2a2a]'"
+              :title="c.likedByMe ? 'Retirer le like' : 'J\'aime ce commentaire'">
+              <AppIcon name="thumbsUp" :size="12" /> {{ c.likes || 0 }}
+            </button>
+            <button @click="toggleReaction(c, 'dislike')"
+              class="inline-flex items-center gap-1 text-[10px] font-mono transition-colors"
+              :class="c.dislikedByMe ? 'text-sky-400' : 'text-zinc-500 hover:text-sky-400'"
+              :title="c.dislikedByMe ? 'Retirer le dislike' : 'Je n\'aime pas ce commentaire'">
+              <AppIcon name="thumbsDown" :size="12" /> {{ c.dislikes || 0 }}
+            </button>
+            <button @click="shareComment(c)" title="Partager le produit"
+              class="inline-flex items-center gap-1 text-[10px] font-mono text-zinc-500 hover:text-violet-400 transition-colors">
+              <AppIcon name="share" :size="12" /> Partager
+            </button>
+            <button @click="reportThis(c)" :disabled="c.reportedByMe"
+              class="inline-flex items-center gap-1 text-[10px] font-mono transition-colors"
+              :class="c.reportedByMe ? 'text-amber-400 cursor-default' : 'text-zinc-500 hover:text-amber-400'"
+              :title="c.reportedByMe ? 'Commentaire déjà signalé' : 'Signaler ce commentaire'">
+              <AppIcon name="flag" :size="12" /> {{ c.reportedByMe ? 'Signalé' : 'Signaler' }}
+            </button>
+          </div>
         </div>
         <div v-if="isMine(c)" class="flex flex-col gap-1.5 shrink-0">
           <button @click="startEdit(c)" :disabled="editingId === c.id"

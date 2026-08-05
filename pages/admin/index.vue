@@ -193,6 +193,9 @@ const INTER_CARDS = computed(() => {
     { label: 'Partages', value: i.shares, color: '#a78bfa', icon: 'share' },
     { label: 'Copies lien', value: i.copies, color: '#facc15', icon: 'link' },
     { label: 'Commentaires', value: i.comments, color: '#60a5fa', icon: 'comment' },
+    { label: 'Likes commentaires', value: i.commentLikes, color: '#f472b6', icon: 'thumbsUp' },
+    { label: 'Dislikes commentaires', value: i.commentDislikes, color: '#38bdf8', icon: 'thumbsDown' },
+    { label: 'Signalements', value: i.commentReports, color: '#fb923c', icon: 'flag' },
     { label: 'Retraits like', value: i.unlikes, color: '#fb7185', icon: 'heart' },
     { label: 'Événements', value: i.events, color: '#f59e0b', icon: 'sparkles' },
   ]
@@ -498,7 +501,7 @@ const USER_TOP_CONFIG = computed(() => {
       </div>
 
       <!-- Mini-cards per interaction type -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
         <div v-for="c in INTER_CARDS" :key="c.label" class="bg-[#0d0d14] rounded-xl p-3 border border-zinc-800">
           <div class="flex items-center justify-between mb-2">
             <span class="text-[8px] font-mono text-zinc-500 uppercase tracking-wider leading-tight">{{ c.label }}</span>
