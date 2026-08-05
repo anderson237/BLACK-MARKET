@@ -12,6 +12,7 @@ export interface Product {
   imageUrl: string
   gallery?: string[]
   videoUrl?: string
+  featuredMedia?: 'image' | 'video'
   category: string
   whatsappClicks: number
   waNumber?: string

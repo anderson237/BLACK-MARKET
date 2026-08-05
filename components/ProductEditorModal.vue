@@ -23,13 +23,14 @@ const draft = reactive({
   imageUrl: props.product?.imageUrl || '',
   gallery: [...(props.product?.gallery || [])],
   videoUrl: props.product?.videoUrl || '',
+  featuredMedia: props.product?.featuredMedia || (props.product?.videoUrl ? 'video' : 'image'),
   category: props.product?.category || 'Techwear',
   whatsappClicks: props.product?.whatsappClicks || 0,
   waNumber: props.product?.waNumber || '',
   sourceRmb: props.product?.sourceRmb || undefined,
   stockStatus: props.product?.stockStatus || 'preorder',
   stockQuantity: props.product?.stockQuantity ?? 0,
-  moq: props.product?.moq ?? 1,
+  moq: props.product?.moq ?? 0,
 })
 
 const saving = ref(false)
@@ -58,7 +59,8 @@ async function save() {
       sourceRmb: Number(draft.sourceRmb) || 0,
       stockStatus: draft.stockStatus || 'preorder',
       stockQuantity: Math.max(0, Number(draft.stockQuantity) || 0),
-      moq: Math.max(1, Number(draft.moq) || 1),
+      moq: Math.max(0, Number(draft.moq) || 0),
+      featuredMedia: draft.videoUrl ? draft.featuredMedia || 'video' : 'image',
     }
     const saved = isNew ? await store.createProduct(body) : await store.updateProduct(body)
     emit('saved', saved)
@@ -325,8 +327,8 @@ async function generateAiVideo() {
           </div>
           <div class="space-y-2">
             <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">MOQ (min. de commande)</label>
-            <input v-model.number="draft.moq" type="number" min="1" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="1" />
-            <p class="text-[9px] text-zinc-600 font-mono">Quantité minimale par commande.</p>
+            <input v-model.number="draft.moq" type="number" min="0" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="0" />
+            <p class="text-[9px] text-zinc-600 font-mono">0 = pas de minimum (MOQ non affiché).</p>
           </div>
         </div>
 
@@ -377,6 +379,32 @@ async function generateAiVideo() {
             <button @click="generateAiVideo" :disabled="!!aiBusy" class="inline-flex items-center gap-1 bg-[#ff2a2a]/15 border border-[#ff2a2a]/40 text-[#ff2a2a] hover:bg-[#ff2a2a]/25 text-xs font-bold px-3 py-2 rounded-xl transition-all disabled:opacity-50">🎬 Vidéo IA</button>
           </div>
           <input v-model="draft.videoUrl" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="/api/vid/... ou https://..." />
+        </div>
+
+        <!-- En vitrine : image ou video -->
+        <div class="space-y-2">
+          <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Affiché en vitrine (page client)</label>
+          <div class="flex gap-2">
+            <button type="button" @click="draft.featuredMedia = 'image'"
+              class="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border text-xs font-bold font-mono transition-all"
+              :class="draft.featuredMedia === 'image'
+                ? 'bg-[#ff2a2a]/15 border-[#ff2a2a]/50 text-[#ff2a2a]'
+                : 'bg-black/40 border-zinc-800 text-zinc-400 hover:border-zinc-600'">
+              🖼️ Image
+            </button>
+            <button type="button" @click="draft.featuredMedia = 'video'" :disabled="!draft.videoUrl"
+              class="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border text-xs font-bold font-mono transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              :class="draft.featuredMedia === 'video'
+                ? 'bg-[#ff2a2a]/15 border-[#ff2a2a]/50 text-[#ff2a2a]'
+                : 'bg-black/40 border-zinc-800 text-zinc-400 hover:border-zinc-600'">
+              🎬 Vidéo
+            </button>
+          </div>
+          <p class="text-[9px] text-zinc-600 font-mono">
+            {{ draft.videoUrl
+              ? 'La vidéo joue automatiquement en boucle, muette, sur la page d\'accueil.'
+              : 'Ajoutez une vidéo pour pouvoir l\'afficher en vitrine (sinon l\'image principale est utilisée).' }}
+          </p>
         </div>
 
         <!-- Argumentaire + refine -->

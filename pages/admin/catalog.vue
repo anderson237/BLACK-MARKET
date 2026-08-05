@@ -304,6 +304,12 @@ function copyLink(p: Product) {
               <span v-if="Number(p.stockQuantity) > 0" class="inline-flex items-center gap-1 text-[9px] font-mono font-bold uppercase tracking-wider text-sky-400 bg-sky-500/10 border border-sky-500/30 rounded-md px-2 py-1">
                 {{ p.stockQuantity }} dispo
               </span>
+              <span v-if="p.featuredMedia === 'video' && p.videoUrl" class="inline-flex items-center gap-1 text-[9px] font-mono font-bold uppercase tracking-wider text-fuchsia-400 bg-fuchsia-500/10 border border-fuchsia-500/30 rounded-md px-2 py-1">
+                🎬 Vitrine vidéo
+              </span>
+              <span v-else class="inline-flex items-center gap-1 text-[9px] font-mono font-bold uppercase tracking-wider text-zinc-400 bg-black/50 border border-zinc-800 rounded-md px-2 py-1">
+                🖼️ Vitrine image
+              </span>
             </div>
 
             <div class="pt-3 flex items-center justify-between border-t border-zinc-900 mt-auto">

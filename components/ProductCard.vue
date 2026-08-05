@@ -32,6 +32,7 @@ function preorder() {
 
 const isStock = computed(() => props.product.stockStatus === 'in_stock')
 const ctaLabel = computed(() => (isStock.value ? 'COMMANDER' : 'PRÉCOMMANDER'))
+const showFeaturedVideo = computed(() => props.product.featuredMedia === 'video' && !!props.product.videoUrl)
 </script>
 
 <template>
@@ -39,7 +40,7 @@ const ctaLabel = computed(() => (isStock.value ? 'COMMANDER' : 'PRÉCOMMANDER'))
     <NuxtLink :to="url" class="block" :aria-label="product.title">
       <div class="relative overflow-hidden" :style="{ height: imgHeight }">
         <video
-          v-if="product.videoUrl"
+          v-if="showFeaturedVideo"
           :src="product.videoUrl"
           :muted="videoMuted"
           autoplay
@@ -56,7 +57,7 @@ const ctaLabel = computed(() => (isStock.value ? 'COMMANDER' : 'PRÉCOMMANDER'))
           class="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-500"
         />
         <button
-          v-if="product.videoUrl"
+          v-if="showFeaturedVideo"
           @click.stop.prevent="toggleMute"
           class="absolute bottom-3 right-3 w-10 h-10 rounded-full bg-black/60 hover:bg-[#ff2a2a]/80 border border-white/20 text-white flex items-center justify-center z-10 transition-colors"
           :title="videoMuted ? 'Activer le son' : 'Couper le son'"

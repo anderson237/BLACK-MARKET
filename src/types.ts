@@ -11,6 +11,7 @@ export interface Product {
   imageUrl: string;
   gallery?: string[]; // Additional product photos displayed in the client carousel
   videoUrl?: string; // A video link or simulated slideshow slides
+  featuredMedia?: 'image' | 'video';
   category: string;
   whatsappClicks: number;
   sourceRmb?: number;

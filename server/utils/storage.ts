@@ -71,7 +71,8 @@ function normalizeProduct(p: any): any {
   if (!p || typeof p !== 'object') return p
   p.stockStatus = p.stockStatus === 'in_stock' ? 'in_stock' : 'preorder'
   p.stockQuantity = Number(p.stockQuantity) || 0
-  p.moq = Math.max(1, Number(p.moq) || 1)
+  p.moq = Math.max(0, Number(p.moq) || 0)
+  p.featuredMedia = p.featuredMedia === 'image' ? 'image' : p.videoUrl ? 'video' : 'image'
   return p
 }
 
