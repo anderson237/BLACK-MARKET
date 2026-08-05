@@ -241,6 +241,17 @@ function readImageFile(file: File): Promise<HTMLImageElement> {
   })
 }
 
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(new Error('Lecture du fichier impossible.'))
+    reader.readAsDataURL(file)
+  })
+}
+
+const MAX_VIDEO_MB = 60
+
 // ---- Upload avec filigrane ----
 async function handleMainFile(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
@@ -344,6 +355,28 @@ async function generateAiVideo() {
     aiBusy.value = ''
   }
 }
+
+async function handleVideoFile(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  if (file.size > MAX_VIDEO_MB * 1024 * 1024) {
+    error.value = `Vidéo trop volumineuse (max ${MAX_VIDEO_MB} Mo).`
+    return
+  }
+  aiBusy.value = 'Upload de la vidéo…'
+  error.value = ''
+  try {
+    const dataUrl = await readFileAsDataUrl(file)
+    const json = await apiPost('/api/upload-video', { videoBase64: dataUrl })
+    draft.videoUrl = json.url
+    draft.featuredMedia = 'video'
+  } catch (err: any) {
+    error.value = err?.message || 'Erreur upload vidéo.'
+  } finally {
+    aiBusy.value = ''
+    ;(e.target as HTMLInputElement).value = ''
+  }
+}
 </script>
 
 <template>
@@ -444,9 +477,13 @@ async function generateAiVideo() {
         <div class="space-y-2">
           <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Image principale (upload + filigrane auto)</label>
           <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2">
-            <input type="file" ref="fileInput" accept="image/*" @change="handleMainFile" class="text-[11px] text-zinc-400 w-full sm:w-auto" />
-            <button @click="generateAiPhoto" :disabled="!!aiBusy" class="shrink-0 inline-flex items-center justify-center gap-1 bg-[#ff2a2a]/15 border border-[#ff2a2a]/40 text-[#ff2a2a] hover:bg-[#ff2a2a]/25 text-xs font-bold px-3 py-2.5 rounded-xl transition-all disabled:opacity-50">✨ Photo IA</button>
-            <button @click="generateAiCarousel" :disabled="!!aiBusy" class="shrink-0 inline-flex items-center justify-center gap-1 bg-[#ff2a2a]/15 border border-[#ff2a2a]/40 text-[#ff2a2a] hover:bg-[#ff2a2a]/25 text-xs font-bold px-3 py-2.5 rounded-xl transition-all disabled:opacity-50">✨ 3 photos</button>
+            <input ref="fileInput" type="file" id="mainFileInput" accept="image/*" @change="handleMainFile" class="hidden" />
+            <label for="mainFileInput"
+              class="shrink-0 inline-flex items-center justify-center gap-1.5 bg-zinc-800/60 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 text-xs font-bold px-3 py-2.5 rounded-xl transition-all cursor-pointer">
+              📷 <span>Uploader une photo</span>
+            </label>
+            <button type="button" @click="generateAiPhoto" :disabled="!!aiBusy" class="shrink-0 inline-flex items-center justify-center gap-1 bg-[#ff2a2a]/15 border border-[#ff2a2a]/40 text-[#ff2a2a] hover:bg-[#ff2a2a]/25 text-xs font-bold px-3 py-2.5 rounded-xl transition-all disabled:opacity-50">✨ Photo IA</button>
+            <button type="button" @click="generateAiCarousel" :disabled="!!aiBusy" class="shrink-0 inline-flex items-center justify-center gap-1 bg-[#ff2a2a]/15 border border-[#ff2a2a]/40 text-[#ff2a2a] hover:bg-[#ff2a2a]/25 text-xs font-bold px-3 py-2.5 rounded-xl transition-all disabled:opacity-50">✨ 3 photos</button>
           </div>
           <p v-if="aiBusy" class="text-[11px] text-zinc-400 font-mono">{{ aiBusy }}</p>
         </div>
@@ -459,7 +496,11 @@ async function generateAiVideo() {
         <div class="space-y-2">
           <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Galerie (upload multiple)</label>
           <div class="flex flex-wrap gap-2">
-            <input type="file" ref="galleryInput" accept="image/*" multiple @change="handleGalleryFile" class="text-[11px] text-zinc-400" />
+            <input ref="galleryInput" type="file" id="galleryFileInput" accept="image/*" multiple @change="handleGalleryFile" class="hidden" />
+            <label for="galleryFileInput"
+              class="inline-flex items-center justify-center gap-1.5 bg-zinc-800/60 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 text-xs font-bold px-3 py-2.5 rounded-xl transition-all cursor-pointer">
+              🖼️ <span>Ajouter des photos</span>
+            </label>
           </div>
           <div class="flex gap-2">
             <input v-model="newGalleryUrl" @keyup.enter="addGalleryUrl" class="flex-1 bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="ou URL image/vidéo..." />
@@ -480,6 +521,14 @@ async function generateAiVideo() {
             <button @click="generateAiVideo" :disabled="!!aiBusy" class="inline-flex items-center gap-1 bg-[#ff2a2a]/15 border border-[#ff2a2a]/40 text-[#ff2a2a] hover:bg-[#ff2a2a]/25 text-xs font-bold px-3 py-2 rounded-xl transition-all disabled:opacity-50">🎬 Vidéo IA</button>
           </div>
           <input v-model="draft.videoUrl" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="/api/vid/... ou https://..." />
+          <div class="flex flex-wrap gap-2">
+            <input type="file" id="videoFileInput" accept="video/*" @change="handleVideoFile" class="hidden" />
+            <label for="videoFileInput" title="Uploader une vidéo MP4/WebM/MOV (max 60 Mo)"
+              class="inline-flex items-center justify-center gap-1.5 bg-zinc-800/60 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 text-xs font-bold px-3 py-2.5 rounded-xl transition-all cursor-pointer">
+              🎬 <span>Uploader la vidéo (max 60 Mo)</span>
+            </label>
+          </div>
+          <p v-if="aiBusy" class="text-[11px] text-zinc-400 font-mono">{{ aiBusy }}</p>
         </div>
 
         <!-- En vitrine : image ou video -->
