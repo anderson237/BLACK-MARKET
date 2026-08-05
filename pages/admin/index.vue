@@ -6,8 +6,53 @@ definePageMeta({ layout: 'admin' })
 
 const store = useAdminStore()
 
+// ---- live auto-refresh (2-way binding) ----
+// Every visitor interaction lands in the centralized store; the dashboard
+// re-syncs instantly (local event / other-tab localStorage write) and on a
+// safety-net timer for activity coming from other devices.
+let autoTimer: ReturnType<typeof setInterval> | null = null
+let refreshTimer: ReturnType<typeof setTimeout> | null = null
+
+async function refreshAll() {
+  if (document.visibilityState !== 'visible') return
+  await Promise.all([store.loadStats(), store.loadOrders(), store.loadCustomers()])
+}
+
+function scheduleRefresh() {
+  if (refreshTimer) clearTimeout(refreshTimer)
+  refreshTimer = setTimeout(refreshAll, 600)
+}
+
+function onVisible() {
+  if (document.visibilityState === 'visible') refreshAll()
+}
+
+function onTrackEvent() {
+  scheduleRefresh()
+}
+
+function onStorage(e: StorageEvent) {
+  // useTrack buffers every event in localStorage (bm_events_v1); a write from
+  // another tab on this device means new activity -> refresh live.
+  if (e.key === 'bm_events_v1' || e.key === null) scheduleRefresh()
+}
+
 onMounted(async () => {
   await Promise.all([store.loadStats(), store.loadOrders(), store.loadCustomers()])
+  autoTimer = setInterval(refreshAll, 12_000)
+  window.addEventListener('bm:track', onTrackEvent)
+  window.addEventListener('storage', onStorage)
+  window.addEventListener('focus', onVisible)
+  document.addEventListener('visibilitychange', onVisible)
+})
+
+onUnmounted(() => {
+  if (autoTimer) clearInterval(autoTimer)
+  if (refreshTimer) clearTimeout(refreshTimer)
+  window.removeEventListener('bm:track', onTrackEvent)
+  window.removeEventListener('storage', onStorage)
+  window.removeEventListener('focus', onVisible)
+  document.removeEventListener('visibilitychange', onVisible)
 })
 
 const resetting = ref(false)
@@ -189,7 +234,12 @@ const USER_TOP_CONFIG = computed(() => {
 <template>
   <div class="space-y-6">
     <div class="flex items-center justify-between">
-      <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">Vue d'ensemble</p>
+      <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-wider flex items-center gap-2">
+        Vue d'ensemble
+        <span class="inline-flex items-center gap-1.5 text-[8px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> LIVE · auto-refresh
+        </span>
+      </p>
       <button @click="resetStats" :disabled="resetting"
         class="text-[10px] font-mono text-red-400 hover:text-red-300 border border-red-500/30 hover:border-red-500/60 px-3 py-1.5 rounded-xl transition-all disabled:opacity-50">
         {{ resetting ? 'Réinitialisation…' : 'Réinitialiser les stats' }}
