@@ -28,6 +28,9 @@ const draft = reactive({
   whatsappClicks: props.product?.whatsappClicks || 0,
   waNumber: props.product?.waNumber || '',
   sourceRmb: props.product?.sourceRmb || undefined,
+  purchaseRmb: props.product?.purchaseRmb || 0,
+  shippingRmb: props.product?.shippingRmb || 0,
+  marginPercent: props.product?.marginPercent || 0,
   stockStatus: props.product?.stockStatus || 'preorder',
   stockQuantity: props.product?.stockQuantity ?? 0,
   moq: props.product?.moq ?? 0,
@@ -44,6 +47,31 @@ const blocksModeTech = ref(true)
 
 const categories = ['Techwear', 'Streetwear', 'Cyber Gadgets', 'Gaming Room', 'Accessoires', 'Exclusif', 'Nouveautés']
 
+// ---- Prix : achat fournisseur + transport + marge -> prix de vente ----
+const rmbToXofRate = computed(() => Number(config.public.rmbToXofRate) || 82)
+const xofToEurRate = computed(() => Number(config.public.xofToEurRate) || 655.957)
+
+function computeSellingXof(): number {
+  const purchase = Number(draft.purchaseRmb) || 0
+  const shipping = Number(draft.shippingRmb) || 0
+  const margin = Number(draft.marginPercent) || 0
+  const totalRmb = purchase + shipping
+  if (totalRmb <= 0) return 0
+  const raw = totalRmb * (1 + margin / 100) * rmbToXofRate.value
+  return Math.max(0, Math.round(raw / 100) * 100)
+}
+
+const sellingXof = computed(() => computeSellingXof())
+const sellingEur = computed(() => (sellingXof.value > 0 ? Math.round(sellingXof.value / xofToEurRate.value) : 0))
+
+function applySellingPrice() {
+  if (Number(draft.purchaseRmb) > 0 || draft.shippingRmb > 0 || Number(draft.marginPercent) > 0) {
+    draft.priceXof = sellingXof.value
+    draft.priceEur = sellingEur.value
+  }
+}
+watch([() => draft.purchaseRmb, () => draft.shippingRmb, () => draft.marginPercent], applySellingPrice)
+
 async function save() {
   if (!draft.title.trim() && !draft.description.trim()) {
     error.value = 'Remplissez au moins le titre ou la description.'
@@ -57,6 +85,9 @@ async function save() {
       id: draft.id || `prod_${Date.now()}`,
       features: draft.features.filter((f) => f.trim() !== ''),
       sourceRmb: Number(draft.sourceRmb) || 0,
+      purchaseRmb: Number(draft.purchaseRmb) || 0,
+      shippingRmb: Number(draft.shippingRmb) || 0,
+      marginPercent: Number(draft.marginPercent) || 0,
       stockStatus: draft.stockStatus || 'preorder',
       stockQuantity: Math.max(0, Number(draft.stockQuantity) || 0),
       moq: Math.max(0, Number(draft.moq) || 0),
@@ -427,22 +458,42 @@ async function handleVideoFile(e: Event) {
           </div>
         </div>
 
-        <!-- Catégorie + prix + source -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-          <div class="space-y-2">
-            <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Catégorie</label>
-            <select v-model="draft.category" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none">
-              <option v-for="c in categories" :key="c" :value="c">{{ c }}</option>
-            </select>
+        <!-- Catégorie -->
+        <div class="space-y-2">
+          <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Catégorie</label>
+          <select v-model="draft.category" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none">
+            <option v-for="c in categories" :key="c" :value="c">{{ c }}</option>
+          </select>
+        </div>
+
+        <!-- Prix & marge -->
+        <div class="space-y-2">
+          <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Prix & marge</label>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div class="space-y-2">
+              <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Prix d'achat fournisseur (¥)</label>
+              <input v-model.number="draft.purchaseRmb" type="number" min="0" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="200" />
+            </div>
+            <div class="space-y-2">
+              <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Transport (¥)</label>
+              <input v-model.number="draft.shippingRmb" type="number" min="0" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="30" />
+            </div>
+            <div class="space-y-2">
+              <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Bénéfice (%)</label>
+              <input v-model.number="draft.marginPercent" type="number" min="0" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="80" />
+            </div>
           </div>
-          <div class="space-y-2">
-            <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Prix F CFA</label>
-            <input v-model.number="draft.priceXof" type="number" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="29500" />
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div v-if="sellingXof > 0" class="space-y-2">
+              <label class="text-[10px] text-emerald-400 font-mono uppercase tracking-widest">Prix de vente auto (F CFA)</label>
+              <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-2.5 text-sm font-mono text-emerald-300">{{ sellingXof.toLocaleString('fr-FR') }} F CFA</div>
+            </div>
+            <div v-if="sellingEur > 0" class="space-y-2">
+              <label class="text-[10px] text-emerald-400 font-mono uppercase tracking-widest">Prix de vente auto (€)</label>
+              <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-2.5 text-sm font-mono text-emerald-300">{{ sellingEur }} €</div>
+            </div>
           </div>
-          <div class="space-y-2">
-            <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Source ¥ RMB</label>
-            <input v-model.number="draft.sourceRmb" type="number" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="200" />
-          </div>
+          <p class="text-[9px] text-zinc-600 font-mono">Prix de vente = (achat + transport) × (1 + marge%) × taux {{ rmbToXofRate }}. Dès qu'un coût est renseigné, il remplace automatiquement le prix de vente enregistré.</p>
         </div>
 
         <!-- Stock : statut + quantité + MOQ -->
@@ -502,10 +553,7 @@ async function handleVideoFile(e: Event) {
               🖼️ <span>Ajouter des photos</span>
             </label>
           </div>
-          <div class="flex gap-2">
-            <input v-model="newGalleryUrl" @keyup.enter="addGalleryUrl" class="flex-1 bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="ou URL image/vidéo..." />
-            <button @click="addGalleryUrl" class="shrink-0 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold px-3 py-2.5 rounded-xl transition-all">+</button>
-          </div>
+          <input v-model="newGalleryUrl" @keyup.enter="addGalleryUrl" class="flex-1 bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="ou URL image/vidéo... (Entrée pour ajouter)" />
           <div v-if="draft.gallery.length" class="flex flex-wrap gap-2">
             <div v-for="(u, i) in draft.gallery" :key="i" class="relative group">
               <img :src="u" :alt="`galerie ${i + 1}`" class="w-16 h-16 rounded-lg object-cover border border-zinc-700" @error="($event.target as HTMLImageElement).style.display='none'" />

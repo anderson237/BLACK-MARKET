@@ -17,6 +17,9 @@ export interface Product {
   whatsappClicks: number
   waNumber?: string
   sourceRmb?: number
+  purchaseRmb?: number
+  shippingRmb?: number
+  marginPercent?: number
   stockStatus?: 'in_stock' | 'preorder'
   stockQuantity?: number
   moq?: number
