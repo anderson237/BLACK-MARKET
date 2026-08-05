@@ -15,7 +15,10 @@ const showDeleteModal = ref(false)
 const pendingDelete = ref<Product | null>(null)
 const deleting = ref(false)
 
-onMounted(() => store.loadProducts())
+onMounted(() => {
+  store.loadProducts()
+  store.loadStats()
+})
 
 const categories = computed(() => ['Tous', ...Array.from(new Set(store.products.map((p) => p.category)))].filter(Boolean))
 
@@ -37,7 +40,7 @@ const filtered = computed(() => {
 
 const stats = computed(() => ({
   total: store.activeProducts.length,
-  clicks: store.activeProducts.reduce((s, p) => s + (Number(p.whatsappClicks) || 0), 0),
+  clicks: store.stats?.interactions?.clicks ?? 0,
   withVideo: store.activeProducts.filter((p) => p.videoUrl).length,
 }))
 

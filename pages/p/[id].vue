@@ -104,12 +104,6 @@ const waUrl = computed(() => {
   return 'https://wa.me/' + num + '?text=' + encodeURIComponent(msg)
 })
 
-function trackClick() {
-  try {
-    fetch('/api/products/' + encodeURIComponent(product.value!.id) + '/clicks', { method: 'POST', keepalive: true })
-  } catch {}
-}
-
 // Record the visit as a user event (drives the client space "Vues" stat).
 onMounted(() => {
   if (import.meta.client && product.value) {
@@ -124,7 +118,6 @@ function preorder() {
   const url = waUrl.value
   if (!url) return
   auth.requireAuth(() => {
-    trackClick()
     const p = product.value!
     clickPreorder({ id: p.id, title: p.title })
     fetch('/api/orders', {

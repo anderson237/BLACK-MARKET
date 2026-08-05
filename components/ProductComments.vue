@@ -2,6 +2,9 @@
 import { useAuthStore } from '~/stores/auth'
 import { useTrack } from '~/composables/useTrack'
 import { useCommentsStore } from '~/stores/comments'
+import { themedAvatarUri } from '~/data/avatars'
+
+const { isLight } = useTheme()
 
 interface CommentItem {
   id: string
@@ -29,6 +32,7 @@ const { track, copyLink } = useTrack()
 const commentsStore = useCommentsStore()
 
 const comments = ref<CommentItem[]>([])
+const totalCount = ref(0)
 const text = ref('')
 const loading = ref(false)
 const submitting = ref(false)
@@ -135,6 +139,7 @@ async function load() {
     if (!res.ok) return
     const data = await res.json()
     comments.value = Array.isArray(data?.comments) ? data.comments : []
+    totalCount.value = Number.isFinite(Number(data?.count)) ? Number(data.count) : comments.value.length
     if (Number.isFinite(Number(data?.count))) {
       commentsStore.counts[props.productId] = Number(data.count)
       commentsStore.loaded[props.productId] = true
@@ -216,7 +221,7 @@ function timeAgo(iso: string): string {
 </script><template>
   <div class="space-y-4">
     <div class="flex items-center justify-between">
-      <p class="text-[9px] text-[#ff2a2a] font-mono uppercase font-bold tracking-wider">COMMENTAIRES ({{ comments.length }})</p>
+      <p class="text-[9px] text-[#ff2a2a] font-mono uppercase font-bold tracking-wider">COMMENTAIRES ({{ totalCount }})</p>
       <span class="text-[9px] text-zinc-600 font-mono">Connecté requis pour commenter</span>
     </div>
 
@@ -225,7 +230,7 @@ function timeAgo(iso: string): string {
       <div class="flex gap-2">
         <img
           v-if="auth.user?.picture"
-          :src="auth.user.picture"
+          :src="themedAvatarUri(auth.user.picture, isLight.value)"
           alt="avatar"
           class="w-9 h-9 rounded-full object-cover border border-zinc-700 shrink-0"
         />
@@ -262,7 +267,7 @@ function timeAgo(iso: string): string {
       <div v-for="c in comments" :key="c.id" class="flex gap-3 bg-black/30 border border-zinc-900 rounded-xl p-3">
         <img
           v-if="c.picture"
-          :src="c.picture"
+          :src="themedAvatarUri(c.picture, isLight.value)"
           alt="avatar"
           class="w-8 h-8 rounded-full object-cover border border-zinc-700 shrink-0"
         />

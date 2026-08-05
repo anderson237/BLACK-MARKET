@@ -1,5 +1,5 @@
-import { loadProducts, saveProducts, loadOrders, saveOrders } from '~~/server/utils/storage'
-import { rateLimit } from '~~/server/utils/auth'
+import { loadProducts, loadOrders, saveOrders, pushEvent } from '~~/server/utils/storage'
+import { rateLimit, clientIP } from '~~/server/utils/auth'
 
 export default defineEventHandler(async (event) => {
   rateLimit(30, 60_000)(event)
@@ -12,11 +12,16 @@ export default defineEventHandler(async (event) => {
   const p = products.find((pp) => pp.id === productId)
   if (!p) throw createError({ statusCode: 404, statusMessage: 'Produit introuvable.' })
 
-  products[products.findIndex((pp) => pp.id === productId)] = {
-    ...p,
-    whatsappClicks: (Number(p.whatsappClicks) || 0) + 1,
-  }
-  await saveProducts(products)
+  // WhatsApp lead = one click, recorded in the SAME social event log that
+  // powers every click counter (no parallel product.whatsappClicks anymore).
+  await pushEvent({
+    type: 'click',
+    productId: p.id,
+    productTitle: String(p.title || '').slice(0, 300),
+    ts: Date.now(),
+    userId: body?.userId ? String(body.userId) : undefined,
+    ip: clientIP(event),
+  })
 
   const order = {
     id: `ord_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,

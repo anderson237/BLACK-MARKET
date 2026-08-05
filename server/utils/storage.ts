@@ -297,8 +297,59 @@ export async function upsertAccount(account: PublicAccount): Promise<PublicAccou
 }
 
 // ---- social data (comments, likes, events) ----
-type SocialShape = { comments: any[]; likes: Record<string, number>; events: any[] }
-const SOCIAL_SEED: SocialShape = { comments: [], likes: {}, events: [] }
+// Single source of truth for every interaction: comments, the like index and
+// the event log live together so admin analytics and the client space always
+// read the same numbers.
+//  - `likes`       : net like count per product (productId -> count)
+//  - `likedBy`     : users currently liking a product (productId -> userIds)
+//  - `likedByUser` : products currently liked by a user (userId -> productIds)
+type SocialShape = {
+  comments: any[]
+  likes: Record<string, number>
+  likedBy: Record<string, string[]>
+  likedByUser: Record<string, string[]>
+  events: any[]
+}
+const SOCIAL_SEED: SocialShape = { comments: [], likes: {}, likedBy: {}, likedByUser: {}, events: [] }
+
+/** Rebuild the like index from the event log (migration + cap-trim recovery). */
+function rebuildLikeIndex(events: any[]) {
+  const likedBy: Record<string, string[]> = {}
+  const likedByUser: Record<string, string[]> = {}
+  for (const e of events) {
+    if (e.type !== 'like' && e.type !== 'unlike') continue
+    const pid = String(e.productId || '')
+    const uid = String(e.userId || '')
+    if (!pid || !uid) continue
+    const liked = e.type === 'like'
+    likedBy[pid] = likedBy[pid] || []
+    likedByUser[uid] = likedByUser[uid] || []
+    likedBy[pid] = likedBy[pid].filter((x) => x !== uid)
+    likedByUser[uid] = likedByUser[uid].filter((x) => x !== pid)
+    if (liked) {
+      likedBy[pid].push(uid)
+      likedByUser[uid].push(pid)
+    }
+  }
+  return { likedBy, likedByUser }
+}
+
+function normalizeSocial(raw: any): SocialShape {
+  if (!raw || !Array.isArray(raw.comments)) return { ...SOCIAL_SEED }
+  const base = {
+    comments: raw.comments,
+    likes: raw.likes && typeof raw.likes === 'object' ? raw.likes : {},
+    likedBy: raw.likedBy && typeof raw.likedBy === 'object' ? raw.likedBy : {},
+    likedByUser: raw.likedByUser && typeof raw.likedByUser === 'object' ? raw.likedByUser : {},
+    events: Array.isArray(raw.events) ? raw.events : [],
+  }
+  if (!base.likedBy || !base.likedByUser || Object.keys(base.likedBy).length === 0 && Object.keys(base.likedByUser).length === 0) {
+    const rebuilt = rebuildLikeIndex(base.events)
+    base.likedBy = rebuilt.likedBy
+    base.likedByUser = rebuilt.likedByUser
+  }
+  return base
+}
 
 async function loadSocial(): Promise<SocialShape> {
   if (isNetlifyRuntime()) {
@@ -306,14 +357,13 @@ async function loadSocial(): Promise<SocialShape> {
     // next GET, even across different serverless instances.
     const raw = await blobGet('bm-social', 'social.json', 'text', 'strong')
     if (raw != null) {
-      const p = JSON.parse(raw)
-      if (p && Array.isArray(p.comments)) return p
+      return normalizeSocial(JSON.parse(raw))
     }
     await blobSet('bm-social', 'social.json', JSON.stringify(SOCIAL_SEED, null, 2))
     return SOCIAL_SEED
   }
   const p = await readJSON(path.join(DATA_DIR, 'social.json'))
-  return p && Array.isArray(p.comments) ? p : { ...SOCIAL_SEED }
+  return normalizeSocial(p)
 }
 
 async function saveSocial(data: any): Promise<void> {
@@ -373,6 +423,8 @@ export async function resetSocial(): Promise<void> {
   await mutateSocial((social) => {
     social.comments = []
     social.likes = {}
+    social.likedBy = {}
+    social.likedByUser = {}
     social.events = []
     return { next: social, value: undefined }
   })
@@ -393,11 +445,40 @@ export async function pushEvent(ev: MarketEvent): Promise<void> {
     social.events.push(ev)
     social.events = social.events.slice(-20000)
     if (ev.type === 'like' || ev.type === 'unlike') {
-      const id = ev.productId || 'global'
-      const cur = social.likes[id] || 0
-      social.likes[id] = Math.max(0, cur + (ev.type === 'like' ? 1 : -1))
+      const pid = ev.productId || 'global'
+      const uid = ev.userId || ''
+      const cur = social.likes[pid] || 0
+      social.likes[pid] = Math.max(0, cur + (ev.type === 'like' ? 1 : -1))
+      // Keep the per-product and per-user like index in sync so every screen
+      // (product likes, "plus aimés", client space) derives from the SAME data.
+      if (uid) {
+        social.likedBy[pid] = social.likedBy[pid] || []
+        social.likedByUser[uid] = social.likedByUser[uid] || []
+        social.likedBy[pid] = social.likedBy[pid].filter((x) => x !== uid)
+        social.likedByUser[uid] = social.likedByUser[uid].filter((x) => x !== pid)
+        if (ev.type === 'like') {
+          social.likedBy[pid].push(uid)
+          social.likedByUser[uid].push(pid)
+        }
+      }
     }
     return { next: social, value: undefined }
+  })
+}
+
+/** Product ids currently liked by a user (single source: the like index). */
+export async function getLikedProductIds(userId: string): Promise<string[]> {
+  return withLock('social', async () => {
+    const social = await loadSocial()
+    return social.likedByUser[String(userId)] || []
+  })
+}
+
+/** Users currently liking a product + net count (single source: the like index). */
+export async function getLikeIndex(): Promise<{ likedBy: Record<string, string[]>; likes: Record<string, number> }> {
+  return withLock('social', async () => {
+    const social = await loadSocial()
+    return { likedBy: social.likedBy || {}, likes: social.likes || {} }
   })
 }
 

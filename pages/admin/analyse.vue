@@ -202,7 +202,7 @@ function lowMarginColor(m: number) {
       <div class="bg-[#0d0d14] rounded-2xl p-4 border border-zinc-800">
         <p class="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">Bénéfice net / mois</p>
         <p class="mt-2 text-lg font-black font-mono text-emerald-400">{{ fmt(p('month').netProfitXof) }}</p>
-        <p class="text-[9px] font-mono text-zinc-600 mt-1">Brut − dépenses</p>
+        <p class="text-[9px] font-mono text-zinc-600 mt-1">Brut − dépenses − charges fixes</p>
       </div>
       <div class="bg-[#0d0d14] rounded-2xl p-4 border border-zinc-800">
         <p class="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">Contribution / mois</p>

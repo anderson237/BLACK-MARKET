@@ -1,4 +1,4 @@
-import { findAccount, getSocial, loadOrders, loadProducts } from '~~/server/utils/storage'
+import { findAccount, getSocial, getLikedProductIds, loadOrders, loadProducts } from '~~/server/utils/storage'
 import { requireAuth } from '~~/server/utils/auth'
 
 const MAX = 120
@@ -23,13 +23,11 @@ export default defineEventHandler(async (event) => {
     .filter((e) => e.userId === userId)
     .sort((a, b) => (b.ts || 0) - (a.ts || 0))
 
-  // Current like state per product: last like/unlike event wins.
-  const likeState = new Map<string, boolean>()
-  for (const e of mine) {
-    if (e.type === 'like') likeState.set(e.productId, true)
-    else if (e.type === 'unlike') likeState.set(e.productId, false)
-  }
-  const likedIds = [...likeState.entries()].filter(([, liked]) => liked).map(([productId]) => productId)
+  // Current liked products come from the SAME like index that feeds every like
+  // counter (social.likedByUser) -> never diverges from the server truth even
+  // if the 20k event cap trimmed old events.
+  const likedIds = userId ? await getLikedProductIds(userId) : []
+  const likedSet = new Set(likedIds)
 
   const orders = (await loadOrders())
     .filter((o) =>
@@ -59,7 +57,7 @@ export default defineEventHandler(async (event) => {
   const timeline = mine.slice(0, MAX)
   const seenProducts = new Set(timeline.map((e) => e.productId))
   for (const e of mine) {
-    if (e.type === 'like' && likedIds.includes(e.productId) && !seenProducts.has(e.productId)) {
+    if (e.type === 'like' && likedSet.has(e.productId) && !seenProducts.has(e.productId)) {
       timeline.push(e)
       seenProducts.add(e.productId)
     }

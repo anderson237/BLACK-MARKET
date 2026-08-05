@@ -1,17 +1,27 @@
 import { loadProducts, loadOrders, getSocial, loadAccounts } from '~~/server/utils/storage'
 import { requireAuth } from '~~/server/utils/auth'
+import { revenueRows } from '~~/server/utils/accounting'
 
 // Admin dashboard: global business KPIs + a rich interaction analytics layer
 // (~18 stats): per-product tops (views, clicks, likes, comments, preorders,
 // WhatsApp) and per-user tops (likers, commenters, preorders, viewers, sharers,
 // engaged).
+//
+// Single source of truth:
+//  - Revenue (CA) counts ONLY paid orders (REVENUE_STATUSES), exactly like
+//    /api/accounting and /api/treasury -> the dashboard, comptabilité and
+//    analyse always show the same numbers.
+//  - Clicks come from social events (type 'click'), like counts come from the
+//    social like index (social.likes) -> no parallel counters anywhere.
 export default defineEventHandler(async (event) => {
   await requireAuth(event)
   const [productsRaw, orders, social, accounts] = await Promise.all([loadProducts(), loadOrders(), getSocial(), loadAccounts()])
   const products = productsRaw.filter((p: any) => !p.deleted)
+  const rows = revenueRows(orders, products)
 
   const events = social.events || []
   const comments = social.comments || []
+  const likeIndex = social.likes || {}
 
   // ---- user display info ----
   const accountIndex = new Map(accounts.map((a) => [a.id, a]))
@@ -84,11 +94,10 @@ export default defineEventHandler(async (event) => {
     u.total += n
   }
 
-  // ---- product aggregates ----
+  // ---- product aggregates (views/clicks/shares/comments from social) ----
   const viewedByProduct = new Map<string, number>()
   const clickedByProduct = new Map<string, number>()
   const sharedByProduct = new Map<string, number>()
-  const likedUsers = new Map<string, Set<string>>()
   const commentedByProduct = new Map<string, number>()
   const bump = (m: Map<string, number>, key: string, n = 1) => m.set(key, (m.get(key) || 0) + n)
 
@@ -98,13 +107,6 @@ export default defineEventHandler(async (event) => {
     if (e.type === 'view') bump(viewedByProduct, pid)
     else if (e.type === 'click') bump(clickedByProduct, pid)
     else if (e.type === 'share' || e.type === 'copy') bump(sharedByProduct, pid)
-    else if (e.type === 'like') {
-      let s = likedUsers.get(pid)
-      if (!s) { s = new Set(); likedUsers.set(pid, s) }
-      if (e.userId) s.add(String(e.userId))
-    } else if (e.type === 'unlike' && e.userId) {
-      likedUsers.get(pid)?.delete(String(e.userId))
-    }
   }
   for (const c of comments) {
     if (!c.productId) continue
@@ -121,8 +123,10 @@ export default defineEventHandler(async (event) => {
       .sort((a, b) => b.count - a.count)
       .slice(0, n)
 
-  const topLiked = [...likedUsers.entries()]
-    .map(([id, s]) => ({ ...productMeta(id), count: s.size }))
+  // "Plus aimés": derived from the SAME like index as every like count shown
+  // (social.likes) so both numbers can never diverge.
+  const topLiked = Object.entries(likeIndex)
+    .map(([id, count]) => ({ ...productMeta(id), count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 6)
 
@@ -135,13 +139,27 @@ export default defineEventHandler(async (event) => {
       .sort((a, b) => b.count - a.count)
       .slice(0, n)
 
-  const totalClicks = products.reduce((s: number, p: any) => s + (Number(p.whatsappClicks) || 0), 0)
-  const totalRevenueXof = orders.reduce((s: number, o: any) => s + (Number(o.priceXof) || 0) * (Number(o.quantity) || 1), 0)
-  const totalRevenueEur = orders.reduce((s: number, o: any) => s + (Number(o.priceEur) || 0) * (Number(o.quantity) || 1), 0)
+  // ---- revenue: paid orders only (same definition as comptabilité/analyse) ----
+  const totalClicks = [...clickedByProduct.values()].reduce((s, n) => s + n, 0)
+  let totalRevenueXof = 0
+  let totalRevenueEur = 0
+  for (const row of rows) {
+    totalRevenueXof += row.revenueXof
+    totalRevenueEur += (Number(row.order.priceEur) || 0) * Math.max(1, Number(row.order.quantity) || 1)
+  }
+
+  const revenueByProduct = new Map<string, { revenueXof: number; revenueEur: number }>()
+  for (const row of rows) {
+    const pid = String(row.order.productId || '')
+    const cur = revenueByProduct.get(pid) || { revenueXof: 0, revenueEur: 0 }
+    cur.revenueXof += row.revenueXof
+    cur.revenueEur += (Number(row.order.priceEur) || 0) * Math.max(1, Number(row.order.quantity) || 1)
+    revenueByProduct.set(pid, cur)
+  }
 
   const salesByCategory: Record<string, number> = {}
-  orders.forEach((o: any) => {
-    const p = products.find((pp: any) => pp.id === o.productId)
+  rows.forEach((row) => {
+    const p = products.find((pp: any) => pp.id === row.order.productId)
     const cat = (p?.category || 'Autres') as string
     salesByCategory[cat] = (salesByCategory[cat] || 0) + 1
   })
@@ -150,32 +168,35 @@ export default defineEventHandler(async (event) => {
     const d = new Date()
     d.setDate(d.getDate() - (6 - i))
     const key = d.toISOString().slice(0, 10)
-    const dayOrders = orders.filter((o: any) => (o.createdAt || '').slice(0, 10) === key)
+    const dayRows = rows.filter((r) => (r.order.createdAt || '').slice(0, 10) === key)
     const label = d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })
     return {
       label,
-      revenueXof: dayOrders.reduce((s: number, o: any) => s + (Number(o.priceXof) || 0) * (Number(o.quantity) || 1), 0),
-      revenueEur: dayOrders.reduce((s: number, o: any) => s + (Number(o.priceEur) || 0) * (Number(o.quantity) || 1), 0),
-      orders: dayOrders.length,
+      revenueXof: dayRows.reduce((s, r) => s + r.revenueXof, 0),
+      revenueEur: dayRows.reduce((s, r) => s + (Number(r.order.priceEur) || 0) * Math.max(1, Number(r.order.quantity) || 1), 0),
+      orders: dayRows.length,
     }
   })
 
   const topProducts = products
-    .map((p: any) => ({
-      id: p.id,
-      title: p.title,
-      imageUrl: p.imageUrl,
-      clicks: Number(p.whatsappClicks) || 0,
-      revenueXof: orders.filter((o: any) => o.productId === p.id).reduce((s: number, o: any) => s + (Number(o.priceXof) || 0) * (Number(o.quantity) || 1), 0),
-      revenueEur: orders.filter((o: any) => o.productId === p.id).reduce((s: number, o: any) => s + (Number(o.priceEur) || 0) * (Number(o.quantity) || 1), 0),
-    }))
+    .map((p: any) => {
+      const rev = revenueByProduct.get(p.id) || { revenueXof: 0, revenueEur: 0 }
+      return {
+        id: p.id,
+        title: p.title,
+        imageUrl: p.imageUrl,
+        clicks: clickedByProduct.get(p.id) || 0,
+        revenueXof: rev.revenueXof,
+        revenueEur: rev.revenueEur,
+      }
+    })
     .sort((a: any, b: any) => b.clicks - a.clicks)
     .slice(0, 8)
 
   const interactions = {
     views: events.filter((e: any) => e.type === 'view').length,
-    clicks: events.filter((e: any) => e.type === 'click').length,
-    likes: Object.values(social.likes || {}).reduce((s: number, v) => s + (Number(v) || 0), 0),
+    clicks: totalClicks,
+    likes: Object.values(likeIndex).reduce((s: number, v) => s + (Number(v) || 0), 0),
     shares: events.filter((e: any) => e.type === 'share').length,
     copies: events.filter((e: any) => e.type === 'copy').length,
     unlikes: events.filter((e: any) => e.type === 'unlike').length,
@@ -195,7 +216,7 @@ export default defineEventHandler(async (event) => {
       totalRevenueXof,
       totalRevenueEur,
       interactions,
-      salesByCategory: Object.entries(salesByCategory).map(([category, orders]) => ({ category, orders, revenueXof: 0 })),
+      salesByCategory: Object.entries(salesByCategory).map(([category, ordersCount]) => ({ category, orders: ordersCount, revenueXof: 0 })),
       revenueSeries,
       topProducts,
       analytics: {
@@ -207,11 +228,7 @@ export default defineEventHandler(async (event) => {
           liked: topLiked,
           commented: topBy(commentedByProduct),
           preordered: topBy(preordersByProduct),
-          whatsapp: products
-            .map((p: any) => ({ id: p.id, title: p.title, imageUrl: p.imageUrl, count: Number(p.whatsappClicks) || 0 }))
-            .filter((p) => p.count > 0)
-            .sort((a, b) => b.count - a.count)
-            .slice(0, 6),
+          whatsapp: topBy(clickedByProduct),
         },
         users: {
           likers: topUsers((c) => c.liked.size, 1),

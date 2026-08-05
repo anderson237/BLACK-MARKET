@@ -49,8 +49,9 @@ export default defineEventHandler(async (event) => {
     const feesXof = Math.round(p.revenueXof * (settings.feesPct / 100))
     const shippingXof = Math.round(p.orders * settings.shippingCostXof)
     const adsXof = Math.round(settings.adsMonthlyXof * months)
+    const fixedXof = Math.round(settings.fixedCostsMonthlyXof * months)
     const contribution = p.grossProfitXof - feesXof - shippingXof - returnsXof
-    const netProfit = contribution - p.expensesXof
+    const netProfit = contribution - p.expensesXof - fixedXof
     const aov = p.orders > 0 ? p.revenueXof / p.orders : 0
     const ordersPerCustomer = customers > 0 ? p.orders / customers : 0
     const cac = customers > 0 ? adsXof / customers : 0
@@ -72,6 +73,7 @@ export default defineEventHandler(async (event) => {
       feesXof,
       shippingXof,
       adsXof,
+      fixedXof,
       aov: Math.round(aov),
       cac: Math.round(cac),
       clv: Math.round(clv),
