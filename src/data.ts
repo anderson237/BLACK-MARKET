@@ -21,6 +21,9 @@ export const INITIAL_PRODUCTS: Product[] = [
     "category": "Techwear",
     "whatsappClicks": 74,
     "sourceRmb": 180,
+    "stockStatus": "in_stock",
+    "stockQuantity": 12,
+    "moq": 3,
     "createdAt": "2026-07-28T20:01:55.045Z"
   },
   {
@@ -43,6 +46,9 @@ export const INITIAL_PRODUCTS: Product[] = [
     "category": "Streetwear",
     "whatsappClicks": 112,
     "sourceRmb": 130,
+    "stockStatus": "preorder",
+    "stockQuantity": 0,
+    "moq": 10,
     "createdAt": "2026-07-30T20:01:55.047Z"
   },
   {

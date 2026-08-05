@@ -119,6 +119,7 @@ onMounted(() => {
 
 // Preorder: fire the click event + create a pending order linked to the
 // account (deduped), then open WhatsApp. Fire-and-forget so the tab opens fast.
+const isStock = computed(() => product.value?.stockStatus === 'in_stock')
 function preorder() {
   const url = waUrl.value
   if (!url) return
@@ -139,13 +140,13 @@ function preorder() {
         customerName: auth.user?.name || auth.user?.pseudo || 'Client WhatsApp',
         customerPhone: auth.user?.phone || '',
         customerLocation: auth.user?.country || '—',
-        quantity: 1,
+        quantity: Math.max(1, Number(p.moq) || 1),
         priceXof: p.priceXof,
         priceEur: p.priceEur,
       }),
     }).catch(() => {})
     window.open(url, '_blank', 'noopener,noreferrer')
-  }, 'Connectez-vous pour précommander ce drop')
+  }, isStock.value ? 'Connectez-vous pour commander ce drop' : 'Connectez-vous pour précommander ce drop')
 }
 
 // Rich content: descriptions are AI-generated HTML -> render sanitized.
@@ -195,15 +196,38 @@ const techHtml = computed(() => sanitizeHtml(product.value?.originalDescription 
       <!-- Info -->
       <div class="space-y-5">
         <div>
-          <span class="inline-block bg-[#ff2a2a]/10 text-[#ff2a2a] text-[10px] font-bold tracking-widest uppercase px-2.5 py-0.5 rounded border border-[#ff2a2a]/25 mb-2">
-            {{ product.category }}
-          </span>
+          <div class="flex items-center flex-wrap gap-2 mb-2">
+            <span class="inline-block bg-[#ff2a2a]/10 text-[#ff2a2a] text-[10px] font-bold tracking-widest uppercase px-2.5 py-0.5 rounded border border-[#ff2a2a]/25">
+              {{ product.category }}
+            </span>
+            <span
+              v-if="isStock"
+              class="inline-block bg-emerald-500/15 text-emerald-400 text-[10px] font-bold tracking-widest uppercase px-2.5 py-0.5 rounded border border-emerald-500/40"
+            >
+              ✓ EN STOCK
+            </span>
+            <span
+              v-else
+              class="inline-block bg-amber-500/15 text-amber-400 text-[10px] font-bold tracking-widest uppercase px-2.5 py-0.5 rounded border border-amber-500/40"
+            >
+              📦 PRÉCOMMANDE
+            </span>
+          </div>
           <h1 class="text-xl sm:text-2xl font-extrabold text-slate-100 leading-snug">{{ product.title }}</h1>
         </div>
 
         <div class="bg-gradient-to-r from-[#ff2a2a]/10 to-transparent p-3 rounded-xl border-l-4 border-[#ff2a2a]">
           <p class="text-[8px] text-zinc-400 uppercase font-mono font-bold tracking-widest">PRIX DE VENTE SPECIAL</p>
           <p class="text-2xl font-extrabold text-[#ff2a2a] font-mono">{{ formatPriceXof(product.priceXof) }}</p>
+        </div>
+
+        <div v-if="Number(product.moq) > 0 || Number(product.stockQuantity) > 0" class="flex flex-wrap gap-2">
+          <span v-if="Number(product.moq) > 0" class="inline-flex items-center gap-1.5 text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-200 bg-black/40 border border-zinc-800 rounded-lg px-3 py-1.5">
+            <AppIcon name="tag" :size="13" class="text-[#ff2a2a]" /> MOQ : {{ product.moq }} unité(s) minimum
+          </span>
+          <span v-if="Number(product.stockQuantity) > 0" class="inline-flex items-center gap-1.5 text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-3 py-1.5">
+            <AppIcon name="box" :size="13" /> {{ product.stockQuantity }} unité(s) en stock
+          </span>
         </div>
 
         <div class="space-y-2">
@@ -213,7 +237,7 @@ const techHtml = computed(() => sanitizeHtml(product.value?.originalDescription 
 
         <button @click="preorder"
           class="block w-full text-center bg-[#ff2a2a] hover:bg-red-600 text-white font-bold text-sm px-4 py-3 rounded-xl transition-all font-mono cursor-pointer">
-          PRÉCOMMANDER SUR WHATSAPP
+          {{ isStock ? 'COMMANDER SUR WHATSAPP' : 'PRÉCOMMANDER SUR WHATSAPP' }}
         </button>
 
         <ProductActions :product="product" />

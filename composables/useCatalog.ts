@@ -54,15 +54,30 @@ export function formatPriceEur(priceEur: number): string {
   return Number(priceEur || 0) + ' €'
 }
 
-/** Builds the WhatsApp preorder message. */
+/** Builds the WhatsApp preorder/order message. */
 export function buildWaMessage(product: Product, priceStr: string, productUrl: string): string {
-  return (
-    'Bonjour BLACK MARKET, 👋\n\n' +
-    'Je souhaite passer une PRÉCOMMANDE pour le produit suivant :\n\n' +
-    '  📦 PRODUIT : ' + String(product.title || '').toUpperCase() + '\n' +
-    '  💰 PRIX : ' + priceStr + '\n' +
-    '  🔗 FICHE PRODUIT : ' + productUrl + '\n\n' +
-    'Merci de me confirmer la disponibilité, le délai de livraison et les modalités de paiement.\n\n' +
-    "Dans l'attente de votre retour, je vous prie d'agréer mes salutations distinguées."
-  )
+  const isStock = product.stockStatus === 'in_stock'
+  const header = isStock
+    ? 'Je souhaite passer une COMMANDE pour le produit suivant :'
+    : 'Je souhaite passer une PRÉCOMMANDE pour le produit suivant :'
+  const lines: string[] = [
+    'Bonjour BLACK MARKET, 👋',
+    '',
+    header,
+    '',
+    '  📦 PRODUIT : ' + String(product.title || '').toUpperCase(),
+    '  💰 PRIX : ' + priceStr,
+  ]
+  if (Number(product.moq) > 0) {
+    lines.push('  📌 MOQ : ' + Number(product.moq) + ' unité(s) minimum')
+  }
+  if (Number(product.stockQuantity) > 0) {
+    lines.push('  🏷️ DISPONIBLE : ' + Number(product.stockQuantity) + ' unité(s) en stock')
+  }
+  lines.push('  🔗 FICHE PRODUIT : ' + productUrl + '\n')
+  lines.push(isStock
+    ? 'Merci de me confirmer la disponibilité, le délai de livraison et les modalités de paiement.'
+    : 'Merci de me confirmer la disponibilité, le délai de livraison et les modalités de paiement.')
+  lines.push('', "Dans l'attente de votre retour, je vous prie d'agréer mes salutations distinguées.")
+  return lines.join('\n')
 }

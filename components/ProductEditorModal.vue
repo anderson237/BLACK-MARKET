@@ -27,6 +27,9 @@ const draft = reactive({
   whatsappClicks: props.product?.whatsappClicks || 0,
   waNumber: props.product?.waNumber || '',
   sourceRmb: props.product?.sourceRmb || undefined,
+  stockStatus: props.product?.stockStatus || 'preorder',
+  stockQuantity: props.product?.stockQuantity ?? 0,
+  moq: props.product?.moq ?? 1,
 })
 
 const saving = ref(false)
@@ -53,6 +56,9 @@ async function save() {
       id: draft.id || `prod_${Date.now()}`,
       features: draft.features.filter((f) => f.trim() !== ''),
       sourceRmb: Number(draft.sourceRmb) || 0,
+      stockStatus: draft.stockStatus || 'preorder',
+      stockQuantity: Math.max(0, Number(draft.stockQuantity) || 0),
+      moq: Math.max(1, Number(draft.moq) || 1),
     }
     const saved = isNew ? await store.createProduct(body) : await store.updateProduct(body)
     emit('saved', saved)
@@ -300,6 +306,27 @@ async function generateAiVideo() {
           <div class="space-y-2">
             <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Source ¥ RMB</label>
             <input v-model.number="draft.sourceRmb" type="number" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="200" />
+          </div>
+        </div>
+
+        <!-- Stock : statut + quantité + MOQ -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="space-y-2">
+            <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Statut stock</label>
+            <select v-model="draft.stockStatus" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none">
+              <option value="preorder">📦 Précommande</option>
+              <option value="in_stock">✅ En stock</option>
+            </select>
+          </div>
+          <div class="space-y-2">
+            <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Quantité en stock</label>
+            <input v-model.number="draft.stockQuantity" type="number" min="0" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="0 = non affichée" />
+            <p class="text-[9px] text-zinc-600 font-mono">Affichée en vitrine si différente de 0.</p>
+          </div>
+          <div class="space-y-2">
+            <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">MOQ (min. de commande)</label>
+            <input v-model.number="draft.moq" type="number" min="1" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="1" />
+            <p class="text-[9px] text-zinc-600 font-mono">Quantité minimale par commande.</p>
           </div>
         </div>
 

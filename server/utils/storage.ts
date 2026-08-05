@@ -67,20 +67,28 @@ async function blobSet(store: string, key: string, value: string | Buffer): Prom
 }
 
 // ---- products ----
+function normalizeProduct(p: any): any {
+  if (!p || typeof p !== 'object') return p
+  p.stockStatus = p.stockStatus === 'in_stock' ? 'in_stock' : 'preorder'
+  p.stockQuantity = Number(p.stockQuantity) || 0
+  p.moq = Math.max(1, Number(p.moq) || 1)
+  return p
+}
+
 export async function loadProducts(): Promise<any[]> {
   if (isNetlifyRuntime()) {
     const raw = await blobGet('bm-products', 'products.json', 'text')
     if (raw != null) {
       const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed)) return parsed
+      if (Array.isArray(parsed)) return parsed.map(normalizeProduct)
     }
     const { INITIAL_PRODUCTS } = await import('../../src/data')
-    const seed = JSON.parse(JSON.stringify(INITIAL_PRODUCTS))
+    const seed = JSON.parse(JSON.stringify(INITIAL_PRODUCTS)).map(normalizeProduct)
     await blobSet('bm-products', 'products.json', JSON.stringify(seed, null, 2))
     return seed
   }
   const parsed = await readJSON(PRODUCTS_FILE)
-  return Array.isArray(parsed) ? parsed : []
+  return Array.isArray(parsed) ? parsed.map(normalizeProduct) : []
 }
 
 export async function saveProducts(products: any[]): Promise<void> {

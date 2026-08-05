@@ -293,6 +293,19 @@ function copyLink(p: Product) {
               </ul>
             </div>
 
+            <div class="flex flex-wrap gap-1.5">
+              <span class="inline-flex items-center gap-1 text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-1 rounded-md"
+                :class="p.stockStatus === 'in_stock' ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/30' : 'text-amber-400 bg-amber-500/10 border border-amber-500/30'">
+                {{ p.stockStatus === 'in_stock' ? '✓ En stock' : '📦 Précommande' }}
+              </span>
+              <span v-if="Number(p.moq) > 0" class="inline-flex items-center gap-1 text-[9px] font-mono font-bold uppercase tracking-wider text-zinc-300 bg-black/50 border border-zinc-800 rounded-md px-2 py-1">
+                MOQ {{ p.moq }}
+              </span>
+              <span v-if="Number(p.stockQuantity) > 0" class="inline-flex items-center gap-1 text-[9px] font-mono font-bold uppercase tracking-wider text-sky-400 bg-sky-500/10 border border-sky-500/30 rounded-md px-2 py-1">
+                {{ p.stockQuantity }} dispo
+              </span>
+            </div>
+
             <div class="pt-3 flex items-center justify-between border-t border-zinc-900 mt-auto">
               <div class="flex flex-col">
                 <span class="text-[8px] text-zinc-500 uppercase font-mono tracking-widest">Prix unitaire factory</span>
@@ -347,6 +360,19 @@ function copyLink(p: Product) {
             <span class="bg-[#ff2a2a]/15 text-[#ff2a2a] border border-[#ff2a2a]/30 text-sm font-extrabold font-mono px-3 py-2 rounded-xl">{{ formatPriceXof(detailProduct.priceXof) }}</span>
             <span v-if="detailProduct.sourceRmb" class="text-[10px] font-mono text-yellow-500 bg-black/40 border border-zinc-800 px-2.5 py-1 rounded-lg">Sourcing: ¥{{ detailProduct.sourceRmb }} RMB</span>
             <span class="text-[10px] font-mono text-zinc-500">Fiche technique (中文) —</span>
+          </div>
+
+          <div class="flex flex-wrap gap-2">
+            <span class="inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg"
+              :class="detailProduct.stockStatus === 'in_stock' ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/30' : 'text-amber-400 bg-amber-500/10 border border-amber-500/30'">
+              {{ detailProduct.stockStatus === 'in_stock' ? '✓ En stock' : '📦 Précommande' }}
+            </span>
+            <span v-if="Number(detailProduct.moq) > 0" class="inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-300 bg-black/50 border border-zinc-800 rounded-lg px-2.5 py-1">
+              MOQ : {{ detailProduct.moq }} min
+            </span>
+            <span v-if="Number(detailProduct.stockQuantity) > 0" class="inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-wider text-sky-400 bg-sky-500/10 border border-sky-500/30 rounded-lg px-2.5 py-1">
+              {{ detailProduct.stockQuantity }} unité(s) dispo
+            </span>
           </div>
 
           <!-- Description -->

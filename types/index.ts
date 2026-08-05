@@ -16,6 +16,9 @@ export interface Product {
   whatsappClicks: number
   waNumber?: string
   sourceRmb?: number
+  stockStatus?: 'in_stock' | 'preorder'
+  stockQuantity?: number
+  moq?: number
   deleted?: boolean
   deletedAt?: string
   createdAt: string

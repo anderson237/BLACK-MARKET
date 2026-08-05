@@ -14,6 +14,9 @@ export interface Product {
   category: string;
   whatsappClicks: number;
   sourceRmb?: number;
+  stockStatus?: 'in_stock' | 'preorder';
+  stockQuantity?: number;
+  moq?: number;
   createdAt: string;
 }
 
