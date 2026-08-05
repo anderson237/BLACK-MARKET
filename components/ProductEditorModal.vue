@@ -99,26 +99,111 @@ async function apiPost(path: string, body: any) {
   return json
 }
 
-/** Refresh the argumentaire or fiche technique via /api/ai-refine (Gemini). */
-async function refine(field: 'description' | 'technical') {
-  aiBusy.value = `Optimisation ${field === 'description' ? "de l'argumentaire" : 'de la fiche technique'} par l'IA…`
+/** Refresh the title, argumentaire or fiche technique via /api/ai-refine (Gemini). */
+async function refine(field: 'title' | 'description' | 'technical') {
+  aiBusy.value = `Génération ${field === 'title' ? 'du titre' : field === 'description' ? "de l'argumentaire" : 'de la fiche technique'} par l'IA…`
   error.value = ''
   try {
-    const { html } = await apiPost('/api/ai-refine', {
+    const { html, text } = await apiPost('/api/ai-refine', {
       field,
       title: draft.title,
       category: draft.category,
-      currentText: field === 'description' ? draft.description : draft.originalDescription,
+      currentText: field === 'title' ? draft.title : field === 'description' ? draft.description : draft.originalDescription,
     })
-    if (field === 'description') draft.description = html
+    if (field === 'title') draft.title = text || draft.title
+    else if (field === 'description') draft.description = html
     else draft.originalDescription = html
-    aiAction.value = field === 'description' ? "Argumentaire optimisé par l'IA ✓" : 'Fiche technique optimisée par l\'IA ✓'
+    aiAction.value = field === 'title' ? 'Titre généré par l\'IA ✓' : field === 'description' ? "Argumentaire optimisé par l'IA ✓" : 'Fiche technique optimisée par l\'IA ✓'
   } catch (e: any) {
     error.value = e?.message || 'Erreur IA.'
   } finally {
     aiBusy.value = ''
   }
 }
+
+// ---- Dictée vocale (Web Speech API) ----
+// L'admin dicte le titre, l'argumentaire ou la fiche technique et le texte
+// apparaît en direct dans l'éditeur (puis peut être optimisé par l'IA).
+type DictationField = 'title' | 'description' | 'technical'
+let recognition: any = null
+const dictating = ref<DictationField | ''>('')
+const interimText = ref('')
+
+function dictationSupported(): boolean {
+  if (!import.meta.client) return false
+  const w = window as any
+  return !!(w.SpeechRecognition || w.webkitSpeechRecognition)
+}
+
+function appendDictated(field: DictationField, text: string) {
+  const clean = String(text).trim()
+  if (!clean) return
+  if (field === 'title') {
+    draft.title = (draft.title ? draft.title.trimEnd() + ' ' : '') + clean
+  } else {
+    const para = `<p>${clean.replace(/\n+/g, ' ')}</p>`
+    const current = field === 'description' ? draft.description : draft.originalDescription
+    const next = current ? `${current.replace(/<p>\s*<\/p>$/i, '')} ${para}` : para
+    if (field === 'description') draft.description = next
+    else draft.originalDescription = next
+  }
+}
+
+function stopDictation() {
+  if (recognition) {
+    try { recognition.stop() } catch {}
+    recognition = null
+  }
+  dictating.value = ''
+  interimText.value = ''
+}
+
+function startDictation(field: DictationField) {
+  if (!import.meta.client) return
+  const w = window as any
+  const Ctor = w.SpeechRecognition || w.webkitSpeechRecognition
+  if (!Ctor) {
+    error.value = 'La dictée vocale n\'est pas supportée par ce navigateur. Utilisez Chrome ou Edge.'
+    return
+  }
+  if (dictating.value) stopDictation()
+  try {
+    recognition = new Ctor()
+    recognition.lang = 'fr-FR'
+    recognition.continuous = true
+    recognition.interimResults = true
+    dictating.value = field
+    interimText.value = ''
+    recognition.onresult = (e: any) => {
+      let interim = ''
+      let final = ''
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const res = e.results[i]
+        const t = res[0].transcript
+        if (res.isFinal) final += t
+        else interim += t
+      }
+      if (final) appendDictated(field, final)
+      interimText.value = interim
+    }
+    recognition.onerror = (e: any) => {
+      if (e?.error === 'not-allowed' || e?.error === 'service-not-allowed') {
+        error.value = 'Accès au microphone refusé. Autorisez le micro dans le navigateur.'
+      }
+      interimText.value = ''
+      dictating.value = ''
+    }
+    recognition.onend = () => {
+      dictating.value = ''
+      interimText.value = ''
+    }
+    recognition.start()
+  } catch {
+    error.value = 'Impossible de démarrer la dictée vocale.'
+  }
+}
+
+onUnmounted(() => stopDictation())
 
 // ---- Filigrane canvas: bake "BLACK MARKET © 2026" onto any image ----
 function watermarkDataUrl(img: HTMLImageElement, targetW = 720, targetH = 720): string {
@@ -285,7 +370,23 @@ async function generateAiVideo() {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div class="space-y-2">
             <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Titre</label>
-            <input v-model="draft.title" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="Nom du produit" />
+            <div class="flex items-center gap-2">
+              <input v-model="draft.title" class="flex-1 min-w-0 bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="Nom du produit" />
+              <button type="button" @click="refine('title')" :disabled="!!aiBusy"
+                class="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-xl border bg-zinc-800/60 hover:bg-zinc-700 border-zinc-700 text-zinc-300 hover:text-[#ff2a2a] text-xs font-bold transition-all disabled:opacity-50"
+                title="Générer le titre par IA" aria-label="Générer le titre par IA">✨</button>
+              <button type="button" @click="dictating === 'title' ? stopDictation() : startDictation('title')" :disabled="!!aiBusy"
+                class="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-xl border transition-all disabled:opacity-50"
+                :class="dictating === 'title'
+                  ? 'bg-red-600/20 border-red-500/60 text-red-400 animate-pulse'
+                  : 'bg-black/40 border-zinc-800 text-zinc-300 hover:border-[#ff2a2a]/50 hover:text-[#ff2a2a]'"
+                :title="dictating === 'title' ? 'Arrêter la dictée' : 'Dicter le titre (voix)'" :aria-label="dictating === 'title' ? 'Arrêter la dictée' : 'Dicter le titre'">
+                <AppIcon :name="dictating === 'title' ? 'micOff' : 'mic'" :size="15" />
+              </button>
+            </div>
+            <p v-if="dictating === 'title'" class="flex items-center gap-1.5 text-[10px] text-red-400 font-mono animate-pulse">
+              <span class="w-1.5 h-1.5 rounded-full bg-red-500" /> En train de dicter le titre… {{ interimText ? `« ${interimText} »` : '' }}
+            </p>
           </div>
           <div class="space-y-2">
             <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Grossiste 中文 (chinois)</label>
@@ -417,9 +518,20 @@ async function generateAiVideo() {
                 :title="blocksModeDesc ? 'Basculer en éditeur texte simple' : 'Basculer en éditeur par blocs (drag & drop)'">
                 {{ blocksModeDesc ? '🔀 Blocs' : '🔀 Simple' }}
               </button>
+              <button type="button" @click="dictating === 'description' ? stopDictation() : startDictation('description')" :disabled="!!aiBusy"
+                class="inline-flex items-center gap-1 border px-2 py-1 rounded-lg text-[10px] font-bold transition-all disabled:opacity-50"
+                :class="dictating === 'description'
+                  ? 'bg-red-600/20 border-red-500/60 text-red-400 animate-pulse'
+                  : 'bg-zinc-800/60 hover:bg-zinc-700 border-zinc-700 text-zinc-300 hover:text-[#ff2a2a]'"
+                :title="dictating === 'description' ? 'Arrêter la dictée' : 'Dicter l\'argumentaire (voix)'">
+                <AppIcon :name="dictating === 'description' ? 'micOff' : 'mic'" :size="12" /> {{ dictating === 'description' ? 'Stop' : 'Dicter' }}
+              </button>
               <button @click="refine('description')" :disabled="!!aiBusy" class="inline-flex items-center gap-1 bg-zinc-800/60 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 text-[10px] font-bold px-2 py-1 rounded-lg transition-all disabled:opacity-50">✨ Optimiser IA</button>
             </div>
           </div>
+          <p v-if="dictating === 'description'" class="flex items-center gap-1.5 text-[10px] text-red-400 font-mono animate-pulse">
+            <span class="w-1.5 h-1.5 rounded-full bg-red-500" /> Dictée en cours… {{ interimText ? `« ${interimText} »` : '' }}
+          </p>
           <RichBlocksEditor v-if="blocksModeDesc" v-model="draft.description" />
           <RichEditor v-else v-model="draft.description" />
         </div>
@@ -434,9 +546,20 @@ async function generateAiVideo() {
                 :title="blocksModeTech ? 'Basculer en éditeur texte simple' : 'Basculer en éditeur par blocs (drag & drop)'">
                 {{ blocksModeTech ? '🔀 Blocs' : '🔀 Simple' }}
               </button>
+              <button type="button" @click="dictating === 'technical' ? stopDictation() : startDictation('technical')" :disabled="!!aiBusy"
+                class="inline-flex items-center gap-1 border px-2 py-1 rounded-lg text-[10px] font-bold transition-all disabled:opacity-50"
+                :class="dictating === 'technical'
+                  ? 'bg-red-600/20 border-red-500/60 text-red-400 animate-pulse'
+                  : 'bg-zinc-800/60 hover:bg-zinc-700 border-zinc-700 text-zinc-300 hover:text-[#ff2a2a]'"
+                :title="dictating === 'technical' ? 'Arrêter la dictée' : 'Dicter la fiche technique (voix)'">
+                <AppIcon :name="dictating === 'technical' ? 'micOff' : 'mic'" :size="12" /> {{ dictating === 'technical' ? 'Stop' : 'Dicter' }}
+              </button>
               <button @click="refine('technical')" :disabled="!!aiBusy" class="inline-flex items-center gap-1 bg-zinc-800/60 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 text-[10px] font-bold px-2 py-1 rounded-lg transition-all disabled:opacity-50">✨ Optimiser IA</button>
             </div>
           </div>
+          <p v-if="dictating === 'technical'" class="flex items-center gap-1.5 text-[10px] text-red-400 font-mono animate-pulse">
+            <span class="w-1.5 h-1.5 rounded-full bg-red-500" /> Dictée en cours… {{ interimText ? `« ${interimText} »` : '' }}
+          </p>
           <RichBlocksEditor v-if="blocksModeTech" v-model="draft.originalDescription" />
           <RichEditor v-else v-model="draft.originalDescription" />
         </div>

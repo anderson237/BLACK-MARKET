@@ -14,13 +14,22 @@ export default defineEventHandler(async (event) => {
   }
   const body = await readBody(event)
   const { field, title, category, currentText } = body || {}
-  const target = field === 'technical' ? 'technical' : 'description'
+  const target = field === 'title' ? 'title' : field === 'technical' ? 'technical' : 'description'
+  const isTitle = target === 'title'
   const cleanTitle = String(title || '').slice(0, 300)
   const cleanCategory = String(category || '').slice(0, 80)
   const cleanCurrent = String(currentText || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 4000)
 
-  const instructions =
-    target === 'description'
+  const instructions = isTitle
+    ? `Tu es un expert en nommage de produits e-commerce (import Chine, marché francophone).
+${cleanCurrent ? `À partir du titre actuel, améliore-le pour le rendre plus vendeur et plus clair : "${cleanCurrent}".` : `Crée un titre produit percutant pour « ${cleanCategory || 'ce produit'} ».`}
+Exigences :
+- Un titre court et accrocheur (10 à 12 mots maximum, idéalement 7-9).
+- Structure typique : [NOM produit] + [Type / Caractéristique clé] + [bénéfice ou usage].
+- Capitalisation élégante, sans émojis, sans guillemets, sans point final.
+- Concis, premium, adapté à une vitrine streetwear/tech import Chine.
+Renvoie uniquement le texte du titre, sans ponctuation finale ni saut de ligne.`
+    : target === 'description'
       ? `Tu es un copywriter d'élite pour la marque de précommande BLACK MARKET (import Chine, marché francophone).
 Rédige ou optimise l'ARGUMENTAIRE DE VENTE du produit « ${cleanTitle} » (catégorie : ${cleanCategory || 'non précisée'}).
 ${cleanCurrent ? `Reprends les informations utiles de l'argumentaire actuel et optimise-le pour le rendre plus percutant, plus structuré et plus orienté bénéfices clients : "${cleanCurrent}".` : 'Crée un argumentaire de vente premium de toutes pièces.'}
@@ -49,15 +58,17 @@ Renvoie du HTML propre : <h3>, <p>, <ul><li>. Sans balise <html>, <body> ni text
       contents: [{ text: instructions }],
       config: {
         systemInstruction:
-          'Tu génères exclusivement du contenu HTML propre (balises <p>, <h3>, <ul>, <li>) pour une interface d\'édition produit. Aucune balise <html>, <body> ni texte hors HTML.',
+          isTitle
+            ? 'Tu génères uniquement un titre produit court et vendeur. Aucun émoji, aucune ponctuation finale, aucun saut de ligne.'
+            : 'Tu génères exclusivement du contenu HTML propre (balises <p>, <h3>, <ul>, <li>) pour une interface d\'édition produit. Aucune balise <html>, <body> ni texte hors HTML.',
         temperature: 0.7,
         responseMimeType: 'application/json',
         responseSchema: {
           type: Type.OBJECT,
-          properties: {
-            html: { type: Type.STRING, description: 'Contenu HTML final à insérer directement dans l\'éditeur.' },
-          },
-          required: ['html'],
+          properties: isTitle
+            ? { text: { type: Type.STRING, description: 'Titre produit final (texte brut, sans émojis ni ponctuation finale).' } }
+            : { html: { type: Type.STRING, description: 'Contenu HTML final à insérer directement dans l\'éditeur.' } },
+          required: isTitle ? ['text'] : ['html'],
         },
       },
     },
@@ -70,6 +81,9 @@ Renvoie du HTML propre : <h3>, <p>, <ul><li>. Sans balise <html>, <body> ni text
     resultJson = JSON.parse(resultText)
   } catch {
     throw createError({ statusCode: 502, statusMessage: "Réponse de l'IA au format invalide. Veuillez réessayer." })
+  }
+  if (isTitle) {
+    return { success: true, text: String(resultJson.text || '').replace(/[.。\n]+$/g, '').slice(0, 300) }
   }
   return { success: true, html: String(resultJson.html || '').slice(0, 12000) }
 })
