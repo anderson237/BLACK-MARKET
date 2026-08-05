@@ -178,12 +178,14 @@ async function loadInteractions() {
 onMounted(() => {
   window.addEventListener('bm:track', onTrackRefresh)
   window.addEventListener('focus', onTrackRefresh)
+  window.addEventListener('storage', onStorage)
   document.addEventListener('visibilitychange', onVisibility)
   autoRefresh = setInterval(onTrackRefresh, 15_000)
 })
 onUnmounted(() => {
   window.removeEventListener('bm:track', onTrackRefresh)
   window.removeEventListener('focus', onTrackRefresh)
+  window.removeEventListener('storage', onStorage)
   document.removeEventListener('visibilitychange', onVisibility)
   if (refreshTimer) clearTimeout(refreshTimer)
   if (autoRefresh) clearInterval(autoRefresh)
@@ -193,6 +195,11 @@ function onTrackRefresh() {
   refreshTimer = setTimeout(() => {
     if (auth.isAuthed && !needsCompletion.value) loadInteractions()
   }, 600)
+}
+function onStorage(e: StorageEvent) {
+  // useTrack buffers every event in localStorage (bm_events_v1); a write from
+  // another tab on this device means new activity -> refresh live.
+  if (e.key === 'bm_events_v1' || e.key === null) onTrackRefresh()
 }
 function onVisibility() {
   if (document.visibilityState === 'visible') onTrackRefresh()
