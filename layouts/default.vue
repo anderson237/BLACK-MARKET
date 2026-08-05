@@ -5,6 +5,8 @@ import { useAuthStore } from '~/stores/auth'
 // in a mobile/tablet drawer only (large screens don't need it).
 const drawerOpen = ref(false)
 const auth = useAuthStore()
+const { isLight, toggle, init } = useTheme()
+onMounted(() => init())
 
 const config = useRuntimeConfig()
 const nav = [
@@ -73,6 +75,11 @@ function doLogout() {
             <AppIcon name="whatsapp" :size="14" />
             <span class="hidden sm:inline">PRÉCOMMANDER</span>
             <span class="sm:hidden">WhatsApp</span>
+          </button>
+          <button @click="toggle()" :title="isLight ? 'Passer au mode sombre' : 'Passer au mode clair'"
+            :aria-label="isLight ? 'Passer au mode sombre' : 'Passer au mode clair'"
+            class="w-10 h-10 rounded-lg border border-zinc-800 flex items-center justify-center text-zinc-300 hover:border-[#ff2a2a]/50 hover:text-white transition-all">
+            <AppIcon :name="isLight ? 'sun' : 'moon'" :size="15" />
           </button>
           <button @click="drawerOpen = true" aria-label="Menu"
             class="lg:hidden w-10 h-10 rounded-lg border border-zinc-800 flex items-center justify-center text-zinc-300 hover:border-[#ff2a2a]/50 hover:text-white transition-all">

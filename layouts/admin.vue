@@ -5,6 +5,8 @@ import { useAuthStore } from '~/stores/auth'
 const drawerOpen = ref(false)
 const route = useRoute()
 const auth = useAuthStore()
+const { isLight, toggle, init } = useTheme()
+onMounted(() => init())
 
 // Only an authenticated admin (role === 'admin') can access the console.
 const isAdmin = computed(() => auth.isAuthed && auth.role === 'admin')
@@ -71,6 +73,11 @@ function closeDrawer() {
         <span class="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">BLACK MARKET · ADMIN</span>
       </NuxtLink>
       <NuxtLink to="/" class="text-[10px] font-mono text-zinc-400 hover:text-[#ff2a2a] border border-zinc-800 px-3 py-1.5 rounded-lg transition-all">← Voir le site</NuxtLink>
+      <button @click="toggle()" :title="isLight ? 'Mode sombre' : 'Mode clair'"
+        :aria-label="isLight ? 'Passer au mode sombre' : 'Passer au mode clair'"
+        class="w-9 h-9 rounded-lg border border-zinc-800 flex items-center justify-center text-zinc-300 hover:border-[#ff2a2a]/50 hover:text-white transition-all">
+        <AppIcon :name="isLight ? 'sun' : 'moon'" :size="14" />
+      </button>
     </div>
     <AdminLogin />
   </div>
@@ -102,6 +109,11 @@ function closeDrawer() {
             <option value="XOF" class="bg-[#0d0d14]">XOF</option>
             <option value="EUR" class="bg-[#0d0d14]">EUR</option>
           </select>
+          <button @click="toggle()" :title="isLight ? 'Mode sombre' : 'Mode clair'"
+            :aria-label="isLight ? 'Passer au mode sombre' : 'Passer au mode clair'"
+            class="w-10 h-10 shrink-0 rounded-lg border border-zinc-800 flex items-center justify-center text-zinc-300 hover:border-[#ff2a2a]/50 hover:text-white transition-all">
+            <AppIcon :name="isLight ? 'sun' : 'moon'" :size="15" />
+          </button>
           <button @click="doLogout"
             class="text-[10px] font-mono text-red-400 hover:text-red-300 border border-red-500/30 hover:border-red-500/60 px-2.5 py-2 rounded-lg transition-all inline-flex items-center gap-1.5" title="Se déconnecter">
             <AppIcon name="logout" :size="13" />

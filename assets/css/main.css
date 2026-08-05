@@ -47,3 +47,164 @@ html, body {
   to { opacity: 1; transform: translateY(0); }
 }
 .bm-fade-in { animation: bmFadeIn 0.35s ease-out both; }
+
+/* ============================================================
+   THEME SYSTEM — Light mode
+   Sombre = défaut (design actuel). Mode clair = surcouche CSS
+   activée via la classe `light` sur <html> (composable useTheme).
+   ============================================================ */
+html { color-scheme: dark; }
+html.light { color-scheme: light; }
+
+/* Transition douce lors du basculement (classe ajoutée par useTheme) */
+html.theme-anim,
+html.theme-anim *,
+html.theme-anim *::before,
+html.theme-anim *::after {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, fill 0.3s ease, stroke 0.3s ease !important;
+}
+
+/* ---- Fond de page ---- */
+html.light,
+html.light body {
+  background-color: #f4f4f7;
+  color: #1a1a22;
+}
+
+/* ---- Surfaces (fonds sombres -> clairs) ---- */
+html.light .bg-\[\#08080c\] { background-color: #f4f4f7; }
+html.light .bg-\[\#0a0a10\] { background-color: #ececf1; }
+html.light .bg-\[\#0d0d14\] { background-color: #eaeaf0; }
+html.light .bg-\[\#0d0d14\]\/85 { background-color: rgba(234, 234, 240, 0.85); }
+html.light .bg-\[\#0d0d14\]\/60 { background-color: rgba(234, 234, 240, 0.6); }
+html.light .bg-\[\#12121a\] { background-color: #ffffff; }
+html.light .bg-\[\#15151e\] { background-color: #f0f0f4; }
+html.light .bg-\[\#16161d\] { background-color: #eef0f4; }
+html.light .bg-\[\#1a1a24\] { background-color: #ececf1; }
+html.light .bg-zinc-950 { background-color: #fafafa; }
+html.light .bg-zinc-900,
+html.light .bg-zinc-900\/40,
+html.light .bg-zinc-900\/50 { background-color: #ececf1; }
+html.light .bg-zinc-800,
+html.light .bg-zinc-800\/60 { background-color: #e3e3ea; }
+html.light .bg-zinc-700,
+html.light .bg-zinc-700\/60 { background-color: #d6d6dd; }
+html.light .bg-zinc-600 { background-color: #c8c8d1; }
+html.light .hover\:bg-zinc-900:hover,
+html.light .hover\:bg-zinc-900\/40:hover,
+html.light .hover\:bg-zinc-900\/30:hover { background-color: #ececf1; }
+html.light .hover\:bg-zinc-800:hover,
+html.light .hover\:bg-zinc-800\/60:hover { background-color: #e3e3ea; }
+html.light .hover\:bg-zinc-700:hover { background-color: #d6d6dd; }
+/* Inputs & badges translucides */
+html.light .bg-black\/30 { background-color: rgba(17, 17, 24, 0.04); }
+html.light .bg-black\/40 { background-color: rgba(17, 17, 24, 0.06); }
+html.light .bg-black\/50 { background-color: rgba(17, 17, 24, 0.08); }
+html.light .skeleton {
+  background: #e8e8ef linear-gradient(90deg, #e8e8ef 25%, #f0f0f5 37%, #e8e8ef 63%);
+}
+
+/* ---- Texte principal (clair -> sombre) ---- */
+html.light .text-white { color: #1a1a22; }
+html.light .text-slate-100 { color: #1b1b22; }
+html.light .text-slate-200 { color: #23232b; }
+html.light .text-slate-300 { color: #3f3f4a; }
+html.light .text-slate-400 { color: #5b6b86; }
+html.light .text-zinc-100 { color: #1b1b22; }
+html.light .text-zinc-200 { color: #23232b; }
+html.light .text-zinc-300 { color: #52525b; }
+html.light .text-zinc-400 { color: #71717a; }
+html.light .text-zinc-500 { color: #71717a; }
+html.light .hover\:text-white:hover { color: #1a1a22; }
+html.light .hover\:text-slate-100:hover { color: #1b1b22; }
+html.light .hover\:text-slate-200:hover { color: #23232b; }
+html.light .hover\:text-slate-300:hover { color: #3f3f4a; }
+html.light .\[\&_h3\]\:text-slate-100 h3 { color: #1b1b22; }
+
+/* ---- Bordures (foncées -> claires) ---- */
+html.light .border-zinc-900 { border-color: #efeff3; }
+html.light .border-zinc-800,
+html.light .border-zinc-800\/60,
+html.light .border-zinc-800\/80 { border-color: #e3e3ea; }
+html.light .border-zinc-700,
+html.light .border-zinc-700\/50,
+html.light .border-zinc-700\/60,
+html.light .border-zinc-700\/70 { border-color: #d7d7de; }
+html.light .hover\:border-zinc-600:hover { border-color: #c8c8d1; }
+html.light .divide-zinc-800 > :not([hidden]) ~ :not([hidden]) { border-color: #e3e3ea; }
+
+/* ---- Textes d'accent (niveau 400 -> 600 pour le contraste en mode clair) ---- */
+html.light .text-red-400 { color: #dc2626; }
+html.light .text-red-300 { color: #ef4444; }
+html.light .text-emerald-400 { color: #059669; }
+html.light .text-emerald-300 { color: #10b981; }
+html.light .text-amber-400 { color: #d97706; }
+html.light .text-sky-400,
+html.light .text-sky-300 { color: #0284c7; }
+html.light .text-green-400 { color: #16a34a; }
+html.light .text-yellow-400 { color: #ca8a04; }
+html.light .text-yellow-500 { color: #a16207; }
+html.light .text-violet-400 { color: #7c3aed; }
+html.light .text-cyan-400 { color: #0891b2; }
+
+/* ---- Exceptions : garder le blanc sur accents & overlays sombres ---- */
+html.light .bg-\[\#ff2a2a\].text-white,
+html.light .bg-\[\#ff2a2a\] .text-white,
+html.light .bg-\[\#ff2a2a\]\/80.text-white,
+html.light .bg-\[\#ff2a2a\]\/80 .text-white,
+html.light .bg-red-600.text-white,
+html.light .bg-red-600 .text-white,
+html.light .bg-red-500.text-white,
+html.light .bg-red-500 .text-white,
+html.light .bg-red-700.text-white,
+html.light .bg-red-700 .text-white,
+html.light .bg-emerald-500.text-white,
+html.light .bg-emerald-500 .text-white,
+html.light .bg-emerald-600.text-white,
+html.light .bg-emerald-600 .text-white,
+html.light .bg-green-500.text-white,
+html.light .bg-green-500 .text-white,
+html.light .bg-amber-500.text-white,
+html.light .bg-amber-500 .text-white,
+html.light .bg-sky-500.text-white,
+html.light .bg-sky-500 .text-white,
+html.light .bg-sky-600.text-white,
+html.light .bg-sky-600 .text-white,
+html.light .bg-yellow-500.text-white,
+html.light .bg-yellow-500 .text-white,
+html.light .from-\[\#ff2a2a\].text-white,
+html.light .from-\[\#ff2a2a\] .text-white,
+html.light .bg-black\/60.text-white,
+html.light .bg-black\/60 .text-white,
+html.light .bg-black\/70.text-white,
+html.light .bg-black\/70 .text-white,
+html.light .bg-black\/80.text-white,
+html.light .bg-black\/80 .text-white,
+html.light .bg-black\/90.text-white,
+html.light .bg-black\/90 .text-white {
+  color: #ffffff;
+}
+html.light .bg-\[\#ff2a2a\].hover\:text-white:hover,
+html.light .bg-\[\#ff2a2a\] .hover\:text-white:hover,
+html.light .bg-black\/60.hover\:text-white:hover,
+html.light .bg-black\/60 .hover\:text-white:hover,
+html.light .bg-black\/70.hover\:text-white:hover,
+html.light .bg-black\/70 .hover\:text-white:hover {
+  color: #ffffff;
+}
+
+/* ---- Exceptions : éléments conservés sombres (éditeurs de code, boutons admin) ---- */
+html.light .bg-black\/60 .text-emerald-400,
+html.light .bg-black\/60.text-emerald-400 { color: #34d399; }
+html.light .bg-black\/60 .text-slate-300,
+html.light .bg-black\/60.text-slate-300 { color: #cbd5e1; }
+html.light .bg-black\/80 .text-zinc-300,
+html.light .bg-black\/80.text-zinc-300 { color: #d4d4d8; }
+html.light .bg-black\/80 .text-zinc-400,
+html.light .bg-black\/80.text-zinc-400 { color: #a1a1aa; }
+html.light .bg-black\/80 .text-red-400\/80,
+html.light .bg-black\/80.text-red-400\/80 { color: rgba(248, 113, 113, 0.8); }
+html.light .bg-black\/80 .hover\:text-emerald-400:hover,
+html.light .bg-black\/80.hover\:text-emerald-400:hover { color: #34d399; }
+html.light .bg-black\/80 .hover\:text-red-400:hover,
+html.light .bg-black\/80.hover\:text-red-400:hover { color: #f87171; }
