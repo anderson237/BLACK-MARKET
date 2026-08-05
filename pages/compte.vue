@@ -767,7 +767,7 @@ const totalActivity = computed(() => {
                     </div>
                   </div>
                   <div class="flex flex-col gap-1.5 shrink-0">
-                    <button @click="startEditComment(c.id)"
+                    <button @click="startEditComment(c)"
                     class="w-10 h-10 rounded-lg border border-zinc-800 hover:border-sky-500/60 text-zinc-500 hover:text-sky-400 flex items-center justify-center transition-all"
                     title="Modifier ce commentaire">
                       <AppIcon name="edit" :size="13" />
