@@ -52,6 +52,7 @@ const navItems = [
   { label: 'Commandes', icon: 'cart', to: '/admin/orders' },
   { label: 'Comptabilité', icon: 'chart', to: '/admin/comptabilite' },
   { label: 'Analyse', icon: 'chart', to: '/admin/analyse' },
+  { label: 'Audience', icon: 'globe', to: '/admin/audience' },
   { label: 'Trésorerie', icon: 'wallet', to: '/admin/tresorerie' },
   { label: 'Clients', icon: 'users', to: '/admin/customers' },
   { label: 'Utilisateurs', icon: 'crown', to: '/admin/users' },

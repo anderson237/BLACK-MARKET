@@ -208,6 +208,40 @@ export async function saveKpiSettings(settings: any): Promise<void> {
   return writeJSON(KPI_SETTINGS_FILE, settings)
 }
 
+// ---- site settings (Google Analytics, …) ----
+const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json')
+
+export interface SiteSettings {
+  ga4Id: string
+}
+
+export function normalizeSettings(raw: any): SiteSettings {
+  return { ga4Id: String(raw?.ga4Id || '').trim() }
+}
+
+export async function loadSettings(): Promise<SiteSettings> {
+  if (isNetlifyRuntime()) {
+    const raw = await blobGet('bm-settings', 'settings.json', 'text')
+    if (raw != null) {
+      try {
+        const parsed = JSON.parse(raw)
+        if (parsed && typeof parsed === 'object') return normalizeSettings(parsed)
+      } catch {
+        /* corrupted -> seed */
+      }
+    }
+    return { ga4Id: '' }
+  }
+  return normalizeSettings(await readJSON(SETTINGS_FILE))
+}
+
+export async function saveSettings(settings: SiteSettings): Promise<void> {
+  if (isNetlifyRuntime()) {
+    return blobSet('bm-settings', 'settings.json', JSON.stringify(settings, null, 2))
+  }
+  return writeJSON(SETTINGS_FILE, settings)
+}
+
 // ---- users ----
 export type BMUsers = { admins: string[]; logins: any[]; accounts: any[] }
 export async function loadUsers(): Promise<BMUsers> {
@@ -243,6 +277,7 @@ export interface PublicAccount {
   mood?: string
   phone?: string
   country?: string
+  city?: string
   phonePrefix?: string
   provider: 'google' | 'password' | 'phone'
   passwordHash?: string
@@ -438,6 +473,10 @@ export interface MarketEvent {
   ts: number
   userId?: string
   ip?: string
+  country?: string
+  countryCode?: string
+  city?: string
+  region?: string
 }
 
 export async function pushEvent(ev: MarketEvent): Promise<void> {

@@ -1,5 +1,6 @@
 import { useRuntimeConfig } from '#app'
 import { useAuthStore } from '~/stores/auth'
+import { useGeo } from '~/composables/useGeo'
 
 export interface TrackEvent {
   type: 'view' | 'click' | 'like' | 'unlike' | 'share' | 'copy' | 'comment'
@@ -8,6 +9,25 @@ export interface TrackEvent {
   url: string
   ts: number
   userId?: string
+  country?: string
+  countryCode?: string
+  city?: string
+  region?: string
+}
+
+const GA_MAP: Record<string, string> = {
+  view: 'view_item',
+  click: 'generate_lead',
+  like: 'like',
+  unlike: 'like',
+  share: 'share',
+  copy: 'copy',
+  comment: 'comment',
+}
+
+function gaEvent(name: string, params: Record<string, unknown> = {}) {
+  const w = window as any
+  if (typeof w.gtag === 'function') w.gtag('event', name, params)
 }
 
 /**
@@ -44,13 +64,21 @@ export function useTrack() {
   // ---- fire an event: local queue + global Vue event + best-effort push ----
   function track(ev: Partial<TrackEvent>) {
     const auth = useAuthStore()
+    const geo = useGeo()
     const event: TrackEvent = {
       type: 'view',
       ...ev,
       userId: ev.userId || auth.user?.id,
       url: ev.url || window.location.pathname,
       ts: Date.now(),
+      country: ev.country || geo.geo.value.country,
+      countryCode: ev.countryCode || geo.geo.value.countryCode,
+      city: ev.city || geo.geo.value.city,
+      region: ev.region || geo.geo.value.region,
     }
+    // Kick off IP geolocation (cached after the first success).
+    geo.resolve()
+
     const q = readQueue()
     q.push(event)
     writeQueue(q)
@@ -59,6 +87,19 @@ export function useTrack() {
     window.dispatchEvent(
       new CustomEvent('bm:track', { detail: event }),
     )
+
+    // Google Analytics (GA4) custom events mirroring the tracked interactions.
+    const gaName = GA_MAP[event.type]
+    if (gaName) {
+      gaEvent(gaName, {
+        ...(event.productId ? { item_id: event.productId, product_id: event.productId } : {}),
+        ...(event.productTitle ? { item_name: event.productTitle, item_title: event.productTitle } : {}),
+        ...(event.city ? { city: event.city } : {}),
+        ...(event.countryCode ? { country: event.countryCode } : {}),
+        page_path: event.url,
+        method: event.type === 'click' ? 'whatsapp' : undefined,
+      })
+    }
 
     // Best-effort push to backend (fire and forget)
     if (import.meta.client) {
