@@ -249,6 +249,7 @@ const deleting = ref<string | null>(null)
 const editingId = ref<string | null>(null)
 const editingText = ref('')
 const savingEdit = ref(false)
+const editError = ref('')
 
 async function deleteOwnComment(id: string) {
   if (!window.confirm('Supprimer définitivement ce commentaire ?')) return
@@ -267,17 +268,22 @@ async function deleteOwnComment(id: string) {
 function startEditComment(c: CommentItem) {
   editingId.value = c.id
   editingText.value = c.text
+  editError.value = ''
 }
 
 function cancelEditComment() {
   editingId.value = null
   editingText.value = ''
+  editError.value = ''
 }
+
+const editingComment = computed(() => data.value?.comments.find((c) => c.id === editingId.value) || null)
 
 async function saveEditComment(id: string) {
   const text = editingText.value.trim()
   if (!text) return
   savingEdit.value = true
+  editError.value = ''
   try {
     const res = await auth.api('/api/me/comments/' + encodeURIComponent(id), {
       method: 'PUT',
@@ -285,12 +291,16 @@ async function saveEditComment(id: string) {
     })
     if (data.value) {
       const idx = data.value.comments.findIndex((c) => c.id === id)
-      if (idx >= 0) data.value.comments[idx].text = res.comment?.text || text
+      if (idx >= 0) {
+        data.value.comments[idx].text = res.comment?.text || text
+        data.value.comments[idx].editedAt = res.comment?.editedAt || new Date().toISOString()
+      }
     }
     editingId.value = null
+    editingText.value = ''
     window.dispatchEvent(new CustomEvent('bm:track', { detail: { type: 'comment' } }))
   } catch (e: any) {
-    window.alert(e?.message || 'Impossible de modifier le commentaire.')
+    editError.value = e?.message || 'Impossible de modifier le commentaire.'
   } finally {
     savingEdit.value = false
   }
@@ -640,6 +650,47 @@ const totalActivity = computed(() => {
         </div>
       </Teleport>
 
+      <!-- Edit comment modal -->
+      <Teleport to="body">
+        <div v-if="editingId" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
+          <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" @click="cancelEditComment" />
+          <div class="relative w-full sm:max-w-md bg-[#12121a] border border-zinc-800 sm:rounded-3xl rounded-t-3xl max-h-[92vh] flex flex-col overflow-hidden shadow-2xl">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-zinc-800 bg-[#0d0d14] shrink-0">
+              <p class="text-sm font-extrabold text-white font-mono uppercase tracking-widest">Modifier le commentaire</p>
+              <button @click="cancelEditComment" aria-label="Fermer" class="w-10 h-10 rounded-lg border border-zinc-800 flex items-center justify-center text-zinc-300 hover:text-white hover:border-[#ff2a2a]/50 transition-all">✕</button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-5 space-y-4">
+              <div class="flex items-center gap-3 bg-black/30 border border-zinc-900 rounded-xl p-3">
+                <img v-if="editingComment?.productImage" :src="editingComment.productImage" alt="" class="w-11 h-11 rounded-lg object-cover border border-zinc-800 shrink-0" />
+                <div v-else class="w-11 h-11 rounded-lg bg-[#16161d] border border-zinc-800 flex items-center justify-center text-[#ff2a2a] shrink-0">
+                  <AppIcon name="comment" :size="14" />
+                </div>
+                <div class="min-w-0">
+                  <p class="text-[11px] font-mono text-zinc-300 truncate">{{ editingComment?.productTitle || 'Produit' }}</p>
+                  <p class="text-[9px] font-mono text-zinc-600">{{ editingComment ? timeAgo(editingComment.createdAt) : '' }}</p>
+                </div>
+              </div>
+
+              <div>
+                <label class="text-[9px] text-zinc-500 font-mono uppercase tracking-widest">Votre commentaire</label>
+                <textarea v-model="editingText" rows="4" maxlength="1000" placeholder="Votre commentaire…"
+                  class="mt-1 w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 font-mono focus:outline-none focus:border-[#ff2a2a]/60 transition-colors resize-none" />
+                <div class="flex items-center justify-between mt-1">
+                  <p v-if="editError" class="text-[11px] text-[#ff2a2a] font-mono">{{ editError }}</p>
+                  <p class="text-[9px] font-mono text-zinc-600 ml-auto">{{ editingText.length }}/1000</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="border-t border-zinc-800 bg-[#0d0d14] px-5 py-4 flex items-center gap-2 shrink-0">
+              <button @click="cancelEditComment" class="flex-1 text-[11px] font-mono text-zinc-400 hover:text-white border border-zinc-800 px-4 py-2.5 rounded-xl transition-all">Annuler</button>
+              <button @click="saveEditComment(editingId!)" :disabled="savingEdit || !editingText.trim()" class="flex-1 bg-[#ff2a2a] hover:bg-red-600 text-white text-xs font-bold font-mono px-4 py-2.5 rounded-xl transition-all disabled:opacity-50">{{ savingEdit ? '…' : 'Enregistrer' }}</button>
+            </div>
+          </div>
+        </div>
+      </Teleport>
+
       <!-- Interactions -->
       <div class="mt-8">
         <p class="text-[9px] text-[#ff2a2a] font-mono uppercase font-bold tracking-wider mb-3">VOTRE ACTIVITÉ SUR BLACK MARKET</p>
@@ -707,31 +758,17 @@ const totalActivity = computed(() => {
                     </div>
                   </NuxtLink>
                   <div class="flex-1 min-w-0">
-                    <template v-if="editingId === c.id">
-                      <textarea v-model="editingText" rows="2" maxlength="1000"
-                        class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-[#ff2a2a]/60 transition-colors resize-none" />
-                      <div class="flex items-center gap-2 mt-2">
-                        <button @click="saveEditComment(c.id)" :disabled="savingEdit || !editingText.trim()"
-                          class="shrink-0 bg-[#ff2a2a] hover:bg-red-600 text-white text-[10px] font-bold font-mono px-3 py-1.5 rounded-lg transition-all disabled:opacity-40">
-                          {{ savingEdit ? '…' : 'Enregistrer' }}
-                        </button>
-                        <button @click="cancelEditComment"
-                          class="shrink-0 text-[10px] font-mono text-zinc-400 hover:text-white border border-zinc-800 px-3 py-1.5 rounded-lg transition-all">Annuler</button>
-                      </div>
-                    </template>
-                    <template v-else>
-                      <p class="text-xs text-zinc-300"><span class="text-slate-100 font-bold">Vous avez commenté</span> {{ c.text }}</p>
-                      <NuxtLink :to="productUrl(c.productId)" class="text-[10px] text-zinc-500 font-mono hover:text-[#ff2a2a] transition-colors">{{ c.productTitle || 'Produit' }} · {{ timeAgo(c.createdAt) }}<span v-if="c.editedAt" class="text-zinc-500 italic"> · modifié</span></NuxtLink>
-                      <div class="flex items-center gap-3 mt-1.5">
-                        <span class="inline-flex items-center gap-1 text-[10px] font-mono text-zinc-500"><AppIcon name="thumbsUp" :size="11" /> {{ c.likes || 0 }}</span>
-                        <span class="inline-flex items-center gap-1 text-[10px] font-mono text-zinc-500"><AppIcon name="thumbsDown" :size="11" /> {{ c.dislikes || 0 }}</span>
-                        <span v-if="c.reports" class="inline-flex items-center gap-1 text-[10px] font-mono text-amber-400/80"><AppIcon name="flag" :size="11" /> {{ c.reports }}</span>
-                      </div>
-                    </template>
+                    <p class="text-xs text-zinc-300"><span class="text-slate-100 font-bold">Vous avez commenté</span> {{ c.text }}</p>
+                    <NuxtLink :to="productUrl(c.productId)" class="text-[10px] text-zinc-500 font-mono hover:text-[#ff2a2a] transition-colors">{{ c.productTitle || 'Produit' }} · {{ timeAgo(c.createdAt) }}<span v-if="c.editedAt" class="text-zinc-500 italic"> · modifié</span></NuxtLink>
+                    <div class="flex items-center gap-3 mt-1.5">
+                      <span class="inline-flex items-center gap-1 text-[10px] font-mono text-zinc-500"><AppIcon name="thumbsUp" :size="11" /> {{ c.likes || 0 }}</span>
+                      <span class="inline-flex items-center gap-1 text-[10px] font-mono text-zinc-500"><AppIcon name="thumbsDown" :size="11" /> {{ c.dislikes || 0 }}</span>
+                      <span v-if="c.reports" class="inline-flex items-center gap-1 text-[10px] font-mono text-amber-400/80"><AppIcon name="flag" :size="11" /> {{ c.reports }}</span>
+                    </div>
                   </div>
                   <div class="flex flex-col gap-1.5 shrink-0">
-                    <button @click="startEditComment(c.id)" :disabled="editingId === c.id"
-                    class="w-10 h-10 rounded-lg border border-zinc-800 hover:border-sky-500/60 text-zinc-500 hover:text-sky-400 flex items-center justify-center transition-all disabled:opacity-40"
+                    <button @click="startEditComment(c.id)"
+                    class="w-10 h-10 rounded-lg border border-zinc-800 hover:border-sky-500/60 text-zinc-500 hover:text-sky-400 flex items-center justify-center transition-all"
                     title="Modifier ce commentaire">
                       <AppIcon name="edit" :size="13" />
                     </button>
