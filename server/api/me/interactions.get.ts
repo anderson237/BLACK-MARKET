@@ -36,6 +36,7 @@ export default defineEventHandler(async (event) => {
       (o.userId && o.userId === userId) ||
       (phone && o.customerPhone && String(o.customerPhone).replace(/\D/g, '') === phone),
     )
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, MAX)
 
   // Enrich with product info (title/thumbnail) so the timeline is readable.
@@ -75,6 +76,17 @@ export default defineEventHandler(async (event) => {
     orders: orders.length,
   }
 
+  // Activity grouped by category, newest first, so the client space can show
+  // dedicated sections (views / likes / shares / others) with "voir plus".
+  const ACT_MAX = 500
+  const byType = (types: string[]) => mine.filter((e) => types.includes(e.type))
+  const activity = {
+    views: enrich(byType(['view']).slice(0, ACT_MAX)),
+    likes: enrich(byType(['like']).slice(0, ACT_MAX)),
+    shares: enrich(byType(['share', 'copy']).slice(0, ACT_MAX)),
+    others: enrich(byType(['click', 'unlike']).slice(0, ACT_MAX)),
+  }
+
   return {
     success: true,
     user: account
@@ -96,6 +108,7 @@ export default defineEventHandler(async (event) => {
     events: enrich(timeline),
     liked: enrich(likedIds.map((id) => ({ productId: id }))),
     orders: enrich(orders),
+    activity,
     stats,
   }
 })

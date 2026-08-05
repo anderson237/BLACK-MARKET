@@ -155,6 +155,12 @@ interface InteractionsData {
   events: EventItem[]
   liked: LikedItem[]
   orders: OrderItem[]
+  activity: {
+    views: EventItem[]
+    likes: EventItem[]
+    shares: EventItem[]
+    others: EventItem[]
+  }
   stats: { comments: number; likes: number; views: number; clicks: number; shares: number; orders: number }
 }
 
@@ -295,7 +301,14 @@ async function deleteOwnEvent(ts: number) {
   deleting.value = 'e' + ts
   try {
     await auth.api('/api/me/events/' + encodeURIComponent(String(ts)), { method: 'DELETE' })
-    if (data.value) data.value.events = data.value.events.filter((e) => e.ts !== ts)
+    if (data.value) {
+      const rm = (arr: EventItem[]) => arr.filter((e) => e.ts !== ts)
+      data.value.events = rm(data.value.events)
+      data.value.activity.views = rm(data.value.activity.views)
+      data.value.activity.likes = rm(data.value.activity.likes)
+      data.value.activity.shares = rm(data.value.activity.shares)
+      data.value.activity.others = rm(data.value.activity.others)
+    }
   } catch (e: any) {
     window.alert(e?.message || 'Impossible de retirer cet événement.')
   } finally {
@@ -312,6 +325,58 @@ function unlikeProduct(productId: string) {
   }
   loadInteractions()
 }
+
+// ---- activity tabs: categories + "voir plus" (9 first) ----
+type CatKey = 'views' | 'likes' | 'shares' | 'comments' | 'orders' | 'others'
+const PAGE = 9
+const CATEGORIES: { key: CatKey; label: string; icon: string }[] = [
+  { key: 'views', label: 'Pages consultées', icon: 'eye' },
+  { key: 'likes', label: 'Likes', icon: 'heart' },
+  { key: 'shares', label: 'Partages', icon: 'share' },
+  { key: 'comments', label: 'Commentaires', icon: 'comment' },
+  { key: 'orders', label: 'Commandes', icon: 'cart' },
+  { key: 'others', label: 'Autres réactions', icon: 'sparkles' },
+]
+const activeCat = ref<CatKey>('views')
+const shown = reactive<Record<CatKey, number>>({ views: PAGE, likes: PAGE, shares: PAGE, comments: PAGE, orders: PAGE, others: PAGE })
+
+function catIcon(key: CatKey): string {
+  return CATEGORIES.find((c) => c.key === key)?.icon || 'sparkles'
+}
+
+function catItems(key: CatKey): any[] {
+  const d = data.value
+  if (!d || !d.activity) return []
+  if (key === 'comments') return d.comments
+  if (key === 'orders') return d.orders
+  if (key === 'views') return d.activity.views
+  if (key === 'likes') return d.activity.likes
+  if (key === 'shares') return d.activity.shares
+  return d.activity.others
+}
+
+function visibleItems(key: CatKey): any[] {
+  return catItems(key).slice(0, shown[key])
+}
+
+function showMore(key: CatKey) {
+  shown[key] = Math.min(catItems(key).length, shown[key] + PAGE)
+}
+
+function showLess(key: CatKey) {
+  shown[key] = PAGE
+}
+
+const catList = computed(() =>
+  CATEGORIES.map((c) => ({ ...c, count: catItems(c.key).length })),
+)
+
+const totalActivity = computed(() => {
+  const d = data.value
+  if (!d || !d.activity) return 0
+  return d.comments.length + d.orders.length
+    + d.activity.views.length + d.activity.likes.length + d.activity.shares.length + d.activity.others.length
+})
 </script>
 
 <template>
@@ -584,71 +649,127 @@ function unlikeProduct(productId: string) {
         </div>
 
         <template v-else-if="data">
-          <div v-if="data.events.length === 0 && data.comments.length === 0 && data.orders.length === 0" class="text-center py-10 text-zinc-600 font-mono text-[11px]">
+          <div v-if="totalActivity === 0" class="text-center py-10 text-zinc-600 font-mono text-[11px]">
             AUCUNE ACTIVITÉ POUR L'INSTANT — PARCOUREZ LE CATALOGUE !
           </div>
 
-          <div v-else class="space-y-2">
-            <div v-for="o in data.orders" :key="'o' + o.id" class="flex items-center gap-3 bg-black/30 border border-zinc-900 rounded-xl p-3">
-              <img v-if="o.productImage" :src="o.productImage" alt="" class="w-11 h-11 rounded-lg object-cover border border-zinc-800 shrink-0" />
-              <div class="flex-1 min-w-0">
-                <p class="text-xs font-bold text-slate-200 truncate">Commande — {{ o.productTitle || o.id }}</p>
-                <p class="text-[10px] text-zinc-500 font-mono mt-0.5">x{{ o.quantity }} · {{ o.priceXof ? o.priceXof.toLocaleString('fr-FR') + ' F CFA' : '' }} · {{ timeAgo(o.createdAt) }}</p>
-              </div>
-              <span class="text-[9px] font-mono uppercase tracking-widest px-2 py-1 rounded border" :class="o.status === 'completed' ? 'text-emerald-400 border-emerald-500/30' : o.status === 'cancelled' ? 'text-red-400 border-red-500/30' : 'text-amber-400 border-amber-500/30'">{{ o.status }}</span>
-            </div>
-
-            <div v-for="c in data.comments" :key="'c' + c.id" class="flex items-center gap-3 bg-black/30 border border-zinc-900 rounded-xl p-3">
-              <NuxtLink :to="productUrl(c.productId)">
-                <img v-if="c.productImage" :src="c.productImage" alt="" class="w-11 h-11 rounded-lg object-cover border border-zinc-800 shrink-0" />
-              </NuxtLink>
-              <div class="flex-1 min-w-0">
-                <template v-if="editingId === c.id">
-                  <textarea v-model="editingText" rows="2" maxlength="1000"
-                    class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-[#ff2a2a]/60 transition-colors resize-none" />
-                  <div class="flex items-center gap-2 mt-2">
-                    <button @click="saveEditComment(c.id)" :disabled="savingEdit || !editingText.trim()"
-                      class="shrink-0 bg-[#ff2a2a] hover:bg-red-600 text-white text-[10px] font-bold font-mono px-3 py-1.5 rounded-lg transition-all disabled:opacity-40">
-                      {{ savingEdit ? '…' : 'Enregistrer' }}
-                    </button>
-                    <button @click="cancelEditComment"
-                      class="shrink-0 text-[10px] font-mono text-zinc-400 hover:text-white border border-zinc-800 px-3 py-1.5 rounded-lg transition-all">Annuler</button>
-                  </div>
-                </template>
-                <template v-else>
-                  <p class="text-xs text-zinc-300"><span class="text-slate-100 font-bold">Vous avez commenté</span> {{ c.text }}</p>
-                  <NuxtLink :to="productUrl(c.productId)" class="text-[10px] text-zinc-500 font-mono hover:text-[#ff2a2a] transition-colors">{{ c.productTitle || 'Produit' }} · {{ timeAgo(c.createdAt) }}</NuxtLink>
-                </template>
-              </div>
-              <div class="flex flex-col gap-1.5 shrink-0">
-                <button @click="startEditComment(c.id)" :disabled="editingId === c.id"
-                  class="w-8 h-8 rounded-lg border border-zinc-800 hover:border-sky-500/60 text-zinc-500 hover:text-sky-400 flex items-center justify-center transition-all disabled:opacity-40"
-                  title="Modifier ce commentaire">
-                  <AppIcon name="edit" :size="13" />
-                </button>
-                <button @click="deleteOwnComment(c.id)" :disabled="deleting === c.id"
-                  class="w-8 h-8 rounded-lg border border-zinc-800 hover:border-red-500/60 text-zinc-500 hover:text-red-400 flex items-center justify-center transition-all disabled:opacity-40"
-                  title="Supprimer ce commentaire">
-                  <AppIcon name="trash" :size="13" />
-                </button>
-              </div>
-            </div>
-
-            <div v-for="(e, i) in data.events" :key="'e' + i" class="flex items-center gap-3 bg-black/30 border border-zinc-900 rounded-xl p-3">
-              <NuxtLink :to="productUrl(e.productId)">
-                <img v-if="e.productImage" :src="e.productImage" alt="" class="w-11 h-11 rounded-lg object-cover border border-zinc-800 shrink-0" />
-              </NuxtLink>
-              <div class="flex-1 min-w-0">
-                <p class="text-xs text-zinc-300">Vous <span class="text-slate-100 font-bold">{{ eventLabel[e.type] || 'avez interagi avec' }}</span>
-                  <NuxtLink :to="productUrl(e.productId)" class="text-[#ff2a2a] hover:underline">{{ e.productTitle || 'un produit' }}</NuxtLink>
-                </p>
-                <p class="text-[10px] text-zinc-500 font-mono mt-0.5">{{ timeAgo(e.ts) }}</p>
-              </div>
-              <button @click="deleteOwnEvent(e.ts)" :disabled="deleting === 'e' + e.ts"
-                class="shrink-0 w-8 h-8 rounded-lg border border-zinc-800 hover:border-red-500/60 text-zinc-500 hover:text-red-400 flex items-center justify-center transition-all disabled:opacity-40"
-                title="Retirer de mon historique">
-                <AppIcon name="trash" :size="13" />
+          <div v-else>
+            <!-- Category tabs -->
+            <div class="flex flex-wrap gap-1.5 mb-4">
+              <button v-for="c in catList" :key="c.key" @click="activeCat = c.key"
+                class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[10px] font-mono uppercase tracking-wider transition-all"
+                :class="activeCat === c.key
+                  ? 'bg-[#ff2a2a] border-[#ff2a2a] text-white font-bold'
+                  : 'bg-black/30 border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600'">
+                <AppIcon :name="c.icon" :size="12" />
+                <span>{{ c.label }}</span>
+                <span v-if="c.count" class="px-1.5 rounded bg-white/10">{{ c.count }}</span>
               </button>
+            </div>
+
+            <div class="space-y-2">
+              <!-- Event categories: views / likes / shares / others -->
+              <template v-if="activeCat === 'views' || activeCat === 'likes' || activeCat === 'shares' || activeCat === 'others'">
+                <div v-if="visibleItems(activeCat).length === 0" class="text-center py-8 text-zinc-600 font-mono text-[11px]">
+                  AUCUNE ACTIVITÉ DE CE TYPE POUR L'INSTANT.
+                </div>
+                <div v-for="e in visibleItems(activeCat)" :key="'e' + e.ts" class="flex items-center gap-3 bg-black/30 border border-zinc-900 rounded-xl p-3">
+                  <NuxtLink :to="productUrl(e.productId)">
+                    <img v-if="e.productImage" :src="e.productImage" alt="" class="w-11 h-11 rounded-lg object-cover border border-zinc-800 shrink-0" />
+                    <div v-else class="w-11 h-11 rounded-lg bg-[#16161d] border border-zinc-800 flex items-center justify-center text-[#ff2a2a]">
+                      <AppIcon :name="catIcon(activeCat)" :size="14" />
+                    </div>
+                  </NuxtLink>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-xs text-zinc-300">Vous <span class="text-slate-100 font-bold">{{ eventLabel[e.type] || 'avez interagi avec' }}</span>
+                      <NuxtLink :to="productUrl(e.productId)" class="text-[#ff2a2a] hover:underline">{{ e.productTitle || 'un produit' }}</NuxtLink>
+                    </p>
+                    <p class="text-[10px] text-zinc-500 font-mono mt-0.5">{{ timeAgo(e.ts) }}</p>
+                  </div>
+                  <button @click="deleteOwnEvent(e.ts)" :disabled="deleting === 'e' + e.ts"
+                    class="shrink-0 w-8 h-8 rounded-lg border border-zinc-800 hover:border-red-500/60 text-zinc-500 hover:text-red-400 flex items-center justify-center transition-all disabled:opacity-40"
+                    title="Retirer de mon historique">
+                    <AppIcon name="trash" :size="13" />
+                  </button>
+                </div>
+              </template>
+
+              <!-- Comments -->
+              <template v-else-if="activeCat === 'comments'">
+                <div v-if="visibleItems('comments').length === 0" class="text-center py-8 text-zinc-600 font-mono text-[11px]">
+                  AUCUN COMMENTAIRE POSTÉ POUR L'INSTANT.
+                </div>
+                <div v-for="c in visibleItems('comments')" :key="'c' + c.id" class="flex items-center gap-3 bg-black/30 border border-zinc-900 rounded-xl p-3">
+                  <NuxtLink :to="productUrl(c.productId)">
+                    <img v-if="c.productImage" :src="c.productImage" alt="" class="w-11 h-11 rounded-lg object-cover border border-zinc-800 shrink-0" />
+                    <div v-else class="w-11 h-11 rounded-lg bg-[#16161d] border border-zinc-800 flex items-center justify-center text-[#ff2a2a]">
+                      <AppIcon name="comment" :size="14" />
+                    </div>
+                  </NuxtLink>
+                  <div class="flex-1 min-w-0">
+                    <template v-if="editingId === c.id">
+                      <textarea v-model="editingText" rows="2" maxlength="1000"
+                        class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-[#ff2a2a]/60 transition-colors resize-none" />
+                      <div class="flex items-center gap-2 mt-2">
+                        <button @click="saveEditComment(c.id)" :disabled="savingEdit || !editingText.trim()"
+                          class="shrink-0 bg-[#ff2a2a] hover:bg-red-600 text-white text-[10px] font-bold font-mono px-3 py-1.5 rounded-lg transition-all disabled:opacity-40">
+                          {{ savingEdit ? '…' : 'Enregistrer' }}
+                        </button>
+                        <button @click="cancelEditComment"
+                          class="shrink-0 text-[10px] font-mono text-zinc-400 hover:text-white border border-zinc-800 px-3 py-1.5 rounded-lg transition-all">Annuler</button>
+                      </div>
+                    </template>
+                    <template v-else>
+                      <p class="text-xs text-zinc-300"><span class="text-slate-100 font-bold">Vous avez commenté</span> {{ c.text }}</p>
+                      <NuxtLink :to="productUrl(c.productId)" class="text-[10px] text-zinc-500 font-mono hover:text-[#ff2a2a] transition-colors">{{ c.productTitle || 'Produit' }} · {{ timeAgo(c.createdAt) }}</NuxtLink>
+                    </template>
+                  </div>
+                  <div class="flex flex-col gap-1.5 shrink-0">
+                    <button @click="startEditComment(c.id)" :disabled="editingId === c.id"
+                      class="w-8 h-8 rounded-lg border border-zinc-800 hover:border-sky-500/60 text-zinc-500 hover:text-sky-400 flex items-center justify-center transition-all disabled:opacity-40"
+                      title="Modifier ce commentaire">
+                      <AppIcon name="edit" :size="13" />
+                    </button>
+                    <button @click="deleteOwnComment(c.id)" :disabled="deleting === c.id"
+                      class="w-8 h-8 rounded-lg border border-zinc-800 hover:border-red-500/60 text-zinc-500 hover:text-red-400 flex items-center justify-center transition-all disabled:opacity-40"
+                      title="Supprimer ce commentaire">
+                      <AppIcon name="trash" :size="13" />
+                    </button>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Orders -->
+              <template v-else>
+                <div v-if="visibleItems('orders').length === 0" class="text-center py-8 text-zinc-600 font-mono text-[11px]">
+                  AUCUNE COMMANDE POUR L'INSTANT.
+                </div>
+                <div v-for="o in visibleItems('orders')" :key="'o' + o.id" class="flex items-center gap-3 bg-black/30 border border-zinc-900 rounded-xl p-3">
+                  <img v-if="o.productImage" :src="o.productImage" alt="" class="w-11 h-11 rounded-lg object-cover border border-zinc-800 shrink-0" />
+                  <div v-else class="w-11 h-11 rounded-lg bg-[#16161d] border border-zinc-800 flex items-center justify-center text-[#ff2a2a]">
+                    <AppIcon name="cart" :size="14" />
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-xs font-bold text-slate-200 truncate">Commande — {{ o.productTitle || o.id }}</p>
+                    <p class="text-[10px] text-zinc-500 font-mono mt-0.5">x{{ o.quantity }} · {{ o.priceXof ? o.priceXof.toLocaleString('fr-FR') + ' F CFA' : '' }} · {{ timeAgo(o.createdAt) }}</p>
+                  </div>
+                  <span class="text-[9px] font-mono uppercase tracking-widest px-2 py-1 rounded border" :class="o.status === 'completed' ? 'text-emerald-400 border-emerald-500/30' : o.status === 'cancelled' ? 'text-red-400 border-red-500/30' : 'text-amber-400 border-amber-500/30'">{{ o.status }}</span>
+                </div>
+              </template>
+
+              <!-- Voir plus / moins -->
+              <div v-if="catItems(activeCat).length > shown[activeCat]" class="flex justify-center pt-1">
+                <button @click="showMore(activeCat)"
+                  class="text-[10px] font-mono text-zinc-400 hover:text-white border border-zinc-800 hover:border-[#ff2a2a]/50 px-4 py-2 rounded-xl transition-all inline-flex items-center gap-1.5">
+                  <AppIcon name="chevronDown" :size="12" /> VOIR PLUS ({{ catItems(activeCat).length - shown[activeCat] }})
+                </button>
+              </div>
+              <div v-else-if="catItems(activeCat).length > PAGE" class="flex justify-center pt-1">
+                <button @click="showLess(activeCat)"
+                  class="text-[10px] font-mono text-zinc-500 hover:text-white border border-zinc-800 px-4 py-2 rounded-xl transition-all inline-flex items-center gap-1.5">
+                  <AppIcon name="chevronUp" :size="12" /> VOIR MOINS
+                </button>
+              </div>
             </div>
           </div>
         </template>
