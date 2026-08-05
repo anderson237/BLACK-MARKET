@@ -14,7 +14,7 @@ export default defineNuxtConfig({
       siteUrl: "https://blackmarket-import-export.netlify.app",
       phoneNumber: "237683963007",
       currency: "XOF",
-      rmbToXofRate: 82,
+      rmbToXofRate: 85,
       xofToEurRate: 655.957,
       googleClientId: process.env.GOOGLE_CLIENT_ID || "",
     },

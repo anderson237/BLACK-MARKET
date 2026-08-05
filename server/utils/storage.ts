@@ -12,6 +12,8 @@ const DATA_DIR = path.join(process.cwd(), 'data')
 const PRODUCTS_FILE = path.join(DATA_DIR, 'products.json')
 const ORDERS_FILE = path.join(DATA_DIR, 'orders.json')
 const USERS_FILE = path.join(DATA_DIR, 'users.json')
+const EXPENSES_FILE = path.join(DATA_DIR, 'expenses.json')
+const TREASURY_FILE = path.join(DATA_DIR, 'treasury.json')
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads')
 
 export function isNetlifyRuntime(): boolean {
@@ -118,6 +120,92 @@ export async function saveOrders(orders: any[]): Promise<void> {
     return blobSet('bm-orders', 'orders.json', JSON.stringify(orders, null, 2))
   }
   return writeJSON(ORDERS_FILE, orders)
+}
+
+// ---- expenses (accounting) ----
+export async function loadExpenses(): Promise<any[]> {
+  if (isNetlifyRuntime()) {
+    const raw = await blobGet('bm-expenses', 'expenses.json', 'text')
+    if (raw != null) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) return parsed
+    }
+    return []
+  }
+  const parsed = await readJSON(EXPENSES_FILE)
+  return Array.isArray(parsed) ? parsed : []
+}
+
+export async function saveExpenses(expenses: any[]): Promise<void> {
+  if (isNetlifyRuntime()) {
+    return blobSet('bm-expenses', 'expenses.json', JSON.stringify(expenses, null, 2))
+  }
+  return writeJSON(EXPENSES_FILE, expenses)
+}
+
+// ---- treasury (cash ledger: settings + manual in/out entries) ----
+export interface TreasuryData {
+  settings: { initialBalanceXof: number }
+  entries: any[]
+}
+
+const SEED_TREASURY: TreasuryData = { settings: { initialBalanceXof: 0 }, entries: [] }
+
+export async function loadTreasury(): Promise<TreasuryData> {
+  if (isNetlifyRuntime()) {
+    const raw = await blobGet('bm-treasury', 'treasury.json', 'text')
+    if (raw != null) {
+      const parsed = JSON.parse(raw)
+      if (parsed && typeof parsed === 'object') {
+        return {
+          settings: { initialBalanceXof: Number(parsed.settings?.initialBalanceXof) || 0 },
+          entries: Array.isArray(parsed.entries) ? parsed.entries : [],
+        }
+      }
+    }
+    return JSON.parse(JSON.stringify(SEED_TREASURY))
+  }
+  const parsed = await readJSON(TREASURY_FILE)
+  if (parsed && typeof parsed === 'object') {
+    return {
+      settings: { initialBalanceXof: Number(parsed.settings?.initialBalanceXof) || 0 },
+      entries: Array.isArray(parsed.entries) ? parsed.entries : [],
+    }
+  }
+  return JSON.parse(JSON.stringify(SEED_TREASURY))
+}
+
+export async function saveTreasury(data: TreasuryData): Promise<void> {
+  if (isNetlifyRuntime()) {
+    return blobSet('bm-treasury', 'treasury.json', JSON.stringify(data, null, 2))
+  }
+  return writeJSON(TREASURY_FILE, data)
+}
+
+// ---- KPI assumptions (ad spend, fees, returns, fixed costs) ----
+const KPI_SETTINGS_FILE = path.join(DATA_DIR, 'kpi-settings.json')
+
+export async function loadKpiSettings(): Promise<any> {
+  if (isNetlifyRuntime()) {
+    const raw = await blobGet('bm-kpi-settings', 'settings.json', 'text')
+    if (raw != null) {
+      try {
+        const parsed = JSON.parse(raw)
+        if (parsed && typeof parsed === 'object') return parsed
+      } catch {
+        /* corrupted -> seed */
+      }
+    }
+    return {}
+  }
+  return (await readJSON(KPI_SETTINGS_FILE)) || {}
+}
+
+export async function saveKpiSettings(settings: any): Promise<void> {
+  if (isNetlifyRuntime()) {
+    return blobSet('bm-kpi-settings', 'settings.json', JSON.stringify(settings, null, 2))
+  }
+  return writeJSON(KPI_SETTINGS_FILE, settings)
 }
 
 // ---- users ----

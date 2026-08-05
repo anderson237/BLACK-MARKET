@@ -187,6 +187,9 @@ const kpi = computed(() => data.value?.kpi || {})
         <h2 class="text-lg font-extrabold text-white font-mono uppercase tracking-widest">Boutique de téléphone</h2>
       </div>
       <div class="flex items-center gap-2">
+        <NuxtLink to="/admin/analyse" class="inline-flex items-center gap-1.5 text-[10px] font-mono font-bold border border-zinc-800 text-zinc-300 hover:text-white hover:border-[#ff2a2a]/50 px-3 py-2 rounded-xl transition-all">
+          <AppIcon name="chart" :size="13" /> Analyse KPI
+        </NuxtLink>
         <NuxtLink to="/admin/tresorerie" class="inline-flex items-center gap-1.5 text-[10px] font-mono font-bold border border-zinc-800 text-zinc-300 hover:text-white hover:border-[#ff2a2a]/50 px-3 py-2 rounded-xl transition-all">
           <AppIcon name="wallet" :size="13" /> Trésorerie
         </NuxtLink>
@@ -238,7 +241,7 @@ const kpi = computed(() => data.value?.kpi || {})
     </div>
 
     <!-- Bénéfices du mois -->
-    <div v-if="data" class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div v-if="data" class="grid grid-cols-2 lg:grid-cols-5 gap-3">
       <div class="bg-[#0d0d14] rounded-2xl p-4 border border-zinc-800">
         <p class="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">Bénéfice brut / mois</p>
         <p class="mt-2 text-lg font-black font-mono text-white">{{ fmt(kpi.month?.grossProfitXof) }}</p>
@@ -248,6 +251,11 @@ const kpi = computed(() => data.value?.kpi || {})
         <p class="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">Bénéfice net / mois</p>
         <p class="mt-2 text-lg font-black font-mono text-emerald-400">{{ fmt(kpi.month?.netProfitXof) }}</p>
         <p class="text-[9px] font-mono text-zinc-600 mt-1">Brut − dépenses</p>
+      </div>
+      <div class="bg-[#0d0d14] rounded-2xl p-4 border border-zinc-800">
+        <p class="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">Contribution / mois</p>
+        <p class="mt-2 text-lg font-black font-mono text-violet-400">{{ fmt(kpi.month?.contribution) }}</p>
+        <p class="text-[9px] font-mono text-zinc-600 mt-1">Brut − frais plateforme</p>
       </div>
       <div class="bg-[#0d0d14] rounded-2xl p-4 border border-zinc-800">
         <p class="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">Marge brute</p>
