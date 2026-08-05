@@ -10,11 +10,30 @@ const auth = useAuthStore()
 const { viewProduct, clickPreorder } = useTrack()
 const productId = computed(() => String(route.params.id || '').replace(/\.html$/i, ''))
 
-const { data: product, error } = await useAsyncData<Product | null>(
+const { data: product, error, refresh } = await useAsyncData<Product | null>(
   `product-${productId.value}`,
   () => fetchProduct(productId.value),
   { dedupe: 'cancel' },
 )
+
+// Live product data: re-fetch when the tab regains focus so admin edits
+// (title/price/stock/archive) appear on the storefront without a manual reload.
+function onVisible() {
+  if (document.visibilityState !== 'visible') return
+  refresh().then(() => {
+    if (!product.value && !error.value) navigateTo('/')
+  })
+}
+
+onMounted(() => {
+  window.addEventListener('focus', onVisible)
+  document.addEventListener('visibilitychange', onVisible)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('focus', onVisible)
+  document.removeEventListener('visibilitychange', onVisible)
+})
 
 useHead(() => {
   const p = product.value
