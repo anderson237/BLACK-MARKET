@@ -86,7 +86,7 @@ function onComment() {
 </script>
 
 <template>
-  <div :class="compact ? 'grid grid-cols-4 gap-1.5' : 'flex items-center gap-1.5'">
+  <div :class="compact ? 'grid grid-cols-2 sm:grid-cols-4 gap-1.5' : 'flex items-center gap-1.5'">
     <!-- Like -->
     <button
       @click="onLike"
@@ -97,7 +97,7 @@ function onComment() {
       :aria-label="liked ? 'Retirer le like' : 'J\'aime'"
     >
       <AppIcon name="heart" :size="15" :class="like ? 'fill-[#ff2a2a] text-[#ff2a2a]' : ''" />
-      <span>{{ likeCount }}</span>
+      <span class="hidden sm:inline">{{ likeCount }}</span>
     </button>
 
     <!-- Comment -->
@@ -107,7 +107,7 @@ function onComment() {
       aria-label="Commenter"
     >
       <AppIcon name="comment" :size="15" />
-      <span>{{ commentCount }}</span>
+      <span class="hidden sm:inline">{{ commentCount }}</span>
     </button>
 
     <!-- Share WhatsApp -->

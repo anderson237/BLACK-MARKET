@@ -243,7 +243,7 @@ function timeAgo(iso: string): string {
         <button
           @click="submit"
           :disabled="submitting || !text.trim()"
-          class="shrink-0 bg-[#ff2a2a] hover:bg-red-600 text-white text-xs font-bold px-4 rounded-xl transition-all font-mono disabled:opacity-40"
+          class="shrink-0 bg-[#ff2a2a] hover:bg-red-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all font-mono disabled:opacity-40"
         >
           {{ submitting ? '…' : 'Envoyer' }}
         </button>
@@ -314,7 +314,7 @@ function timeAgo(iso: string): string {
         </div>
         <div v-if="isMine(c)" class="flex flex-col gap-1.5 shrink-0">
           <button @click="startEdit(c)" :disabled="editingId === c.id"
-            class="w-7 h-7 rounded-lg border border-zinc-800 hover:border-sky-500/60 text-zinc-500 hover:text-sky-400 flex items-center justify-center transition-all disabled:opacity-40"
+            class="w-10 h-10 rounded-lg border border-zinc-800 hover:border-sky-500/60 text-zinc-500 hover:text-sky-400 flex items-center justify-center transition-all disabled:opacity-40"
             title="Modifier mon commentaire">
             <AppIcon name="edit" :size="11" />
           </button>

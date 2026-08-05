@@ -43,10 +43,10 @@ function doLogout() {
     <!-- Top bar -->
     <header class="sticky top-0 z-30 bg-[#0d0d14]/85 backdrop-blur-md border-b border-zinc-800/60">
       <div class="max-w-[1400px] mx-auto px-4 py-3 flex items-center justify-between gap-4">
-        <NuxtLink to="/" class="flex items-center gap-2.5 shrink-0">
-          <span class="w-8 h-8 rounded-lg bg-[#ff2a2a] flex items-center justify-center text-white font-black text-lg shadow-lg shadow-[#ff2a2a]/30">B</span>
-          <div class="leading-none">
-            <p class="text-sm font-extrabold tracking-widest text-white font-mono">BLACK MARKET</p>
+        <NuxtLink to="/" class="flex items-center gap-2.5 min-w-0">
+          <span class="w-8 h-8 rounded-lg bg-[#ff2a2a] flex items-center justify-center text-white font-black text-lg shadow-lg shadow-[#ff2a2a]/30 shrink-0">B</span>
+          <div class="leading-none min-w-0">
+            <p class="text-sm font-extrabold tracking-widest text-white font-mono truncate">BLACK MARKET</p>
             <p class="text-[9px] text-[#ff2a2a] font-mono font-bold tracking-widest uppercase">K-Street Sourcing</p>
           </div>
         </NuxtLink>
@@ -75,7 +75,7 @@ function doLogout() {
             <span class="sm:hidden">WhatsApp</span>
           </button>
           <button @click="drawerOpen = true" aria-label="Menu"
-            class="lg:hidden w-9 h-9 rounded-lg border border-zinc-800 flex items-center justify-center text-zinc-300 hover:border-[#ff2a2a]/50 hover:text-white transition-all">
+            class="lg:hidden w-10 h-10 rounded-lg border border-zinc-800 flex items-center justify-center text-zinc-300 hover:border-[#ff2a2a]/50 hover:text-white transition-all">
             <AppIcon name="menu" :size="16" />
           </button>
         </div>
@@ -88,7 +88,7 @@ function doLogout() {
       <div class="absolute left-0 top-0 bottom-0 w-72 bg-[#12121a] border-r border-zinc-800 shadow-2xl flex flex-col">
         <div class="flex items-center justify-between px-4 py-4 border-b border-zinc-800">
           <span class="font-mono text-xs font-bold text-white uppercase tracking-widest">Menu</span>
-          <button @click="closeDrawer" aria-label="Fermer" class="w-8 h-8 rounded-lg border border-zinc-800 flex items-center justify-center text-zinc-300 hover:text-white"><AppIcon name="close" :size="14" /></button>
+          <button @click="closeDrawer" aria-label="Fermer" class="w-10 h-10 rounded-lg border border-zinc-800 flex items-center justify-center text-zinc-300 hover:text-white"><AppIcon name="close" :size="14" /></button>
         </div>
         <nav class="flex-1 overflow-y-auto p-4 space-y-1">
           <NuxtLink v-for="item in nav" :key="item.label" :to="item.to" @click="closeDrawer" class="block px-3 py-3 rounded-lg text-[12px] font-mono font-bold text-zinc-300 hover:text-white hover:bg-zinc-800/60 transition-all uppercase tracking-widest">

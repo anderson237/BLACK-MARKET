@@ -67,7 +67,7 @@ function closeDrawer() {
   <div v-if="!isAdmin" class="min-h-screen bg-[#08080c]">
     <div class="max-w-[1400px] mx-auto px-4 py-4 flex items-center justify-between">
       <NuxtLink to="/" class="flex items-center gap-2">
-        <span class="w-8 h-8 rounded-lg bg-[#ff2a2a] flex items-center justify-center text-white font-black text-lg">B</span>
+        <span class="w-10 h-10 shrink-0 rounded-lg bg-[#ff2a2a] flex items-center justify-center text-white font-black text-lg">B</span>
         <span class="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">BLACK MARKET · ADMIN</span>
       </NuxtLink>
       <NuxtLink to="/" class="text-[10px] font-mono text-zinc-400 hover:text-[#ff2a2a] border border-zinc-800 px-3 py-1.5 rounded-lg transition-all">← Voir le site</NuxtLink>
@@ -81,14 +81,14 @@ function closeDrawer() {
       <div class="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-3">
         <div class="flex items-center gap-1.5 sm:gap-2 min-w-0">
           <button @click="drawerOpen = true" aria-label="Menu"
-            class="md:hidden w-8 h-8 shrink-0 rounded-lg border border-zinc-800 flex items-center justify-center text-zinc-300 hover:border-[#ff2a2a]/50 hover:text-white transition-all">
+            class="md:hidden w-10 h-10 shrink-0 rounded-lg border border-zinc-800 flex items-center justify-center text-zinc-300 hover:border-[#ff2a2a]/50 hover:text-white transition-all">
             <AppIcon name="menu" :size="16" />
           </button>
           <NuxtLink to="/admin" class="flex items-center gap-1.5 sm:gap-2 min-w-0">
             <span class="w-7 h-7 sm:w-8 sm:h-8 shrink-0 rounded-lg bg-[#ff2a2a] flex items-center justify-center text-white font-black text-base sm:text-lg">B</span>
             <div class="leading-none min-w-0">
               <p class="text-[11px] sm:text-sm font-extrabold tracking-widest text-white font-mono truncate">BLACK MARKET</p>
-              <p class="hidden xs:block text-[8px] sm:text-[9px] text-zinc-500 font-mono uppercase tracking-widest">Admin console</p>
+              <p class="hidden sm:block text-[8px] sm:text-[9px] text-zinc-500 font-mono uppercase tracking-widest">Admin console</p>
             </div>
           </NuxtLink>
         </div>
@@ -98,16 +98,16 @@ function closeDrawer() {
             <AppIcon name="whatsapp" :size="13" /> {{ wa }}
           </a>
           <select :value="currency" @change="setCurrency(($event.target as HTMLSelectElement).value as 'XOF' | 'EUR')"
-            class="bg-black/40 border border-zinc-800 rounded-lg px-1.5 py-1.5 text-[10px] font-mono text-slate-200 focus:outline-none focus:border-[#ff2a2a]/60 cursor-pointer" title="Devise">
+            class="bg-black/40 border border-zinc-800 rounded-lg px-2.5 py-2 text-[10px] font-mono text-slate-200 focus:outline-none focus:border-[#ff2a2a]/60 cursor-pointer" title="Devise">
             <option value="XOF" class="bg-[#0d0d14]">XOF</option>
             <option value="EUR" class="bg-[#0d0d14]">EUR</option>
           </select>
           <button @click="doLogout"
-            class="text-[10px] font-mono text-red-400 hover:text-red-300 border border-red-500/30 hover:border-red-500/60 px-2.5 py-1.5 rounded-lg transition-all inline-flex items-center gap-1.5" title="Se déconnecter">
+            class="text-[10px] font-mono text-red-400 hover:text-red-300 border border-red-500/30 hover:border-red-500/60 px-2.5 py-2 rounded-lg transition-all inline-flex items-center gap-1.5" title="Se déconnecter">
             <AppIcon name="logout" :size="13" />
             <span class="sm:hidden">Sortie</span><span class="hidden sm:inline">Déconnexion</span>
           </button>
-          <NuxtLink to="/" class="text-[10px] font-mono text-zinc-400 hover:text-[#ff2a2a] border border-zinc-800 px-2.5 py-1.5 rounded-lg transition-all inline-flex items-center gap-1.5" title="Voir le site">
+          <NuxtLink to="/" class="text-[10px] font-mono text-zinc-400 hover:text-[#ff2a2a] border border-zinc-800 px-2.5 py-2 rounded-lg transition-all inline-flex items-center gap-1.5" title="Voir le site">
             <AppIcon name="chevronLeft" :size="13" /><span class="hidden sm:inline">Voir le site</span>
           </NuxtLink>
         </div>
@@ -135,7 +135,7 @@ function closeDrawer() {
       <div class="absolute left-0 top-0 bottom-0 w-72 bg-[#12121a] border-r border-zinc-800 shadow-2xl flex flex-col">
         <div class="flex items-center justify-between px-4 py-4 border-b border-zinc-800">
           <span class="font-mono text-xs font-bold text-white uppercase tracking-widest">Administration</span>
-          <button @click="closeDrawer" aria-label="Fermer" class="w-8 h-8 rounded-lg border border-zinc-800 flex items-center justify-center text-zinc-300 hover:text-white"><AppIcon name="close" :size="14" /></button>
+          <button @click="closeDrawer" aria-label="Fermer" class="w-10 h-10 rounded-lg border border-zinc-800 flex items-center justify-center text-zinc-300 hover:text-white"><AppIcon name="close" :size="14" /></button>
         </div>
         <nav class="flex-1 overflow-y-auto p-4 space-y-1">
           <NuxtLink v-for="item in navItems" :key="item.to" :to="item.to" @click="closeDrawer"

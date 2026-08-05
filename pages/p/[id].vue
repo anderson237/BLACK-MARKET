@@ -181,9 +181,9 @@ const techHtml = computed(() => sanitizeHtml(product.value?.originalDescription 
         </template>
         <template v-if="media.length > 1">
           <button @click="current = (current - 1 + media.length) % media.length"
-            class="absolute left-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-[#ff2a2a]/80 text-white w-8 h-8 rounded-full text-lg font-black leading-none border border-white/20 transition-colors z-10">‹</button>
+            class="absolute left-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-[#ff2a2a]/80 text-white w-10 h-10 rounded-full text-lg font-black leading-none border border-white/20 transition-colors z-10">‹</button>
           <button @click="current = (current + 1) % media.length"
-            class="absolute right-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-[#ff2a2a]/80 text-white w-8 h-8 rounded-full text-lg font-black leading-none border border-white/20 transition-colors z-10">›</button>
+            class="absolute right-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-[#ff2a2a]/80 text-white w-10 h-10 rounded-full text-lg font-black leading-none border border-white/20 transition-colors z-10">›</button>
           <div class="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5 z-10">
             <span v-for="(_, i) in media" :key="i"
               class="w-1.5 h-1.5 rounded-full transition-colors"
@@ -208,7 +208,7 @@ const techHtml = computed(() => sanitizeHtml(product.value?.originalDescription 
 
         <div class="space-y-2">
           <p class="text-[9px] text-[#ff2a2a] font-mono uppercase font-bold tracking-wider">DESCRIPTION & SPECIFICATIONS</p>
-          <div class="text-xs text-zinc-300 leading-relaxed bg-black/40 p-4 rounded-lg border border-zinc-900 [&_p]:mb-2 [&_h3]:text-slate-100 [&_h3]:font-bold [&_h3]:mt-3 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:mb-1" v-html="descriptionHtml" />
+          <div class="text-xs text-zinc-300 leading-relaxed bg-black/40 p-4 rounded-lg border border-zinc-900 break-words [overflow-wrap:anywhere] [&_p]:mb-2 [&_h3]:text-slate-100 [&_h3]:font-bold [&_h3]:mt-3 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:mb-1" v-html="descriptionHtml" />
         </div>
 
         <button @click="preorder"
@@ -220,7 +220,7 @@ const techHtml = computed(() => sanitizeHtml(product.value?.originalDescription 
 
         <div v-if="techHtml" class="space-y-2">
           <p class="text-[9px] text-[#ff2a2a] font-mono uppercase font-bold tracking-wider">FICHE TECHNIQUE</p>
-          <div class="text-xs text-zinc-400 leading-relaxed bg-black/30 p-4 rounded-lg border border-zinc-900 [&_p]:mb-2 [&_h3]:text-slate-100 [&_h3]:font-bold [&_h3]:mt-3 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:mb-1" v-html="techHtml" />
+          <div class="text-xs text-zinc-400 leading-relaxed bg-black/30 p-4 rounded-lg border border-zinc-900 break-words [overflow-wrap:anywhere] [&_p]:mb-2 [&_h3]:text-slate-100 [&_h3]:font-bold [&_h3]:mt-3 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:mb-1" v-html="techHtml" />
         </div>
 
         <div id="commentaires" class="border-t border-zinc-800 pt-5 scroll-mt-20">

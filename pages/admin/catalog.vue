@@ -162,7 +162,7 @@ function copyLink(p: Product) {
           v-model="searchQuery"
           type="search"
           placeholder="Rechercher (titre, code usine, chinois)..."
-          class="bg-black/40 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none w-full sm:w-60"
+          class="bg-black/40 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none min-w-0 flex-1 sm:w-60 sm:flex-none"
         />
         <button @click="showTrash = !showTrash"
           class="shrink-0 inline-flex items-center gap-1.5 border px-3.5 py-2.5 rounded-xl text-xs font-bold font-mono transition-all"

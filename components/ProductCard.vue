@@ -55,7 +55,7 @@ function preorder() {
         <button
           v-if="product.videoUrl"
           @click.stop.prevent="toggleMute"
-          class="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-black/60 hover:bg-[#ff2a2a]/80 border border-white/20 text-white flex items-center justify-center z-10 transition-colors"
+          class="absolute bottom-3 right-3 w-10 h-10 rounded-full bg-black/60 hover:bg-[#ff2a2a]/80 border border-white/20 text-white flex items-center justify-center z-10 transition-colors"
           :title="videoMuted ? 'Activer le son' : 'Couper le son'"
           :aria-label="videoMuted ? 'Activer le son' : 'Couper le son'"
         >

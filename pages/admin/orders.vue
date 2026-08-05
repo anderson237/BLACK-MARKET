@@ -168,7 +168,7 @@ function cleanPhone(p: string) {
 
     <!-- Table -->
     <div v-else class="bg-[#12121a] border border-zinc-800 rounded-2xl overflow-hidden">
-      <div class="overflow-x-auto">
+      <div class="hidden md:block overflow-x-auto">
         <table class="w-full text-left">
           <thead>
             <tr class="border-b border-zinc-800 text-[9px] font-mono uppercase tracking-widest text-zinc-500">
@@ -208,14 +208,31 @@ function cleanPhone(p: string) {
         </table>
       </div>
 
+      <!-- Mobile cards -->
+      <div class="md:hidden divide-y divide-zinc-800">
+        <div v-for="o in paged" :key="'m' + o.id" class="p-3 flex items-start gap-3 cursor-pointer" @click="openDetail(o)">
+          <img :src="o.productImage || `/api/img/${encodeURIComponent(o.productId)}.jpg`" :alt="o.productTitle" class="w-12 h-12 rounded-lg object-cover border border-zinc-800 shrink-0" @error="($event.target as any).style.display='none'" />
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-mono text-slate-100 truncate">{{ o.productTitle }}</p>
+            <p class="text-[11px] font-mono text-zinc-400 truncate">{{ o.customerName }} · {{ o.customerPhone || 'tel ?' }}</p>
+            <p class="text-[10px] font-mono text-zinc-500">{{ new Date(o.createdAt).toLocaleDateString('fr-FR') }}</p>
+            <div class="flex items-center justify-between mt-1.5 gap-2">
+              <span class="text-xs font-mono font-bold text-[#ff2a2a]">{{ formatPriceXof(o.priceXof * o.quantity) }}</span>
+              <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded border uppercase" :class="statusBadge[o.status] || statusBadge.pending">{{ statusLabel[o.status] || o.status }}</span>
+            </div>
+          </div>
+          <button @click.stop="deleting = o.id" class="shrink-0 w-10 h-10 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 flex items-center justify-center" title="Supprimer"><AppIcon name="trash" :size="14" /></button>
+        </div>
+      </div>
+
       <!-- Empty -->
       <div v-if="paged.length === 0" class="py-12 text-center text-zinc-500 font-mono text-xs">Aucune commande.</div>
 
       <!-- Pagination -->
       <div v-if="totalPages > 1" class="flex items-center justify-center gap-2 p-3 border-t border-zinc-800">
-        <button :disabled="page <= 1" @click="page--" class="px-2.5 py-1 rounded-lg text-[11px] font-mono text-zinc-300 border border-zinc-700 hover:border-[#ff2a2a]/40 disabled:opacity-30">‹</button>
+        <button :disabled="page <= 1" @click="page--" class="px-3 py-2 rounded-lg text-[11px] font-mono text-zinc-300 border border-zinc-700 hover:border-[#ff2a2a]/40 disabled:opacity-30">‹</button>
         <span class="text-[11px] font-mono text-zinc-400">{{ page }} / {{ totalPages }}</span>
-        <button :disabled="page >= totalPages" @click="page++" class="px-2.5 py-1 rounded-lg text-[11px] font-mono text-zinc-300 border border-zinc-700 hover:border-[#ff2a2a]/40 disabled:opacity-30">›</button>
+        <button :disabled="page >= totalPages" @click="page++" class="px-3 py-2 rounded-lg text-[11px] font-mono text-zinc-300 border border-zinc-700 hover:border-[#ff2a2a]/40 disabled:opacity-30">›</button>
       </div>
     </div>
 

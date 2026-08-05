@@ -286,7 +286,7 @@ async function generateAiVideo() {
         </div>
 
         <!-- Catégorie + prix + source -->
-        <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
           <div class="space-y-2">
             <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Catégorie</label>
             <select v-model="draft.category" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none">
@@ -313,10 +313,10 @@ async function generateAiVideo() {
         <!-- Image upload + filigrane -->
         <div class="space-y-2">
           <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Image principale (upload + filigrane auto)</label>
-          <div class="flex gap-2">
-            <input type="file" ref="fileInput" accept="image/*" @change="handleMainFile" class="text-[11px] text-zinc-400" />
-            <button @click="generateAiPhoto" :disabled="!!aiBusy" class="shrink-0 inline-flex items-center gap-1 bg-[#ff2a2a]/15 border border-[#ff2a2a]/40 text-[#ff2a2a] hover:bg-[#ff2a2a]/25 text-xs font-bold px-3 py-2.5 rounded-xl transition-all disabled:opacity-50">✨ Photo IA</button>
-            <button @click="generateAiCarousel" :disabled="!!aiBusy" class="shrink-0 inline-flex items-center gap-1 bg-[#ff2a2a]/15 border border-[#ff2a2a]/40 text-[#ff2a2a] hover:bg-[#ff2a2a]/25 text-xs font-bold px-3 py-2.5 rounded-xl transition-all disabled:opacity-50">✨ 3 photos</button>
+          <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2">
+            <input type="file" ref="fileInput" accept="image/*" @change="handleMainFile" class="text-[11px] text-zinc-400 w-full sm:w-auto" />
+            <button @click="generateAiPhoto" :disabled="!!aiBusy" class="shrink-0 inline-flex items-center justify-center gap-1 bg-[#ff2a2a]/15 border border-[#ff2a2a]/40 text-[#ff2a2a] hover:bg-[#ff2a2a]/25 text-xs font-bold px-3 py-2.5 rounded-xl transition-all disabled:opacity-50">✨ Photo IA</button>
+            <button @click="generateAiCarousel" :disabled="!!aiBusy" class="shrink-0 inline-flex items-center justify-center gap-1 bg-[#ff2a2a]/15 border border-[#ff2a2a]/40 text-[#ff2a2a] hover:bg-[#ff2a2a]/25 text-xs font-bold px-3 py-2.5 rounded-xl transition-all disabled:opacity-50">✨ 3 photos</button>
           </div>
           <p v-if="aiBusy" class="text-[11px] text-zinc-400 font-mono">{{ aiBusy }}</p>
         </div>

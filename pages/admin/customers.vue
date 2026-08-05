@@ -123,7 +123,7 @@ function initial(c: ConsolidatedCustomer) {
     </div>
 
     <div v-else class="bg-[#0d0d14] rounded-3xl p-5 border border-zinc-800 space-y-4">
-      <div class="overflow-x-auto">
+      <div class="hidden md:block overflow-x-auto">
         <table class="w-full text-left">
           <thead>
             <tr class="text-[9px] font-mono uppercase tracking-wider text-zinc-500 border-b border-zinc-800">
@@ -159,7 +159,7 @@ function initial(c: ConsolidatedCustomer) {
                   :href="`https://wa.me/${cleanPhone(c.phone)}`"
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="inline-flex p-1.5 rounded-lg text-zinc-400 hover:text-green-400 hover:bg-zinc-900 transition-colors"
+                  class="inline-flex p-2.5 rounded-lg text-zinc-400 hover:text-green-400 hover:bg-zinc-900 transition-colors"
                   title="Contacter sur WhatsApp"
                 ><AppIcon name="whatsapp" :size="15" /></a>
               </td>
@@ -168,12 +168,32 @@ function initial(c: ConsolidatedCustomer) {
         </table>
       </div>
 
+      <div class="md:hidden space-y-2">
+        <p v-if="pageItems.length === 0" class="py-8 text-center text-xs font-mono text-zinc-500">Aucun client enregistré.</p>
+        <div v-for="c in pageItems" :key="'m' + c.id" class="bg-zinc-900/40 border border-zinc-800 rounded-xl p-3 flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-[#ff2a2a] to-[#900] flex items-center justify-center text-white text-xs font-mono font-bold shrink-0">{{ initial(c) }}</div>
+          <div class="min-w-0 flex-1">
+            <p class="text-[11px] font-mono text-zinc-200 truncate">{{ c.name }} <span class="text-zinc-500">· {{ c.phone || '—' }}</span></p>
+            <p class="text-[10px] font-mono text-zinc-500 truncate">{{ c.location }}</p>
+            <p class="text-[10px] font-mono text-zinc-400 mt-0.5">{{ c.orders }} cmd · <span class="text-[#ff2a2a] font-bold">{{ formatPriceXof(c.totalXof) }}</span> · {{ fmtDate(c.lastOrderAt) }}</p>
+          </div>
+          <a
+            v-if="c.phone"
+            :href="`https://wa.me/${cleanPhone(c.phone)}`"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="shrink-0 w-10 h-10 rounded-lg flex items-center justify-center text-zinc-400 hover:text-green-400 hover:bg-zinc-900 transition-colors border border-zinc-800"
+            title="Contacter sur WhatsApp"
+          ><AppIcon name="whatsapp" :size="15" /></a>
+        </div>
+      </div>
+
       <div class="flex items-center justify-between pt-1">
         <span class="text-[10px] font-mono text-zinc-500">{{ filtered.length }} client{{ filtered.length > 1 ? 's' : '' }}</span>
         <div class="flex items-center gap-1.5">
-          <button :disabled="page <= 1" @click="page = Math.max(1, page - 1)" class="px-3 py-1.5 rounded-lg text-xs font-mono bg-black border border-zinc-800 text-zinc-300 hover:border-[#ff2a2a]/40 disabled:opacity-30">←</button>
+          <button :disabled="page <= 1" @click="page = Math.max(1, page - 1)" class="px-3 py-2 rounded-lg text-xs font-mono bg-black border border-zinc-800 text-zinc-300 hover:border-[#ff2a2a]/40 disabled:opacity-30">←</button>
           <span class="text-[11px] font-mono text-zinc-400 px-2">{{ page }} / {{ totalPages }}</span>
-          <button :disabled="page >= totalPages" @click="page = Math.min(totalPages, page + 1)" class="px-3 py-1.5 rounded-lg text-xs font-mono bg-black border border-zinc-800 text-zinc-300 hover:border-[#ff2a2a]/40 disabled:opacity-30">→</button>
+          <button :disabled="page >= totalPages" @click="page = Math.min(totalPages, page + 1)" class="px-3 py-2 rounded-lg text-xs font-mono bg-black border border-zinc-800 text-zinc-300 hover:border-[#ff2a2a]/40 disabled:opacity-30">→</button>
         </div>
       </div>
     </div>

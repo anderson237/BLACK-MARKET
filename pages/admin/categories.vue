@@ -142,18 +142,18 @@ function knowCat(cat: string) {
           <p class="text-xs font-bold text-slate-100">{{ cat }}</p>
           <p class="text-[10px] text-zinc-500 font-mono">{{ st.count }} produit(s)</p>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-1.5 justify-end">
           <template v-if="renaming === cat">
             <input
               v-model="renameValue"
               @keyup.enter="applyRename"
-              class="bg-black/40 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-[11px] font-mono text-slate-200 w-32 focus:border-[#ff2a2a]/60 focus:outline-none"
+              class="bg-black/40 border border-zinc-800 rounded-lg px-2.5 py-2 text-[11px] font-mono text-slate-200 w-full sm:w-32 focus:border-[#ff2a2a]/60 focus:outline-none"
             />
-            <button @click="applyRename" :disabled="busy" class="text-[10px] font-mono text-green-400 border border-green-500/30 px-2.5 py-1.5 rounded-lg hover:bg-green-500/10">OK</button>
-            <button @click="renaming = null" class="text-[10px] font-mono text-zinc-400 px-2 py-1.5 inline-flex items-center"><AppIcon name="close" :size="12" /></button>
+            <button @click="applyRename" :disabled="busy" class="text-[10px] font-mono text-green-400 border border-green-500/30 px-2.5 py-2 rounded-lg hover:bg-green-500/10">OK</button>
+            <button @click="renaming = null" class="text-[10px] font-mono text-zinc-400 px-2 py-2 inline-flex items-center"><AppIcon name="close" :size="12" /></button>
           </template>
-          <button v-else @click="startRename(cat)" class="text-[10px] font-mono text-zinc-300 hover:text-white border border-zinc-800 px-2.5 py-1.5 rounded-lg transition-all">Renommer</button>
-          <button @click="askDelete(cat, st.count)" class="text-[10px] font-mono text-red-400 hover:text-red-300 border border-red-500/30 px-2.5 py-1.5 rounded-lg transition-all" title="Reclasse en « Exclusif »" :disabled="busy">Suppr.</button>
+          <button v-else @click="startRename(cat)" class="text-[10px] font-mono text-zinc-300 hover:text-white border border-zinc-800 px-2.5 py-2 rounded-lg transition-all">Renommer</button>
+          <button @click="askDelete(cat, st.count)" class="text-[10px] font-mono text-red-400 hover:text-red-300 border border-red-500/30 px-2.5 py-2 rounded-lg transition-all" title="Reclasse en « Exclusif »" :disabled="busy">Suppr.</button>
         </div>
       </div>
 

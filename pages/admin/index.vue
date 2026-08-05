@@ -236,7 +236,7 @@ const USER_TOP_CONFIG = computed(() => {
 
 <template>
   <div class="space-y-6">
-    <div class="flex items-center justify-between">
+    <div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
       <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-wider flex items-center gap-2">
         Vue d'ensemble
         <span class="inline-flex items-center gap-1.5 text-[8px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
@@ -244,7 +244,7 @@ const USER_TOP_CONFIG = computed(() => {
         </span>
       </p>
       <button @click="resetStats" :disabled="resetting"
-        class="text-[10px] font-mono text-red-400 hover:text-red-300 border border-red-500/30 hover:border-red-500/60 px-3 py-1.5 rounded-xl transition-all disabled:opacity-50">
+        class="text-[10px] font-mono text-red-400 hover:text-red-300 border border-red-500/30 hover:border-red-500/60 px-3 py-2 rounded-xl transition-all disabled:opacity-50 self-start sm:self-auto">
         {{ resetting ? 'Réinitialisation…' : 'Réinitialiser les stats' }}
       </button>
     </div>
@@ -352,7 +352,7 @@ const USER_TOP_CONFIG = computed(() => {
     <!-- Revenue Area Chart + Sale by category -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <div class="lg:col-span-2 bg-[#0d0d14] rounded-2xl p-5 border border-zinc-800">
-        <div class="flex items-center justify-between mb-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
           <div>
             <h3 class="text-sm font-extrabold text-white font-mono uppercase tracking-wider">REVENU DES 7 DERNIERS JOURS</h3>
             <p class="text-[10px] font-mono text-zinc-500">Suivi des ventes (F CFA)</p>
@@ -442,7 +442,7 @@ const USER_TOP_CONFIG = computed(() => {
           <h3 class="text-sm font-extrabold text-white font-mono uppercase tracking-wider">COMMANDES RÉCENTES</h3>
           <NuxtLink to="/admin/orders" class="text-[10px] font-mono text-[#ff2a2a] hover:underline">Tout voir</NuxtLink>
         </div>
-        <div class="overflow-x-auto">
+        <div class="hidden md:block overflow-x-auto">
           <table class="w-full text-left">
             <thead>
               <tr class="text-[9px] font-mono uppercase tracking-wider text-zinc-500 border-b border-zinc-800">
@@ -485,6 +485,29 @@ const USER_TOP_CONFIG = computed(() => {
               </tr>
             </tbody>
           </table>
+        </div>
+        <div class="md:hidden space-y-3">
+          <p v-if="recentOrders.length === 0" class="py-4 text-center text-xs font-mono text-zinc-500">
+            Aucune commande enregistrée. Créez-en une dans l'onglet Commandes.
+          </p>
+          <div
+            v-for="o in recentOrders"
+            :key="'m' + o.id"
+            class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 flex items-center gap-3"
+            @click="navigateTo('/admin/orders')"
+          >
+            <img :src="o.productImage || `/api/img/${encodeURIComponent(o.productId)}.jpg`" :alt="o.productTitle" class="w-10 h-10 rounded-lg object-cover bg-zinc-900 shrink-0" />
+            <div class="min-w-0 flex-1">
+              <p class="text-[11px] font-mono text-zinc-200 truncate">{{ o.productTitle }}</p>
+              <p class="text-[10px] font-mono text-zinc-500 truncate">{{ o.customerName }} · {{ o.customerLocation }}</p>
+            </div>
+            <div class="text-right shrink-0">
+              <p class="text-[11px] font-mono text-[#ff2a2a] font-bold">{{ formatMoney(o.priceXof * o.quantity) }}</p>
+              <span class="inline-block text-[8px] font-mono font-bold uppercase px-1.5 py-0.5 rounded-full border mt-1" :class="statusClass[o.status] || statusClass.processing">
+                {{ statusLabel[o.status] || o.status }}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -139,7 +139,7 @@ function isActive(cmd: string): boolean {
 }
 
 const toolbarBtn =
-  'inline-flex items-center justify-center min-w-6 h-6 sm:min-w-7 sm:h-7 px-1 text-[10px] sm:text-[11px] font-mono text-slate-300 bg-zinc-900 border border-zinc-700/70 rounded-md hover:bg-zinc-700/60 hover:text-white transition-colors cursor-pointer'
+  'inline-flex items-center justify-center min-w-8 h-8 sm:min-w-9 sm:h-9 px-1 text-[10px] sm:text-[11px] font-mono text-slate-300 bg-zinc-900 border border-zinc-700/70 rounded-md hover:bg-zinc-700/60 hover:text-white transition-colors cursor-pointer'
 </script>
 
 <template>

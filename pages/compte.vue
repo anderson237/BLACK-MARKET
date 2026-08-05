@@ -419,7 +419,7 @@ const totalActivity = computed(() => {
 
           <div>
             <label class="text-[9px] text-zinc-500 font-mono uppercase tracking-widest">Avatar (choisissez un animal)</label>
-            <div class="grid grid-cols-6 gap-1.5 mt-2">
+            <div class="grid grid-cols-5 sm:grid-cols-6 gap-1.5 mt-2">
               <button v-for="a in ANIMAL_AVATARS" :key="a.key" type="button"
                 class="aspect-square rounded-xl overflow-hidden border transition-all"
                 :class="selectedAvatar === a.key ? 'border-[#ff2a2a] ring-2 ring-[#ff2a2a]/40' : 'border-zinc-800 hover:border-zinc-600'"
@@ -539,7 +539,7 @@ const totalActivity = computed(() => {
               <p class="text-[10px] font-mono text-slate-300 px-2 py-2 truncate">{{ l.productTitle || 'Produit' }}</p>
             </NuxtLink>
             <button @click.stop="unlikeProduct(l.productId)"
-              class="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/70 hover:bg-[#ff2a2a] border border-white/20 text-[#ff2a2a] hover:text-white flex items-center justify-center transition-all"
+              class="absolute top-1.5 right-1.5 w-10 h-10 rounded-full bg-black/70 hover:bg-[#ff2a2a] border border-white/20 text-[#ff2a2a] hover:text-white flex items-center justify-center transition-all"
               title="Retirer le like">
               <AppIcon name="heart" :size="13" />
             </button>
@@ -554,7 +554,7 @@ const totalActivity = computed(() => {
           <div class="relative w-full sm:max-w-md bg-[#12121a] border border-zinc-800 sm:rounded-3xl rounded-t-3xl max-h-[92vh] flex flex-col overflow-hidden shadow-2xl">
             <div class="flex items-center justify-between px-5 py-4 border-b border-zinc-800 bg-[#0d0d14] shrink-0">
               <p class="text-sm font-extrabold text-white font-mono uppercase tracking-widest">Modifier mon profil</p>
-              <button @click="editOpen = false" aria-label="Fermer" class="w-8 h-8 rounded-lg border border-zinc-800 flex items-center justify-center text-zinc-300 hover:text-white hover:border-[#ff2a2a]/50 transition-all">✕</button>
+              <button @click="editOpen = false" aria-label="Fermer" class="w-10 h-10 rounded-lg border border-zinc-800 flex items-center justify-center text-zinc-300 hover:text-white hover:border-[#ff2a2a]/50 transition-all">✕</button>
             </div>
 
             <div class="flex-1 overflow-y-auto p-5 space-y-4">
@@ -572,7 +572,7 @@ const totalActivity = computed(() => {
 
               <div>
                 <label class="text-[9px] text-zinc-500 font-mono uppercase tracking-widest">Avatar animal</label>
-                <div class="grid grid-cols-6 gap-1.5 mt-2">
+                <div class="grid grid-cols-5 sm:grid-cols-6 gap-1.5 mt-2">
                   <button v-for="a in ANIMAL_AVATARS" :key="a.key" type="button"
                     class="aspect-square rounded-xl overflow-hidden border transition-all"
                     :class="selectedAvatar === a.key ? 'border-[#ff2a2a] ring-2 ring-[#ff2a2a]/40' : 'border-zinc-800 hover:border-zinc-600'"
@@ -687,8 +687,8 @@ const totalActivity = computed(() => {
                     <p class="text-[10px] text-zinc-500 font-mono mt-0.5">{{ timeAgo(e.ts) }}</p>
                   </div>
                   <button @click="deleteOwnEvent(e.ts)" :disabled="deleting === 'e' + e.ts"
-                    class="shrink-0 w-8 h-8 rounded-lg border border-zinc-800 hover:border-red-500/60 text-zinc-500 hover:text-red-400 flex items-center justify-center transition-all disabled:opacity-40"
-                    title="Retirer de mon historique">
+                class="shrink-0 w-10 h-10 rounded-lg border border-zinc-800 hover:border-red-500/60 text-zinc-500 hover:text-red-400 flex items-center justify-center transition-all disabled:opacity-40"
+                title="Retirer de mon historique">
                     <AppIcon name="trash" :size="13" />
                   </button>
                 </div>
@@ -731,13 +731,13 @@ const totalActivity = computed(() => {
                   </div>
                   <div class="flex flex-col gap-1.5 shrink-0">
                     <button @click="startEditComment(c.id)" :disabled="editingId === c.id"
-                      class="w-8 h-8 rounded-lg border border-zinc-800 hover:border-sky-500/60 text-zinc-500 hover:text-sky-400 flex items-center justify-center transition-all disabled:opacity-40"
-                      title="Modifier ce commentaire">
+                    class="w-10 h-10 rounded-lg border border-zinc-800 hover:border-sky-500/60 text-zinc-500 hover:text-sky-400 flex items-center justify-center transition-all disabled:opacity-40"
+                    title="Modifier ce commentaire">
                       <AppIcon name="edit" :size="13" />
                     </button>
                     <button @click="deleteOwnComment(c.id)" :disabled="deleting === c.id"
-                      class="w-8 h-8 rounded-lg border border-zinc-800 hover:border-red-500/60 text-zinc-500 hover:text-red-400 flex items-center justify-center transition-all disabled:opacity-40"
-                      title="Supprimer ce commentaire">
+                    class="w-10 h-10 rounded-lg border border-zinc-800 hover:border-red-500/60 text-zinc-500 hover:text-red-400 flex items-center justify-center transition-all disabled:opacity-40"
+                    title="Supprimer ce commentaire">
                       <AppIcon name="trash" :size="13" />
                     </button>
                   </div>

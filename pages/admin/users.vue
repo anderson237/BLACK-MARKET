@@ -170,7 +170,7 @@ async function setRole(login: any, role: string) {
                 :value="u.role || 'user'"
                 :disabled="roleBusy === (u.id || u.email)"
                 @change="setRole(u, ($event.target as HTMLSelectElement).value)"
-                class="bg-black/60 border border-zinc-800 rounded-lg px-1.5 py-1 text-[9px] font-mono text-slate-300 focus:outline-none focus:border-[#ff2a2a]/50 disabled:opacity-40"
+                class="bg-black/60 border border-zinc-800 rounded-lg px-2.5 py-2 text-[9px] font-mono text-slate-300 focus:outline-none focus:border-[#ff2a2a]/50 disabled:opacity-40"
                 title="Changer le rôle"
               >
                 <option value="user">Membre</option>
@@ -185,7 +185,7 @@ async function setRole(login: any, role: string) {
                 v-if="store.admins.includes(u.email) && u.email !== data?.owner"
                 @click="demote(u.email)"
                 :disabled="!isOwner || saving"
-                class="inline-flex items-center gap-1 text-[9px] font-mono font-bold uppercase px-2 py-1 rounded-lg text-red-400 border border-red-500/30 bg-red-500/5 hover:bg-red-500/15 disabled:opacity-30 transition-all"
+                class="inline-flex items-center gap-1 text-[9px] font-mono font-bold uppercase px-2.5 py-2 rounded-lg text-red-400 border border-red-500/30 bg-red-500/5 hover:bg-red-500/15 disabled:opacity-30 transition-all"
                 title="Retirer les droits admin"
               >
                 Rétrograder
@@ -194,7 +194,7 @@ async function setRole(login: any, role: string) {
                 v-else-if="!store.admins.includes(u.email) && u.email !== data?.owner"
                 @click="promote(u.email)"
                 :disabled="!isOwner || saving"
-                class="inline-flex items-center gap-1 text-[9px] font-mono font-bold uppercase px-2 py-1 rounded-lg text-[#ff2a2a] border border-[#ff2a2a]/30 bg-[#ff2a2a]/5 hover:bg-[#ff2a2a]/15 disabled:opacity-30 transition-all"
+                class="inline-flex items-center gap-1 text-[9px] font-mono font-bold uppercase px-2.5 py-2 rounded-lg text-[#ff2a2a] border border-[#ff2a2a]/30 bg-[#ff2a2a]/5 hover:bg-[#ff2a2a]/15 disabled:opacity-30 transition-all"
                 title="Promouvoir au rang d'administrateur"
               >
                 Promouvoir
