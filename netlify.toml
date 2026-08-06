@@ -16,6 +16,20 @@
   status = 200
   force = true
 
+# Static files that must be served straight from the CDN (no `force`, so an
+# existing file is served instead of being redirected to the function):
+#   - /og-image.png : default Open Graph image (Social previews / crawlers)
+#   - /favicon.svg  : favicon linked in <head>
+[[redirects]]
+  from = "/og-image.png"
+  to = "/og-image.png"
+  status = 200
+
+[[redirects]]
+  from = "/favicon.svg"
+  to = "/favicon.svg"
+  status = 200
+
 [[redirects]]
   from = "/*"
   to = "/.netlify/functions/server"
