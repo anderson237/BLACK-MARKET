@@ -16,6 +16,7 @@ export default defineEventHandler(async (event) => {
     userId,
     name: String(body?.name || 'Utilisateur').slice(0, 80),
     picture: body?.picture ? String(body.picture).slice(0, 8000) : undefined,
+    role: String(session.role || 'user'),
     text,
     createdAt: new Date().toISOString(),
   })

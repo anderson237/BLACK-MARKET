@@ -32,6 +32,7 @@ export default defineEventHandler(async (event) => {
       name: a?.pseudo || a?.name || a?.email || 'Anonyme',
       pseudo: a?.pseudo || '',
       picture: a?.picture || '',
+      role: a?.role || 'user',
     }
   }
 
@@ -134,7 +135,7 @@ export default defineEventHandler(async (event) => {
   const usersById = [...counters.entries()].filter(([, c]) => c.total > 0).map(([id, c]) => ({ ...userInfo(id), ...c, likedCount: c.liked.size }))
   const topUsers = (pick: (c: UserCounters) => number, min = 0, n = 6) =>
     usersById
-      .map((u) => ({ id: u.id, name: u.name, pseudo: u.pseudo, picture: u.picture, count: pick(u as any) }))
+      .map((u) => ({ id: u.id, name: u.name, pseudo: u.pseudo, picture: u.picture, role: u.role, count: pick(u as any) }))
       .filter((u) => u.count >= min)
       .sort((a, b) => b.count - a.count)
       .slice(0, n)

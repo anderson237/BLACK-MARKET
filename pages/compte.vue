@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { COUNTRIES, countryByCode, type Country } from '~/data/countries'
-import { ANIMAL_AVATARS, avatarDataUri } from '~/data/avatars'
+import { ANIMAL_AVATARS, avatarDataUri, themedAvatarUri } from '~/data/avatars'
 import { MOODS, moodOf } from '~/data/moods'
 import { useAuthStore } from '~/stores/auth'
 import { useInteractionsStore } from '~/stores/interactions'
 import { useTrack } from '~/composables/useTrack'
+
+const { isLight } = useTheme()
 
 useSeoMeta({ title: 'Mon espace — BLACK MARKET' })
 
@@ -59,7 +61,7 @@ function fillForm() {
   name.value = u?.name || ''
   mood.value = u?.mood || ''
   phoneNumber.value = u?.phone || ''
-  selectedAvatar.value = ANIMAL_AVATARS.find((a) => u?.picture === avatarDataUri(a.key))?.key || ''
+  selectedAvatar.value = ANIMAL_AVATARS.find((a) => u?.picture === avatarDataUri(a.key, false) || u?.picture === avatarDataUri(a.key, true))?.key || ''
   if (u?.phonePrefix) prefix.value = u.phonePrefix
   if (u?.country) {
     const c = COUNTRIES.find((x) => x.name === u.country)
@@ -89,7 +91,7 @@ async function saveProfile() {
         phone: phone || undefined,
         phonePrefix: prefix.value,
         country: selectedCountry.value?.name,
-        picture: selectedAvatar.value ? avatarDataUri(selectedAvatar.value) : undefined,
+        picture: selectedAvatar.value ? avatarDataUri(selectedAvatar.value, isLight.value) : undefined,
       }),
     })
     if (data?.user) auth.updateUser(data.user)
@@ -145,8 +147,8 @@ function readAsDataURL(file: File): Promise<string> {
 }
 
 // ---- interactions ----
-interface CommentItem { id: string; productId: string; text: string; createdAt: string; editedAt?: string; likes?: number; dislikes?: number; reports?: number; likedByMe?: boolean; dislikedByMe?: boolean; reportedByMe?: boolean; productTitle?: string; productImage?: string }
-interface EventItem { type: string; productId?: string; productTitle?: string; productImage?: string; ts: number; url?: string }
+interface CommentItem { id: string; productId: string; text: string; createdAt: string; editedAt?: string; role?: string; likes?: number; dislikes?: number; reports?: number; likedByMe?: boolean; dislikedByMe?: boolean; reportedByMe?: boolean; productTitle?: string; productImage?: string }
+interface EventItem { type: string; productId?: string; productTitle?: string; productImage?: string; role?: string; ts: number; url?: string }
 interface OrderItem { id: string; productTitle?: string; productImage?: string; quantity: number; priceXof: number; status: string; createdAt: string }
 interface LikedItem { productId: string; productTitle?: string; productImage?: string }
 interface InteractionsData {
@@ -238,7 +240,7 @@ const eventLabel: Record<string, string> = {
   comment: 'a commenté',
 }
 
-const avatarUrl = computed(() => auth.user?.picture || '')
+const avatarUrl = computed(() => themedAvatarUri(auth.user?.picture || '', isLight.value))
 const displayName = computed(() => auth.user?.pseudo || auth.user?.name || 'Client BLACK MARKET')
 const initials = computed(() => displayName.value.slice(0, 2).toUpperCase())
 const currentMood = computed(() => moodOf(auth.user?.mood))
@@ -434,7 +436,7 @@ const totalActivity = computed(() => {
                 class="aspect-square rounded-xl overflow-hidden border transition-all"
                 :class="selectedAvatar === a.key ? 'border-[#ff2a2a] ring-2 ring-[#ff2a2a]/40' : 'border-zinc-800 hover:border-zinc-600'"
                 :title="a.label" @click="selectedAvatar = a.key === selectedAvatar ? '' : a.key">
-                <img :src="avatarDataUri(a.key)" :alt="a.label" class="w-full h-full object-cover" />
+                <img :src="avatarDataUri(a.key, isLight.value)" :alt="a.label" class="w-full h-full object-cover" />
               </button>
             </div>
             <label class="inline-flex items-center gap-1.5 mt-2 text-[10px] font-mono text-zinc-400 hover:text-white cursor-pointer transition-colors">
@@ -492,7 +494,7 @@ const totalActivity = computed(() => {
           </label>
         </div>
         <div class="flex-1 text-center sm:text-left min-w-0">
-          <h1 class="text-lg font-extrabold text-slate-100 font-mono">{{ displayName }} <span v-if="currentMood" :title="currentMood.label" class="align-middle">{{ currentMood.emoji }}</span></h1>
+          <h1 class="text-lg font-extrabold text-slate-100 font-mono">{{ displayName }} <StaffBadge :role="auth.role" /><span v-if="currentMood" :title="currentMood.label" class="align-middle">{{ currentMood.emoji }}</span></h1>
           <p class="text-[11px] text-zinc-400 font-mono">{{ auth.user?.email || '—' }}</p>
           <p class="text-[11px] text-zinc-500 font-mono mt-1">
             {{ auth.user?.phone ? (auth.user.phonePrefix || '') + ' ' + auth.user.phone : '—' }}
@@ -587,7 +589,7 @@ const totalActivity = computed(() => {
                     class="aspect-square rounded-xl overflow-hidden border transition-all"
                     :class="selectedAvatar === a.key ? 'border-[#ff2a2a] ring-2 ring-[#ff2a2a]/40' : 'border-zinc-800 hover:border-zinc-600'"
                     :title="a.label" @click="selectedAvatar = a.key === selectedAvatar ? '' : a.key">
-                    <img :src="avatarDataUri(a.key)" :alt="a.label" class="w-full h-full object-cover" />
+                    <img :src="avatarDataUri(a.key, isLight.value)" :alt="a.label" class="w-full h-full object-cover" />
                   </button>
                 </div>
               </div>
@@ -732,7 +734,7 @@ const totalActivity = computed(() => {
                     </div>
                   </NuxtLink>
                   <div class="flex-1 min-w-0">
-                    <p class="text-xs text-zinc-300">Vous <span class="text-slate-100 font-bold">{{ eventLabel[e.type] || 'avez interagi avec' }}</span>
+                    <p class="text-xs text-zinc-300">Vous <StaffBadge :role="e.role || auth.role" /> <span class="text-slate-100 font-bold">{{ eventLabel[e.type] || 'avez interagi avec' }}</span>
                       <NuxtLink :to="productUrl(e.productId)" class="text-[#ff2a2a] hover:underline">{{ e.productTitle || 'un produit' }}</NuxtLink>
                     </p>
                     <p class="text-[10px] text-zinc-500 font-mono mt-0.5">{{ timeAgo(e.ts) }}</p>
@@ -758,7 +760,7 @@ const totalActivity = computed(() => {
                     </div>
                   </NuxtLink>
                   <div class="flex-1 min-w-0">
-                    <p class="text-xs text-zinc-300"><span class="text-slate-100 font-bold">Vous avez commenté</span> {{ c.text }}</p>
+                    <p class="text-xs text-zinc-300"><span class="text-slate-100 font-bold">Vous avez commenté</span> <StaffBadge :role="c.role || auth.role" /> {{ c.text }}</p>
                     <NuxtLink :to="productUrl(c.productId)" class="text-[10px] text-zinc-500 font-mono hover:text-[#ff2a2a] transition-colors">{{ c.productTitle || 'Produit' }} · {{ timeAgo(c.createdAt) }}<span v-if="c.editedAt" class="text-zinc-500 italic"> · modifié</span></NuxtLink>
                     <div class="flex items-center gap-3 mt-1.5">
                       <span class="inline-flex items-center gap-1 text-[10px] font-mono text-zinc-500"><AppIcon name="thumbsUp" :size="11" /> {{ c.likes || 0 }}</span>

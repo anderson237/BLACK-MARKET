@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { formatPriceXof } from '~/composables/useCatalog'
 import { useAuthStore } from '~/stores/auth'
+import { themedAvatarUri } from '~/data/avatars'
+
+const { isLight } = useTheme()
 
 definePageMeta({ layout: 'admin' })
 
@@ -555,9 +558,10 @@ const USER_TOP_CONFIG = computed(() => {
           <p class="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mb-3" :style="{ color: cfg.color }">{{ cfg.title }}</p>
           <div v-if="cfg.items.length" class="space-y-2">
             <div v-for="u in cfg.items.slice(0, 5)" :key="cfg.key + u.id" class="flex items-center gap-2">
-              <img v-if="u.picture" :src="u.picture" alt="" class="w-7 h-7 rounded-full object-cover border border-zinc-800 shrink-0" @error="($event.target as HTMLImageElement).style.display='none'" />
+              <img v-if="u.picture" :src="themedAvatarUri(u.picture, isLight.value)" alt="" class="w-7 h-7 rounded-full object-cover border border-zinc-800 shrink-0" @error="($event.target as HTMLImageElement).style.display='none'" />
               <div v-else class="w-7 h-7 rounded-full bg-[#ff2a2a]/15 border border-[#ff2a2a]/40 flex items-center justify-center text-[#ff2a2a] text-[9px] font-black shrink-0">{{ displayName(u).slice(0, 2).toUpperCase() }}</div>
               <span class="flex-1 text-[10px] font-mono text-zinc-300 truncate" :title="u.name">{{ displayName(u) }}</span>
+              <StaffBadge :role="u.role" />
               <span class="text-[10px] font-mono font-bold" :style="{ color: cfg.color }">{{ u.count }}</span>
             </div>
           </div>

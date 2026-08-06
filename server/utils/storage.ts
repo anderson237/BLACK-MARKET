@@ -477,6 +477,7 @@ export interface MarketEvent {
   countryCode?: string
   city?: string
   region?: string
+  role?: string
 }
 
 export async function pushEvent(ev: MarketEvent): Promise<void> {
@@ -531,6 +532,7 @@ export interface Comment {
   userId: string
   name: string
   picture?: string
+  role?: string
   text: string
   createdAt: string
   editedAt?: string

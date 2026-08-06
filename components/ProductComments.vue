@@ -12,6 +12,7 @@ interface CommentItem {
   userId: string
   name: string
   picture?: string
+  role?: string
   text: string
   createdAt: string
   editedAt?: string
@@ -277,6 +278,7 @@ function timeAgo(iso: string): string {
         <div class="min-w-0 flex-1">
           <div class="flex items-baseline gap-2">
             <span class="text-xs font-bold text-slate-200">{{ c.name }}</span>
+            <StaffBadge :role="c.role" />
             <span class="text-[9px] text-zinc-600 font-mono">{{ timeAgo(c.createdAt) }}</span>
             <span v-if="c.editedAt" class="text-[9px] text-zinc-500 font-mono italic">· modifié</span>
           </div>

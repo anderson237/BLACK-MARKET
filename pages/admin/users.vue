@@ -1,7 +1,11 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'admin' })
 
+import { useAdminStore } from '~/stores/admin'
+import { themedAvatarUri } from '~/data/avatars'
+
 const store = useAdminStore()
+const { isLight } = useTheme()
 const error = ref('')
 const savedMsg = ref('')
 const newEmail = ref('')
@@ -146,7 +150,7 @@ async function setRole(login: any, role: string) {
         <div class="space-y-2 max-h-[480px] overflow-y-auto pr-1">
           <div v-if="!data?.logins?.length" class="py-8 text-center text-xs font-mono text-zinc-500">Aucun compte connecté pour l'instant.</div>
           <div v-for="u in data?.logins || []" :key="u.email" class="flex items-center gap-3 bg-black/40 border border-zinc-900 rounded-xl px-3 py-2.5">
-            <img v-if="u.picture" :src="u.picture" alt="" class="w-9 h-9 rounded-full object-cover bg-zinc-900 border border-zinc-800" />
+            <img v-if="u.picture" :src="themedAvatarUri(u.picture, isLight.value)" alt="" class="w-9 h-9 rounded-full object-cover bg-zinc-900 border border-zinc-800" />
             <div v-else class="w-9 h-9 rounded-full bg-gradient-to-br from-[#ff2a2a] to-[#900] flex items-center justify-center text-white text-xs font-mono font-bold">
               {{ String(u.email || '?').slice(0, 1).toUpperCase() }}
             </div>

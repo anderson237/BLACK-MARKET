@@ -34,6 +34,7 @@ export default defineEventHandler(async (event) => {
     url: body?.url ? String(body.url).slice(0, 500) : undefined,
     ts: Date.now(),
     userId,
+    role: String(session?.role || ''),
     ip: clientIP(event),
     country: body?.country ? String(body.country).slice(0, 100) : undefined,
     countryCode,
