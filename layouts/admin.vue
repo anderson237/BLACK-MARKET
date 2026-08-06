@@ -8,6 +8,13 @@ const auth = useAuthStore()
 const { isLight, toggle, init } = useTheme()
 onMounted(() => init())
 
+// Admin console must never be indexed by search engines: it hosts login
+// forms and private data, and keeping it out of the crawl reduces the risk
+// of Google's Safe Browsing misclassifying the password form as phishing.
+useHead({
+  meta: [{ name: 'robots', content: 'noindex, nofollow', key: 'robots' }],
+})
+
 // Only an authenticated admin (role === 'admin') can access the console.
 const isAdmin = computed(() => auth.isAuthed && auth.role === 'admin')
 

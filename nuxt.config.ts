@@ -38,7 +38,7 @@ export default defineNuxtConfig({
         { name: "description", content: "BLACK MARKET - SOURCING EXCLUSIF CHINE. Découvrez notre catalogue exclusif de produits tendance importés directement d'usines chinoises (Taobao, 1688) avec prix d'usine, précommande WhatsApp et livraison sécurisée." },
         { name: "viewport", content: "width=device-width, initial-scale=1" },
         { name: "theme-color", content: "#0d0d14" },
-        { name: "robots", content: "index, follow, max-image-preview:large" },
+        { name: "robots", content: "index, follow, max-image-preview:large", key: "robots" },
         { name: "google-site-verification", content: process.env.GOOGLE_SITE_VERIFICATION || "ee8d421bcc36433e" },
         { property: "og:site_name", content: "BLACK MARKET" },
         { property: "og:locale", content: "fr_FR" },
