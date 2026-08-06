@@ -51,8 +51,12 @@ function onTrackEvent(e: Event) {
 
 function onLike() {
   auth.requireAuth(() => {
-    like(props.product, !liked.value)
+    // Toggle FIRST so the store's 800ms cooldown (lastLocal) is armed before
+    // `like()` dispatches bm:track -> refreshCount. Otherwise refreshCount would
+    // start before lastLocal exists and the stale server read would clobber the
+    // optimistic count (the old -1/0 bug).
     inter.toggleLike(props.product.id)
+    like(props.product, liked.value)
   }, 'Connectez-vous pour liker ce drop')
 }
 

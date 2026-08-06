@@ -69,8 +69,12 @@ export const useInteractionsStore = defineStore('interactions', () => {
         const data = await res.json()
         const count = Number(data?.count)
         if (Number.isFinite(count)) {
-          // Server truth: count AND whether the current user liked it.
-          const liked = data?.liked === true
+          // Server truth: count AND whether the current user liked it — but ONLY
+          // for authenticated visitors. For anonymous ones the server always
+          // answers liked:false, so trusting it here would reset the local
+          // "I liked this" state on every refresh (and re-clicks would inflate
+          // the count). Anonymous users keep the local optimistic state.
+          const liked = auth.token ? data?.liked === true : likedSet.value.has(id)
           likes.value[id] = { liked, count }
           if (liked) likedSet.value.add(id)
           else likedSet.value.delete(id)

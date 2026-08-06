@@ -329,8 +329,8 @@ async function deleteOwnEvent(ts: number) {
 }
 
 function unlikeProduct(productId: string) {
-  like({ id: productId }, false)
   inter.toggleLike(productId)
+  like({ id: productId }, false)
   if (data.value) {
     data.value.liked = data.value.liked.filter((l) => l.productId !== productId)
     data.value.stats.likes = Math.max(0, data.value.stats.likes - 1)
