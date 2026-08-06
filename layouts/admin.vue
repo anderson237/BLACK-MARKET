@@ -18,6 +18,23 @@ useHead({
 // Only an authenticated admin (role === 'admin') can access the console.
 const isAdmin = computed(() => auth.isAuthed && auth.role === 'admin')
 
+// The admin login screen is the only public entry point of the console.
+const isLoginRoute = computed(() => {
+  const p = String(route.path || '')
+  return p === '/admin/login' || p === '/admin/login/'
+})
+
+// Anyone who is not an admin is bounced to the home page; admins hitting the
+// login screen are sent straight to the dashboard.
+watchEffect(() => {
+  if (!auth.initialized) return
+  if (!isAdmin.value && !isLoginRoute.value) {
+    navigateTo('/')
+  } else if (isAdmin.value && isLoginRoute.value) {
+    navigateTo('/admin')
+  }
+})
+
 const config = useRuntimeConfig()
 const wa = ref(String(config.public.phoneNumber || '22900000000'))
 const currency = ref(config.public.currency === 'EUR' ? 'EUR' : 'XOF')
@@ -76,21 +93,29 @@ function closeDrawer() {
 </script>
 
 <template>
-  <!-- Auth gate: show login if not an admin, otherwise show the console -->
-  <div v-if="!isAdmin" class="min-h-screen bg-[#08080c]">
-    <div class="max-w-[1400px] mx-auto px-4 py-4 flex items-center justify-between">
-      <NuxtLink to="/" class="flex items-center gap-2">
-        <span class="w-10 h-10 shrink-0 rounded-lg bg-[#ff2a2a] flex items-center justify-center text-white font-black text-lg">B</span>
-        <span class="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">BLACK MARKET · ADMIN</span>
-      </NuxtLink>
-      <NuxtLink to="/" class="text-[10px] font-mono text-zinc-400 hover:text-[#ff2a2a] border border-zinc-800 px-3 py-1.5 rounded-lg transition-all">← Voir le site</NuxtLink>
-      <button @click="toggle()" :title="isLight ? 'Mode sombre' : 'Mode clair'"
-        :aria-label="isLight ? 'Passer au mode sombre' : 'Passer au mode clair'"
-        class="w-9 h-9 rounded-lg border border-zinc-800 flex items-center justify-center text-zinc-300 hover:border-[#ff2a2a]/50 hover:text-white transition-all">
-        <AppIcon :name="isLight ? 'sun' : 'moon'" :size="14" />
-      </button>
+  <!-- Auth gate: only the login screen is public; every other admin route is
+       reserved for admins (non-admins are redirected to the home page). -->
+  <div v-if="!isAdmin">
+    <template v-if="isLoginRoute">
+      <div class="min-h-screen bg-[#08080c]">
+        <div class="max-w-[1400px] mx-auto px-4 py-4 flex items-center justify-between">
+          <NuxtLink to="/" class="flex items-center gap-2">
+            <span class="w-10 h-10 shrink-0 rounded-lg bg-[#ff2a2a] flex items-center justify-center text-white font-black text-lg">B</span>
+            <span class="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">BLACK MARKET · ADMIN</span>
+          </NuxtLink>
+          <NuxtLink to="/" class="text-[10px] font-mono text-zinc-400 hover:text-[#ff2a2a] border border-zinc-800 px-3 py-1.5 rounded-lg transition-all">← Voir le site</NuxtLink>
+          <button @click="toggle()" :title="isLight ? 'Mode sombre' : 'Mode clair'"
+            :aria-label="isLight ? 'Passer au mode sombre' : 'Passer au mode clair'"
+            class="w-9 h-9 rounded-lg border border-zinc-800 flex items-center justify-center text-zinc-300 hover:border-[#ff2a2a]/50 hover:text-white transition-all">
+            <AppIcon :name="isLight ? 'sun' : 'moon'" :size="14" />
+          </button>
+        </div>
+        <slot />
+      </div>
+    </template>
+    <div v-else class="min-h-screen bg-[#08080c] grid place-items-center">
+      <p class="text-[11px] font-mono text-zinc-600">Redirection vers l'accueil…</p>
     </div>
-    <AdminLogin />
   </div>
 
   <div v-else class="min-h-screen">
