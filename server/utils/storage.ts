@@ -1,4 +1,5 @@
 import { getStore } from '@netlify/blobs'
+import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -408,43 +409,101 @@ async function saveSocial(data: any): Promise<void> {
   return writeJSON(path.join(DATA_DIR, 'social.json'), data)
 }
 
+// ---------------------------------------------------------------------------
+// Distributed write lock over Netlify Blobs.
+//
+// Netlify Blobs has NO atomic read-modify-write: the `onlyIfMatch` ETag
+// precondition proved unreliable under real concurrency (all 20 parallel
+// writes "succeeded" in 16ms each — the SDK drops the precondition when the
+// read ETag is missing, turning every write into a last-write-wins overwrite
+// and silently losing increments). The ONLY guaranteed atomic primitive is
+// `onlyIfNew: true` (create-if-not-exists). We use it as a mutex: acquire by
+// creating `<key>.lock`, run the RMW, then delete the lock. A stale lock left
+// by a crashed instance is detected by timestamp and broken (anti-deadlock).
+// ---------------------------------------------------------------------------
+const LOCK_TTL_MS = 10000
+const LOCK_TIMEOUT_MS = 20000
+
+async function withBlobLock<T>(storeName: string, key: string, fn: () => Promise<T>): Promise<T> {
+  const s = getStore({ name: storeName })
+  const lockKey = `${key}.lock`
+  const deadline = Date.now() + LOCK_TIMEOUT_MS
+  let attempt = 0
+  for (;;) {
+    let created = false
+    try {
+      const write = await s.set(lockKey, JSON.stringify({ ts: Date.now() }), { onlyIfNew: true } as any)
+      // `onlyIfNew` returns `{ modified }`; `modified: false` = lock already held.
+      created = typeof write === 'object' && write !== null ? (write as any)?.modified !== false : write !== false
+    } catch (err) {
+      console.error(`[BLOBS] lock acquire ${storeName}/${lockKey} failed:`, err)
+    }
+    if (created) {
+      try {
+        return await fn()
+      } finally {
+        try {
+          await s.delete(lockKey)
+        } catch {
+          /* best-effort release */
+        }
+      }
+    }
+    // Lock held by someone else. If the holder crashed, its timestamp goes stale
+    // -> break the lock and retry immediately.
+    try {
+      const holder = await s.get(lockKey, { type: 'json' } as any)
+      if (holder && typeof holder.ts === 'number' && Date.now() - holder.ts > LOCK_TTL_MS) {
+        try {
+          await s.delete(lockKey)
+        } catch {
+          /* raced with holder release -> loop again */
+        }
+        continue
+      }
+    } catch {
+      /* keep waiting */
+    }
+    if (Date.now() > deadline) {
+      throw new Error(`[BLOBS] lock timeout on ${storeName}/${lockKey}`)
+    }
+    const base = Math.min(25 * Math.pow(2, attempt), 500)
+    attempt += 1
+    await new Promise((r) => setTimeout(r, base + Math.random() * base))
+  }
+}
+
 // Atomic read-modify-write on the social store.
 //  - Local dev: in-process mutex (`withLock`) serializes every mutation.
-//  - Production (Netlify Blobs, multiple function instances): Netlify Blobs has
-//    no atomic RMW, but `set` supports an ETag precondition. We read the
-//    current ETag + data, compute the next state, and write with
-//    `onlyIfMatch`. If another instance wrote in between, the write is refused
-//    (`modified: false`) and we re-read + retry. This closes the lost-update
-//    race where a page view event racing a comment POST silently dropped the
-//    freshly posted comment.
+//  - Production (Netlify Blobs, multiple function instances): `withBlobLock`
+//    serializes every mutation through a create-if-not-exists lock so two
+//    concurrent requests (a like racing a comment POST) can never overwrite
+//    each other's increments — the guarantee the ETag CAS failed to provide.
 async function mutateSocial<T>(
   mutate: (social: SocialShape) => { next: SocialShape | null; value: T },
 ): Promise<T> {
   if (isNetlifyRuntime()) {
-    const s = getStore({ name: 'bm-social' })
-    for (let attempt = 0; attempt < 10; attempt++) {
-      let current: { etag?: string; data?: any } | null = null
+    return withBlobLock('bm-social', 'social.json', async () => {
+      const s = getStore({ name: 'bm-social' })
+      let data: SocialShape = { ...SOCIAL_SEED }
       try {
-        current = await s.getWithMetadata('social.json', { type: 'text', consistency: 'strong' } as any)
+        const raw = await s.get('social.json', { type: 'text', consistency: 'strong' } as any)
+        if (raw != null) {
+          const parsed = JSON.parse(String(raw))
+          // ALWAYS normalize: the blob may predate the `likedBy`/`likedByUser`
+          // fields (older social.json has neither) — mutating such a payload
+          // with `social.likedByUser[uid] = ...` throws a TypeError and every
+          // authenticated like 500s while the client thinks it worked.
+          if (parsed && Array.isArray(parsed.comments)) data = normalizeSocial(parsed)
+        }
       } catch (err) {
         console.error('[BLOBS] social read failed:', err)
       }
-      let data: SocialShape = { ...SOCIAL_SEED }
-      if (current?.data != null) {
-        try {
-          const parsed = JSON.parse(String(current.data))
-          if (parsed && Array.isArray(parsed.comments)) data = parsed
-        } catch {
-          // corrupted payload -> start from seed
-        }
-      }
       const { next, value } = mutate(JSON.parse(JSON.stringify(data)))
       if (next == null) return value
-      const write = await s.set('social.json', JSON.stringify(next, null, 2), { onlyIfMatch: current?.etag } as any)
-      if (write?.modified !== false) return value
-      // CAS conflict: another instance committed a newer version -> retry.
-    }
-    throw new Error('[BLOBS] CAS conflict on bm-social/social.json')
+      await s.set('social.json', JSON.stringify(next, null, 2))
+      return value
+    })
   }
   return withLock('social', async () => {
     const social = await loadSocial()
@@ -463,6 +522,7 @@ export async function resetSocial(): Promise<void> {
     social.events = []
     return { next: social, value: undefined }
   })
+  await resetEvents()
 }
 
 export interface MarketEvent {
@@ -481,10 +541,13 @@ export interface MarketEvent {
 }
 
 export async function pushEvent(ev: MarketEvent): Promise<void> {
-  await mutateSocial((social) => {
-    social.events.push(ev)
-    social.events = social.events.slice(-20000)
-    if (ev.type === 'like' || ev.type === 'unlike') {
+  // Like/unlike touch the counters (social blob): atomic CAS with retries.
+  // Everything else (views/clicks/shares/copies) is best-effort analytics and
+  // lives in a SEPARATE blob so a page-view burst never does a read-modify-write
+  // on the same object as a like/comment — that contention was silently dropping
+  // writes ("counter resets to 0 on refresh").
+  if (ev.type === 'like' || ev.type === 'unlike') {
+    await mutateSocial((social) => {
       const pid = ev.productId || 'global'
       const uid = ev.userId || ''
       const cur = social.likes[pid] || 0
@@ -501,9 +564,93 @@ export async function pushEvent(ev: MarketEvent): Promise<void> {
           social.likedByUser[uid].push(pid)
         }
       }
+      return { next: social, value: undefined }
+    })
+  }
+  await pushEventToLog(ev)
+}
+
+// ---------------------------------------------------------------------------
+// Event log (views/clicks/shares/copies/comment events). Kept in its OWN blob
+// store so the high-frequency, best-effort analytics writes never contend with
+// the critical social counters (likes/comments) on bm-social. Events are
+// disposable: if a write loses a CAS race after retries, we log and drop it
+// rather than erroring the request.
+// ---------------------------------------------------------------------------
+
+const EVENTS_BLOB = 'bm-events'
+const EVENTS_KEY = 'events.json'
+const EVENTS_MAX = 20000
+
+async function loadEventsRaw(): Promise<MarketEvent[]> {
+  if (isNetlifyRuntime()) {
+    const raw = await blobGet(EVENTS_BLOB, EVENTS_KEY, 'text', 'strong')
+    if (raw != null) {
+      try {
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed)) return parsed
+      } catch {
+        /* corrupted -> start fresh */
+      }
     }
-    return { next: social, value: undefined }
+    return []
+  }
+  const p = await readJSON(path.join(DATA_DIR, 'events.json'))
+  return Array.isArray(p) ? p : []
+}
+
+async function mutateEvents<T>(
+  mutate: (events: MarketEvent[]) => { next: MarketEvent[] | null; value: T },
+): Promise<T> {
+  if (isNetlifyRuntime()) {
+    return withBlobLock(EVENTS_BLOB, EVENTS_KEY, async () => {
+      const s = getStore({ name: EVENTS_BLOB })
+      let events: MarketEvent[] = []
+      try {
+        const raw = await s.get(EVENTS_KEY, { type: 'text', consistency: 'strong' } as any)
+        if (raw != null) {
+          const parsed = JSON.parse(String(raw))
+          if (Array.isArray(parsed)) events = parsed
+        }
+      } catch (err) {
+        console.error('[BLOBS] events read failed:', err)
+      }
+      const { next, value } = mutate(JSON.parse(JSON.stringify(events)))
+      if (next == null) return value
+      await s.set(EVENTS_KEY, JSON.stringify(next, null, 2))
+      return value
+    })
+  }
+  return withLock('events', async () => {
+    const events = await loadEventsRaw()
+    const { next, value } = mutate(events)
+    if (next != null) await writeJSON(path.join(DATA_DIR, 'events.json'), next)
+    return value
   })
+}
+
+async function pushEventToLog(ev: MarketEvent): Promise<void> {
+  await mutateEvents((events) => {
+    events.push(ev)
+    events = events.slice(-EVENTS_MAX)
+    return { next: events, value: undefined }
+  })
+}
+
+async function resetEvents(): Promise<void> {
+  if (isNetlifyRuntime()) {
+    try {
+      await blobSet(EVENTS_BLOB, EVENTS_KEY, JSON.stringify([]))
+    } catch (err) {
+      console.error('[BLOBS] events reset failed:', err)
+    }
+    return
+  }
+  await writeJSON(path.join(DATA_DIR, 'events.json'), [])
+}
+
+export async function getEvents(): Promise<MarketEvent[]> {
+  return loadEventsRaw()
 }
 
 /** Product ids currently liked by a user (single source: the like index). */
@@ -666,10 +813,10 @@ export async function reportComment(id: string, userId: string): Promise<{ comme
 
 // Client space: a user may remove one of their own tracked events.
 export async function deleteUserEvent(userId: string, ts: number): Promise<boolean> {
-  return mutateSocial((social) => {
-    const before = social.events.length
-    social.events = social.events.filter((e) => !(String(e.userId || '') === String(userId) && Number(e.ts) === Number(ts)))
-    return { next: before === social.events.length ? null : social, value: before !== social.events.length }
+  return mutateEvents((events) => {
+    const before = events.length
+    events = events.filter((e) => !(String(e.userId || '') === String(userId) && Number(e.ts) === Number(ts)))
+    return { next: before === events.length ? null : events, value: before !== events.length }
   })
 }
 

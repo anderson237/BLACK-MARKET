@@ -1,5 +1,5 @@
 import { requireAuth } from '~~/server/utils/auth'
-import { getSocial, loadAccounts, loadOrders } from '~~/server/utils/storage'
+import { getSocial, getEvents, loadAccounts, loadOrders } from '~~/server/utils/storage'
 import { countryByCode, countryByName } from '~~/data/countries'
 
 function clean(s: unknown): string {
@@ -24,8 +24,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, statusMessage: 'Accès réservé à la gestion.' })
   }
 
-  const [social, accounts, orders] = await Promise.all([getSocial(), loadAccounts(), loadOrders()])
-  const events = Array.isArray(social.events) ? social.events : []
+  const [social, accounts, orders, events] = await Promise.all([getSocial(), loadAccounts(), loadOrders(), getEvents()])
 
   const byCode = new Map<string, CountryAgg>()
   const visitorsByCountry = new Map<string, Set<string>>()

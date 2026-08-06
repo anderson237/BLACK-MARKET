@@ -62,7 +62,7 @@ export function useTrack() {
   }
 
   // ---- fire an event: local queue + global Vue event + best-effort push ----
-  function track(ev: Partial<TrackEvent>) {
+  async function track(ev: Partial<TrackEvent>) {
     const auth = useAuthStore()
     const geo = useGeo()
     const event: TrackEvent = {
@@ -101,16 +101,29 @@ export function useTrack() {
       })
     }
 
-    // Best-effort push to backend (fire and forget)
+    // Best-effort push to backend. Views/clicks are fire-and-forget (losing one
+    // is harmless), but likes/unlikes/comments mutate the server counters, so
+    // those are retried with backoff — otherwise a concurrent-write failure
+    // would silently drop the interaction and the count would reset on refresh.
     if (import.meta.client) {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
       if (auth.token) headers.Authorization = `Bearer ${auth.token}`
-      fetch('/api/events', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(event),
-        keepalive: true,
-      }).catch(() => {})
+      const critical = event.type === 'like' || event.type === 'unlike' || event.type === 'comment'
+      const attempts = critical ? 4 : 1
+      for (let i = 0; i < attempts; i++) {
+        try {
+          await fetch('/api/events', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(event),
+            keepalive: true,
+          })
+          break
+        } catch {
+          if (i === attempts - 1) break
+          await new Promise((r) => setTimeout(r, 300 * (i + 1)))
+        }
+      }
     }
   }
 

@@ -1,4 +1,4 @@
-import { loadProducts, loadOrders, getSocial, loadAccounts } from '~~/server/utils/storage'
+import { loadProducts, loadOrders, getSocial, getEvents, loadAccounts } from '~~/server/utils/storage'
 import { requireAuth } from '~~/server/utils/auth'
 import { revenueRows } from '~~/server/utils/accounting'
 
@@ -15,11 +15,9 @@ import { revenueRows } from '~~/server/utils/accounting'
 //    social like index (social.likes) -> no parallel counters anywhere.
 export default defineEventHandler(async (event) => {
   await requireAuth(event)
-  const [productsRaw, orders, social, accounts] = await Promise.all([loadProducts(), loadOrders(), getSocial(), loadAccounts()])
+  const [productsRaw, orders, social, accounts, events] = await Promise.all([loadProducts(), loadOrders(), getSocial(), loadAccounts(), getEvents()])
   const products = productsRaw.filter((p: any) => !p.deleted)
   const rows = revenueRows(orders, products)
-
-  const events = social.events || []
   const comments = social.comments || []
   const likeIndex = social.likes || {}
 

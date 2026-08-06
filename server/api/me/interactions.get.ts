@@ -1,4 +1,4 @@
-import { findAccount, getSocial, getLikedProductIds, loadOrders, loadProducts } from '~~/server/utils/storage'
+import { findAccount, getSocial, getEvents, getLikedProductIds, loadOrders, loadProducts } from '~~/server/utils/storage'
 import { requireAuth } from '~~/server/utils/auth'
 
 const MAX = 120
@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
     .slice(0, MAX)
 
   // Full event history for this user (stats must NOT be sliced by the timeline cap).
-  const mine = (social.events || [])
+  const mine = (await getEvents())
     .filter((e) => e.userId === userId)
     .sort((a, b) => (b.ts || 0) - (a.ts || 0))
 
