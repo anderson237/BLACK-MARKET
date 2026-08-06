@@ -28,7 +28,7 @@ useHead(() => {
       { property: 'og:type', content: 'website' },
       { property: 'og:site_name', content: 'BLACK MARKET' },
       { property: 'og:url', content: `${siteUrl}/` },
-      { property: 'og:image', content: `${siteUrl}/favicon.svg` },
+      { property: 'og:image', content: `${siteUrl}/og-image.png` },
       { name: 'twitter:card', content: 'summary_large_image' },
       { name: 'robots', content: 'index, follow, max-image-preview:large' },
     ],

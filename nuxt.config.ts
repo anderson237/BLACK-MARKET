@@ -44,7 +44,11 @@ export default defineNuxtConfig({
         { property: "og:locale", content: "fr_FR" },
         { property: "og:type", content: "website" },
         { property: "og:description", content: "BLACK MARKET — catalogue exclusif de produits tendance importés directement d'usines chinoises (Taobao, 1688) : techwear, cyberpunk, prix d'usine, précommande WhatsApp." },
+        { property: "og:image", content: "https://blackmarket-import-export.netlify.app/og-image.png" },
+        { property: "og:image:width", content: "1200" },
+        { property: "og:image:height", content: "630" },
         { name: "twitter:card", content: "summary_large_image" },
+        { name: "twitter:image", content: "https://blackmarket-import-export.netlify.app/og-image.png" },
       ],
       link: [
         { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },

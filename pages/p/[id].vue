@@ -57,6 +57,14 @@ useHead(() => {
       url: pageUrl,
     },
   }
+  const breadcrumb = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Catalogue BLACK MARKET', item: `${config.public.siteUrl}/` },
+      { '@type': 'ListItem', position: 2, name: p.title, item: pageUrl },
+    ],
+  }
   return {
     title: `${p.title} — BLACK MARKET`,
     meta: [
@@ -73,7 +81,10 @@ useHead(() => {
       { name: 'twitter:image', content: img },
     ],
     link: [{ rel: 'canonical', href: pageUrl }],
-    script: [{ type: 'application/ld+json', children: JSON.stringify(jsonLd) }],
+    script: [
+      { type: 'application/ld+json', children: JSON.stringify(jsonLd) },
+      { type: 'application/ld+json', children: JSON.stringify(breadcrumb) },
+    ],
   }
 })
 
@@ -162,6 +173,9 @@ const techHtml = computed(() => sanitizeHtml(product.value?.originalDescription 
             v-if="m.type === 'image' && i === current"
             :src="m.src"
             :alt="product.title"
+            :loading="i === 0 ? 'eager' : 'lazy'"
+            :fetchpriority="i === 0 ? 'high' : undefined"
+            decoding="async"
             class="w-full h-full object-cover"
           />
           <video
@@ -170,6 +184,7 @@ const techHtml = computed(() => sanitizeHtml(product.value?.originalDescription 
             controls
             playsinline
             preload="metadata"
+            :poster="media[0]?.src || undefined"
             class="w-full h-full object-cover bg-black"
           />
         </template>

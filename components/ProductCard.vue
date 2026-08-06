@@ -61,6 +61,7 @@ const truncatedTitle = computed(() => {
           :src="product.imageUrl || `/api/img/${encodeURIComponent(product.id)}.jpg`"
           :alt="product.title"
           loading="lazy"
+          decoding="async"
           class="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-500"
         />
         <button
