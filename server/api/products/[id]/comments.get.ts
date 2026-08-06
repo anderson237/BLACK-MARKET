@@ -1,4 +1,4 @@
-import { getComments, getCommentCount } from '~~/server/utils/storage'
+import { getComments, getCommentCount, loadAccounts } from '~~/server/utils/storage'
 import { requireAuth } from '~~/server/utils/auth'
 
 export default defineEventHandler(async (event) => {
@@ -15,8 +15,16 @@ export default defineEventHandler(async (event) => {
     /* public read: no token / invalid token is fine */
   }
 
+  // Comments store a picture snapshot at post time; resolve each author's
+  // CURRENT avatar so a profile update is reflected on every comment instantly
+  // (falls back to the stored snapshot when no account is found).
+  const accounts = await loadAccounts()
+  const pictureByUser = new Map<string, string>()
+  for (const a of accounts) pictureByUser.set(String(a.id), a.picture || '')
+
   const enriched = comments.map((c) => ({
     ...c,
+    picture: pictureByUser.get(String(c.userId || '')) || c.picture || undefined,
     likedByMe: userId ? (c.likedBy || []).includes(userId) : false,
     dislikedByMe: userId ? (c.dislikedBy || []).includes(userId) : false,
     reportedByMe: userId ? (c.reportedBy || []).includes(userId) : false,

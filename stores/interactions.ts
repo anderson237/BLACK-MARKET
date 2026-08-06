@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { useAuthStore } from '~/stores/auth'
 
 export interface LikeState {
   liked: boolean
@@ -17,6 +18,9 @@ export const useInteractionsStore = defineStore('interactions', () => {
   const likedSet = ref<Set<string>>(new Set())
   const initialized = ref(false)
   const refreshing = ref<Record<string, boolean>>({})
+  // Timestamp of the last local toggle per product: the optimistic value must
+  // not be clobbered by a stale server read arriving right after the click.
+  const lastLocal = ref<Record<string, number>>({})
 
   function load() {
     if (initialized.value) return
@@ -51,16 +55,26 @@ export const useInteractionsStore = defineStore('interactions', () => {
   async function refreshCount(id: string): Promise<number> {
     load()
     if (refreshing.value[id]) return likes.value[id]?.count ?? 0
+    // Cooldown: right after a local like/unlike, the /api/events POST may not
+    // have reached the server yet — an immediate refresh would show a stale
+    // (pre-click) count and override the optimistic value.
+    if (Date.now() - (lastLocal.value[id] || 0) < 800) return likes.value[id]?.count ?? 0
     refreshing.value[id] = true
     try {
-      const res = await fetch(`/api/products/${encodeURIComponent(id)}/likes`, {
-        headers: { Accept: 'application/json' },
-      })
+      const auth = useAuthStore()
+      const headers: Record<string, string> = { Accept: 'application/json' }
+      if (auth.token) headers.Authorization = `Bearer ${auth.token}`
+      const res = await fetch(`/api/products/${encodeURIComponent(id)}/likes`, { headers })
       if (res.ok) {
         const data = await res.json()
         const count = Number(data?.count)
         if (Number.isFinite(count)) {
-          likes.value[id] = { liked: likedSet.value.has(id), count }
+          // Server truth: count AND whether the current user liked it.
+          const liked = data?.liked === true
+          likes.value[id] = { liked, count }
+          if (liked) likedSet.value.add(id)
+          else likedSet.value.delete(id)
+          persist()
         }
       }
     } catch {
@@ -82,11 +96,13 @@ export const useInteractionsStore = defineStore('interactions', () => {
     const cur = likes.value[id] || { liked: likedSet.value.has(id), count: 0 }
     const next: LikeState = {
       liked: !cur.liked,
-      count: cur.count + (cur.liked ? -1 : 1),
+      // Never go below 0 (an unlike on a yet-unsynced count must not show -1).
+      count: Math.max(0, cur.count + (cur.liked ? -1 : 1)),
     }
     likes.value[id] = next
     if (next.liked) likedSet.value.add(id)
     else likedSet.value.delete(id)
+    lastLocal.value[id] = Date.now()
     persist()
     return next
   }
