@@ -9,11 +9,17 @@ const { track, like, share } = useTrack()
 const inter = useInteractionsStore()
 const auth = useAuthStore()
 const config = useRuntimeConfig()
+const commentsStore = useCommentsStore()
+
+// Seed the counts from the SSR payload (product.likeCount/commentCount) so the
+// server-rendered HTML already shows the real numbers — no "flash to 0" after
+// a page refresh while the client re-fetches.
+if (props.product.likeCount != null) inter.seed(props.product.id, props.product.likeCount)
+if (props.product.commentCount != null) commentsStore.seed(props.product.id, props.product.commentCount)
 
 const liked = computed(() => inter.getLike(props.product.id).liked)
 const likeCount = computed(() => inter.getLike(props.product.id).count)
 
-const commentsStore = useCommentsStore()
 const commentCount = computed(() => commentsStore.getCount(props.product.id))
 
 function syncStats() {

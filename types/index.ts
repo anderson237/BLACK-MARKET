@@ -15,6 +15,8 @@ export interface Product {
   featuredMedia?: 'image' | 'video'
   category: string
   whatsappClicks: number
+  likeCount?: number
+  commentCount?: number
   waNumber?: string
   sourceRmb?: number
   purchaseRmb?: number

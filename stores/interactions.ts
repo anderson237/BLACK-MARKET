@@ -16,23 +16,30 @@ export interface LikeState {
 export const useInteractionsStore = defineStore('interactions', () => {
   const likes = ref<Record<string, LikeState>>({})
   const likedSet = ref<Set<string>>(new Set())
-  const initialized = ref(false)
+  // Module-scoped (never serialized into the SSR payload): forces a fresh
+  // localStorage read on every client page load, while SSR keeps its state.
+  let clientLoaded = false
   const refreshing = ref<Record<string, boolean>>({})
   // Timestamp of the last local toggle per product: the optimistic value must
   // not be clobbered by a stale server read arriving right after the click.
   const lastLocal = ref<Record<string, number>>({})
 
   function load() {
-    if (initialized.value) return
-    try {
-      const raw = localStorage.getItem('bm_likes_v1')
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        likes.value = parsed.likes || {}
-        likedSet.value = new Set(parsed.likedIds || [])
-      }
-    } catch {}
-    initialized.value = true
+    if (clientLoaded) return
+    clientLoaded = true
+    if (import.meta.client) {
+      try {
+        const raw = localStorage.getItem('bm_likes_v1')
+        if (raw) {
+          const parsed = JSON.parse(raw)
+          likes.value = parsed.likes || {}
+          likedSet.value = new Set(parsed.likedIds || [])
+          return
+        }
+      } catch {}
+    }
+    // SSR or no local data: keep whatever was seeded, but guarantee a real Set.
+    if (!(likedSet.value instanceof Set)) likedSet.value = new Set()
   }
 
   function persist() {
@@ -95,6 +102,19 @@ export const useInteractionsStore = defineStore('interactions', () => {
     likes.value[id] = { ...cur, count: Math.max(0, cur.count + delta) }
   }
 
+  /**
+   * Seeds a product's count from the SSR payload (product.likeCount) so the
+   * very first paint — including the server-rendered HTML — already shows the
+   * real centralized number instead of 0. Never overrides a locally toggled
+   * value.
+   */
+  function seed(id: string, count: number) {
+    load()
+    const cur = likes.value[id]
+    if (cur) return
+    likes.value[id] = { liked: likedSet.value.has(id), count: Math.max(0, Number(count) || 0) }
+  }
+
   function toggleLike(id: string): LikeState {
     load()
     const cur = likes.value[id] || { liked: likedSet.value.has(id), count: 0 }
@@ -111,5 +131,5 @@ export const useInteractionsStore = defineStore('interactions', () => {
     return next
   }
 
-  return { likes, likedSet, getLike, toggleLike, bounceLike, refreshCount }
+  return { likes, likedSet, getLike, toggleLike, bounceLike, seed, refreshCount }
 })

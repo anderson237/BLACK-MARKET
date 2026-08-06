@@ -35,5 +35,14 @@ export const useCommentsStore = defineStore('comments', () => {
     loaded.value[id] = true
   }
 
-  return { counts, loaded, getCount, refresh, bump }
+  /**
+   * Seeds a product's count from the SSR payload (product.commentCount) so the
+   * server-rendered HTML already shows the real number instead of 0.
+   */
+  function seed(id: string, count: number) {
+    if (counts.value[id] == null) counts.value[id] = Math.max(0, Number(count) || 0)
+    loaded.value[id] = true
+  }
+
+  return { counts, loaded, getCount, refresh, bump, seed }
 })

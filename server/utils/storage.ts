@@ -680,6 +680,27 @@ export async function getLikeCount(productId: string): Promise<number> {
   })
 }
 
+/**
+ * Attaches the centralized like/comment counts to product payloads so the
+ * SSR HTML already contains the real numbers (no "flash to 0" on refresh).
+ * Uses one social read for all products instead of N round-trips.
+ */
+export async function attachSocialCounts(products: any[]): Promise<any[]> {
+  if (!products.length) return products
+  const social = await getSocial()
+  const likes = social.likes || {}
+  const commentCounts: Record<string, number> = {}
+  for (const c of social.comments || []) {
+    const pid = String(c?.productId || '')
+    if (pid) commentCounts[pid] = (commentCounts[pid] || 0) + 1
+  }
+  return products.map((p) => ({
+    ...p,
+    likeCount: Number(likes[p.id]) || 0,
+    commentCount: commentCounts[p.id] || 0,
+  }))
+}
+
 // ---- images / videos ----
 export async function saveImage(id: string, buffer: Buffer): Promise<void> {
   if (isNetlifyRuntime()) return blobSet('bm-images', id + '.jpg', buffer)
