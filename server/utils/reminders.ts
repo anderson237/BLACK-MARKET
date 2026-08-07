@@ -1,4 +1,5 @@
 import { loadAllCarts, loadAccounts, loadReminders, saveReminder, type CartItem } from '~~/server/utils/storage'
+import { sendEmail } from '~~/server/utils/email'
 
 /**
  * Abandoned-cart reminder engine.
@@ -225,33 +226,9 @@ export function renderReminderHtml(c: ReminderCandidate): string {
 }
 
 /** Send an email via Resend (no-op unless RESEND_API_KEY is present). */
-async function sendEmail(to: string, subject: string, text: string, html: string): Promise<boolean> {
-  const apiKey = process.env.RESEND_API_KEY
-  if (!apiKey || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return false
-  try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: process.env.RESEND_FROM || 'Deep Roots Logistics <no-reply@deeproots-importexport.netlify.app>',
-        to: [to],
-        subject,
-        text,
-        html,
-      }),
-    })
-    return res.ok
-  } catch (err) {
-    console.error('[reminder] Resend failed:', err)
-    return false
-  }
-}
-
-/** Run the reminder pass. Returns per-candidate status. */
-export async function runReminderPass(opts?: { abandonedHours?: number; cooldownHours?: number; dryRun?: boolean }): Promise<ReminderRunResult> {
+/**
+ * Run the reminder pass. Returns per-candidate status.
+ */export async function runReminderPass(opts?: { abandonedHours?: number; cooldownHours?: number; dryRun?: boolean }): Promise<ReminderRunResult> {
   const candidates = await findAbandonedCarts(opts)
   // Force dry-run unless the operator explicitly enables sending AND a key exists.
   const dryRun = opts?.dryRun === false ? false : (!process.env.RESEND_API_KEY || opts?.dryRun === true)

@@ -7,6 +7,7 @@ import { useInteractionsStore } from '~/stores/interactions'
 import { useTrack } from '~/composables/useTrack'
 import { useCurrency } from '~/composables/useCurrency'
 import { useCartStore, type CartItem } from '~/stores/cart'
+import { useChatStore } from '~/stores/chat'
 
 const { isLight } = useTheme()
 
@@ -16,6 +17,7 @@ const auth = useAuthStore()
 const config = useRuntimeConfig()
 const inter = useInteractionsStore()
 const cart = useCartStore()
+const chat = useChatStore()
 const { like } = useTrack()
 const { format } = useCurrency()
 
@@ -205,7 +207,10 @@ onUnmounted(() => {
 function onTrackRefresh() {
   if (refreshTimer) clearTimeout(refreshTimer)
   refreshTimer = setTimeout(() => {
-    if (auth.isAuthed && !needsCompletion.value) loadInteractions()
+    if (auth.isAuthed && !needsCompletion.value) {
+      loadInteractions()
+      chat.load(true)
+    }
   }, 600)
 }
 function onStorage(e: StorageEvent) {
@@ -219,7 +224,7 @@ function onVisibility() {
 let autoRefresh: ReturnType<typeof setInterval> | null = null
 
 onMounted(fillForm)
-watch(() => auth.isAuthed, (v) => { if (v) { fillForm(); loadInteractions(); cart.load() } }, { immediate: true })
+watch(() => auth.isAuthed, (v) => { if (v) { fillForm(); loadInteractions(); cart.load(); chat.load() } }, { immediate: true })
 
 function timeAgo(isoOrTs: string | number): string {
   const t = typeof isoOrTs === 'number' ? isoOrTs : new Date(isoOrTs).getTime()
@@ -388,6 +393,34 @@ function showLess(key: CatKey) {
 const catList = computed(() =>
   CATEGORIES.map((c) => ({ ...c, count: catItems(c.key).length })),
 )
+
+// ---- Chat (ST-012) : thread précommande + threads commandes + badges ----
+const preThread = computed(() => chat.threads.find((t) => t.kind === 'preorder') || null)
+const orderThreads = computed(() => chat.threads.filter((t) => t.kind === 'order'))
+const chatUnread = computed(() => chat.unread)
+const preChatUnread = computed(() => preThread.value?.unread || 0)
+const ordersChatUnread = computed(() => chat.threads.reduce((s, t) => s + (t.kind === 'order' ? t.unread || 0 : 0), 0))
+
+// Which thread is open in the chat drawer (client side).
+const openThreadId = ref<string | null>(null)
+const openThreadKind = ref<'preorder' | 'order'>('preorder')
+function openChat(kind: 'preorder' | 'order', threadId: string | null) {
+  if (kind === 'preorder' && !threadId) {
+    // Preorder chat can be opened even before the first message: the thread
+    // is created server-side on first send.
+    openThreadId.value = `pre:${auth.user?.id || ''}`
+  } else {
+    openThreadId.value = threadId
+  }
+  openThreadKind.value = kind
+}
+function closeChat() {
+  openThreadId.value = null
+  chat.refresh()
+}
+function onChatSent() {
+  chat.refresh()
+}
 
 const totalActivity = computed(() => {
   const d = data.value
@@ -796,8 +829,31 @@ async function confirmAllPreorders() {
                   : 'bg-black/30 border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600'">
                 <AppIcon :name="c.icon" :size="12" />
                 <span>{{ c.label }}</span>
-                <span v-if="c.count" class="px-1.5 rounded bg-white/10">{{ c.count }}</span>
+                <span v-if="c.key === 'cart' && preChatUnread" class="px-1.5 rounded-full bg-[#ff2a2a] text-white text-[9px] leading-4 min-w-[18px] text-center">{{ preChatUnread }}</span>
+                <span v-else-if="c.key === 'orders' && ordersChatUnread" class="px-1.5 rounded-full bg-[#ff2a2a] text-white text-[9px] leading-4 min-w-[18px] text-center">{{ ordersChatUnread }}</span>
+                <span v-else-if="c.count" class="px-1.5 rounded bg-white/10">{{ c.count }}</span>
               </button>
+            </div>
+
+            <!-- Chat panel (ST-012) -->
+            <div v-if="openThreadId" class="mb-4">
+              <div class="flex items-center justify-between mb-2">
+                <p class="text-[10px] font-mono text-zinc-400 uppercase tracking-widest">
+                  <AppIcon name="message" :size="12" class="inline mr-1 text-[#ff2a2a]" />
+                  Discussion {{ openThreadKind === 'preorder' ? '— précommandes' : '— commande' }}
+                </p>
+                <button @click="closeChat" class="text-[10px] font-mono text-zinc-500 hover:text-white border border-zinc-800 px-2.5 py-1 rounded-lg transition-all">
+                  <AppIcon name="close" :size="11" class="inline" /> Fermer
+                </button>
+              </div>
+              <ChatPanel
+                :key="openThreadId"
+                :thread-id="openThreadId"
+                side="client"
+                :messages="(openThreadKind === 'preorder' ? preThread?.messages : (chat.threads.find(t => t.id === openThreadId)?.messages)) || []"
+                @sent="onChatSent"
+                @read="onChatSent"
+              />
             </div>
 
             <div class="space-y-2">
@@ -807,6 +863,12 @@ async function confirmAllPreorders() {
                   AUCUNE PRÉCOMMANDE — AJOUTEZ DES PRODUITS AU PANIER DEPUIS LE CATALOGUE.
                 </div>
                 <div v-else class="space-y-2">
+                  <button @click="openChat('preorder', preThread?.id || null)"
+                    class="w-full inline-flex items-center justify-center gap-2 border border-[#ff2a2a]/40 hover:border-[#ff2a2a]/80 text-[#ff2a2a] hover:bg-[#ff2a2a]/10 text-[10px] font-mono font-bold px-3 py-2.5 rounded-xl transition-all cursor-pointer">
+                    <AppIcon name="message" :size="13" />
+                    DISCUTER DE MES PRÉCOMMANDES
+                    <span v-if="preChatUnread" class="px-1.5 rounded-full bg-[#ff2a2a] text-white text-[9px] leading-4 min-w-[18px] text-center">{{ preChatUnread }}</span>
+                  </button>
                   <div v-for="item in cart.items" :key="item.productId" class="flex items-center gap-3 bg-black/30 border border-zinc-900 rounded-xl p-3">
                     <NuxtLink :to="productUrl(item.productId)">
                       <img v-if="item.imageUrl" :src="item.imageUrl" alt="" class="w-11 h-11 rounded-lg object-cover border border-zinc-800 shrink-0" />
@@ -921,7 +983,14 @@ async function confirmAllPreorders() {
                     <p class="text-xs font-bold text-slate-200 truncate">Commande — {{ o.productTitle || o.id }}</p>
                     <p class="text-[10px] text-zinc-500 font-mono mt-0.5">x{{ o.quantity }} · {{ o.priceXof ? format(o.priceXof) : '' }} · {{ timeAgo(o.createdAt) }}</p>
                   </div>
-                  <span class="text-[9px] font-mono uppercase tracking-widest px-2 py-1 rounded border" :class="o.status === 'completed' ? 'text-emerald-400 border-emerald-500/30' : o.status === 'cancelled' ? 'text-red-400 border-red-500/30' : 'text-amber-400 border-amber-500/30'">{{ o.status }}</span>
+                  <div class="flex flex-col items-end gap-1.5 shrink-0">
+                    <span class="text-[9px] font-mono uppercase tracking-widest px-2 py-1 rounded border" :class="o.status === 'completed' ? 'text-emerald-400 border-emerald-500/30' : o.status === 'cancelled' ? 'text-red-400 border-red-500/30' : 'text-amber-400 border-amber-500/30'">{{ o.status }}</span>
+                    <button @click="openChat('order', `ord:${o.id}`)"
+                      class="inline-flex items-center gap-1.5 text-[10px] font-mono text-[#ff2a2a] hover:text-white border border-[#ff2a2a]/40 hover:border-[#ff2a2a]/80 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer">
+                      <AppIcon name="message" :size="12" /> Discuter
+                      <span v-if="(chat.threads.find(t => t.id === `ord:${o.id}`)?.unread || 0)" class="px-1 rounded-full bg-[#ff2a2a] text-white text-[9px] leading-4 min-w-[16px] text-center">{{ chat.threads.find(t => t.id === `ord:${o.id}`)?.unread }}</span>
+                    </button>
+                  </div>
                 </div>
               </template>
 

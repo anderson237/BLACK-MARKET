@@ -4,6 +4,7 @@ import { formatPriceXof } from '~/composables/useCatalog'
 definePageMeta({ layout: 'admin' })
 
 const store = useAdminStore()
+const adminChat = useAdminChatStore()
 const deleting = ref<string | null>(null)
 const error = ref('')
 
@@ -61,7 +62,27 @@ watch([search, statusFilter], () => { page.value = 1 })
 const showDetail = ref(false)
 const detailOrder = ref<any>(null)
 
-onMounted(() => store.loadOrders())
+onMounted(() => {
+  store.loadOrders()
+  adminChat.load()
+})
+
+// Chat helpers (ST-012) — thread unread per order + reply from the detail modal.
+const chatUnreadFor = (orderId: string) => {
+  const t = adminChat.threadFor(`ord:${orderId}`)
+  return t ? t.unread || 0 : 0
+}
+
+function openOrderChat(o: any) {
+  // Ensure the order thread exists before opening the admin reply panel.
+  detailOrder.value = o
+  showDetail.value = true
+  adminChat.load(true)
+}
+
+function onAdminChatSent() {
+  adminChat.refresh()
+}
 
 function setStatus(o: any, s: string) {
   try {
@@ -201,6 +222,9 @@ function cleanPhone(p: string) {
               <td class="px-4 py-3 text-[10px] font-mono text-zinc-500 whitespace-nowrap">{{ new Date(o.createdAt).toLocaleDateString('fr-FR') }}</td>
               <td class="px-4 py-3 text-right" @click.stop>
                 <button @click="openDetail(o)" class="text-[10px] font-mono text-[#ff2a2a] hover:text-red-400 px-2 py-1 rounded-lg border border-[#ff2a2a]/30">Voir</button>
+                <button v-if="chatUnreadFor(o.id)" @click="openDetail(o)" class="relative text-[10px] font-mono text-white px-2 py-1 rounded-lg border border-[#ff2a2a]/50 bg-[#ff2a2a]/20 ml-1" title="Messages non lus">
+                  <AppIcon name="message" :size="11" class="inline mr-1" />{{ chatUnreadFor(o.id) }}
+                </button>
                 <button @click="deleting = o.id" class="text-[10px] font-mono text-red-400 hover:text-red-300 px-2 py-1 rounded-lg border border-red-500/30 ml-1">Suppr.</button>
               </td>
             </tr>
@@ -218,7 +242,12 @@ function cleanPhone(p: string) {
             <p class="text-[10px] font-mono text-zinc-500">{{ new Date(o.createdAt).toLocaleDateString('fr-FR') }}</p>
             <div class="flex items-center justify-between mt-1.5 gap-2">
               <span class="text-xs font-mono font-bold text-[#ff2a2a]">{{ formatPriceXof(o.priceXof * o.quantity) }}</span>
-              <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded border uppercase" :class="statusBadge[o.status] || statusBadge.pending">{{ statusLabel[o.status] || o.status }}</span>
+              <div class="flex items-center gap-1.5">
+                <span v-if="chatUnreadFor(o.id)" class="inline-flex items-center gap-1 text-[9px] font-mono font-bold text-white px-2 py-0.5 rounded-lg border border-[#ff2a2a]/50 bg-[#ff2a2a]/20">
+                  <AppIcon name="message" :size="11" />{{ chatUnreadFor(o.id) }}
+                </span>
+                <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded border uppercase" :class="statusBadge[o.status] || statusBadge.pending">{{ statusLabel[o.status] || o.status }}</span>
+              </div>
             </div>
           </div>
           <button @click.stop="deleting = o.id" class="shrink-0 w-10 h-10 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 flex items-center justify-center" title="Supprimer"><AppIcon name="trash" :size="14" /></button>
@@ -306,6 +335,23 @@ function cleanPhone(p: string) {
                 {{ statusLabel[s] }}
               </button>
             </div>
+          </div>
+
+          <!-- Chat client <-> admin (ST-012) -->
+          <div class="border-t border-zinc-800 pt-4">
+            <div class="text-[9px] font-mono text-zinc-500 uppercase tracking-wider mb-2 flex items-center gap-2">
+              <AppIcon name="message" :size="12" class="text-[#ff2a2a]" /> Discussion avec le client
+              <span v-if="chatUnreadFor(detailOrder.id)" class="px-1.5 rounded-full bg-[#ff2a2a] text-white text-[9px] leading-4 min-w-[18px] text-center">{{ chatUnreadFor(detailOrder.id) }}</span>
+            </div>
+            <ChatPanel
+              :key="'ord:' + detailOrder.id"
+              :thread-id="'ord:' + detailOrder.id"
+              side="admin"
+              :messages="adminChat.threadFor('ord:' + detailOrder.id)?.messages || []"
+              placeholder="Répondre au client…"
+              @sent="onAdminChatSent"
+              @read="onAdminChatSent"
+            />
           </div>
 
           <!-- WhatsApp + delete -->

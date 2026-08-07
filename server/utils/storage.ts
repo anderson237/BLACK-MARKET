@@ -1033,3 +1033,49 @@ export function looksLikeVideo(buffer: Buffer): boolean {
 }
 
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000
+
+// ---------------------------------------------------------------------------
+// Chat threads (client <-> admin) — blob bm-chat / chat.json
+// ---------------------------------------------------------------------------
+export interface ChatMessage {
+  id: string
+  from: 'client' | 'admin'
+  text: string
+  ts: number
+}
+
+export interface ChatThread {
+  id: string                 // 'pre:<userId>' OU 'ord:<orderId>'
+  kind: 'preorder' | 'order'
+  userId: string             // compte client
+  orderId?: string           // pour kind='order'
+  productTitle?: string      // libellé affichable
+  customerName?: string      // pour l'affichage admin
+  messages: ChatMessage[]
+  clientReadTs: number       // dernier ts lu par le CLIENT
+  adminReadTs: number        // dernier ts lu par l'ADMIN
+  createdAt: number
+  updatedAt: number
+}
+
+const CHAT_FILE = path.join(DATA_DIR, 'chat.json')
+
+export async function loadChat(): Promise<ChatThread[]> {
+  if (isNetlifyRuntime()) {
+    const raw = await blobGet('bm-chat', 'chat.json', 'text', 'strong')
+    if (raw != null) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) return parsed
+    }
+    return []
+  }
+  const parsed = await readJSON(CHAT_FILE)
+  return Array.isArray(parsed) ? parsed : []
+}
+
+export async function saveChat(threads: ChatThread[]): Promise<void> {
+  if (isNetlifyRuntime()) {
+    return blobSet('bm-chat', 'chat.json', JSON.stringify(threads, null, 2))
+  }
+  return writeJSON(CHAT_FILE, threads)
+}

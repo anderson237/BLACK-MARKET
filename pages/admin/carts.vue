@@ -5,6 +5,7 @@ import { useCurrency } from '~/composables/useCurrency'
 definePageMeta({ layout: 'admin' })
 
 const store = useAdminStore()
+const adminChat = useAdminChatStore()
 const config = useRuntimeConfig()
 const { format } = useCurrency()
 
@@ -13,6 +14,7 @@ const error = ref('')
 const carts = ref<any[]>([])
 const search = ref('')
 const expanded = ref<Record<string, boolean>>({})
+const chatOpen = ref<Record<string, boolean>>({})
 
 // Reminder pass
 const reminderLoading = ref(false)
@@ -55,7 +57,23 @@ async function runReminder() {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  adminChat.load()
+})
+
+// Chat helpers (ST-012) — preorder thread unread per basket + toggle panel.
+const preChatUnreadFor = (userId: string) => {
+  const t = adminChat.threadFor(`pre:${userId}`)
+  return t ? t.unread || 0 : 0
+}
+function toggleChat(userId: string) {
+  chatOpen.value[userId] = !chatOpen.value[userId]
+  if (chatOpen.value[userId]) adminChat.load(true)
+}
+function onAdminChatSent() {
+  adminChat.refresh()
+}
 
 const filtered = computed(() => {
   const q = search.value.trim().toLowerCase()
@@ -241,7 +259,12 @@ function relanceUrl(c: any): string {
             </p>
           </div>
           <div class="text-right shrink-0">
-            <p class="text-[10px] font-mono text-zinc-400">{{ c.itemsCount }} article{{ c.itemsCount > 1 ? 's' : '' }}</p>
+            <div class="flex items-center justify-end gap-2">
+              <p class="text-[10px] font-mono text-zinc-400">{{ c.itemsCount }} article{{ c.itemsCount > 1 ? 's' : '' }}</p>
+              <span v-if="preChatUnreadFor(c.userId)" class="inline-flex items-center gap-1 text-[9px] font-mono font-bold text-white px-2 py-0.5 rounded-lg border border-[#ff2a2a]/50 bg-[#ff2a2a]/20" title="Messages non lus du client">
+                <AppIcon name="message" :size="11" />{{ preChatUnreadFor(c.userId) }}
+              </span>
+            </div>
             <p class="text-sm font-black font-mono text-[#ff2a2a]">{{ format(c.totalXof) }}</p>
             <p class="text-[9px] font-mono text-zinc-600">{{ timeAgo(c.addedAt) }}</p>
           </div>
@@ -266,10 +289,28 @@ function relanceUrl(c: any): string {
             class="inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-300 hover:text-white border border-zinc-800 px-3 py-2 rounded-xl transition-all">
             <AppIcon name="chevronDown" :size="12" :class="expanded[c.userId] ? 'rotate-180' : ''" /> {{ expanded[c.userId] ? 'MASQUER' : 'DÉTAILS' }}
           </button>
+          <button @click="toggleChat(c.userId)"
+            class="inline-flex items-center gap-1.5 text-[10px] font-mono text-[#ff2a2a] hover:text-white border border-[#ff2a2a]/40 hover:border-[#ff2a2a]/80 px-3 py-2 rounded-xl transition-all">
+            <AppIcon name="message" :size="12" /> {{ chatOpen[c.userId] ? 'FERMER LE CHAT' : 'DISCUTER' }}
+            <span v-if="preChatUnreadFor(c.userId)" class="px-1 rounded-full bg-[#ff2a2a] text-white text-[9px] leading-4 min-w-[16px] text-center">{{ preChatUnreadFor(c.userId) }}</span>
+          </button>
           <a :href="relanceUrl(c)" target="_blank" rel="noopener"
             class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-mono font-bold px-3 py-2 rounded-xl transition-all">
             <AppIcon name="whatsapp" :size="12" /> RELANCER SUR WHATSAPP
           </a>
+        </div>
+
+        <!-- Chat client <-> admin (ST-012) -->
+        <div v-if="chatOpen[c.userId]" class="px-4 pb-4 border-t border-zinc-900 pt-3">
+          <ChatPanel
+            :key="'pre:' + c.userId"
+            :thread-id="'pre:' + c.userId"
+            side="admin"
+            :messages="adminChat.threadFor('pre:' + c.userId)?.messages || []"
+            placeholder="Répondre au client…"
+            @sent="onAdminChatSent"
+            @read="onAdminChatSent"
+          />
         </div>
       </div>
     </div>

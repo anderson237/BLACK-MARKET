@@ -8,6 +8,13 @@ const auth = useAuthStore()
 const { isLight, toggle, init } = useTheme()
 onMounted(() => init())
 
+// Chat badge (ST-012): poll unread admin messages for the sidebar.
+const adminChat = useAdminChatStore()
+onMounted(() => {
+  adminChat.pollUnread()
+  setInterval(() => adminChat.pollUnread(), 30_000)
+})
+
 // Admin console must never be indexed by search engines: it hosts login
 // forms and private data, and keeping it out of the crawl reduces the risk
 // of Google's Safe Browsing misclassifying the password form as phishing.
@@ -174,6 +181,7 @@ function closeDrawer() {
           :class="isActive(item.to) ? 'bg-[#ff2a2a]/15 text-[#ff2a2a] border border-[#ff2a2a]/30' : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60 border border-transparent'"
         >
           <AppIcon :name="item.icon" :size="15" />{{ item.label }}
+          <span v-if="item.to === '/admin/orders' && adminChat.unread" class="ml-auto px-1.5 rounded-full bg-[#ff2a2a] text-white text-[9px] font-mono font-bold leading-4 min-w-[18px] text-center">{{ adminChat.unread }}</span>
         </NuxtLink>
       </nav>
     </aside>
@@ -191,6 +199,7 @@ function closeDrawer() {
             class="flex items-center gap-2.5 px-3 py-3 rounded-lg text-[12px] font-mono font-bold transition-all uppercase tracking-wider"
             :class="isActive(item.to) ? 'bg-[#ff2a2a]/15 text-[#ff2a2a] border border-[#ff2a2a]/30' : 'text-zinc-300 hover:text-white hover:bg-zinc-800/60 border border-transparent'">
             <AppIcon :name="item.icon" :size="15" />{{ item.label }}
+            <span v-if="item.to === '/admin/orders' && adminChat.unread" class="ml-auto px-1.5 rounded-full bg-[#ff2a2a] text-white text-[9px] font-mono font-bold leading-4 min-w-[18px] text-center">{{ adminChat.unread }}</span>
           </NuxtLink>
         </nav>
         <div class="p-4 border-t border-zinc-800">
