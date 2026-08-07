@@ -1,6 +1,7 @@
 import { loadProducts, saveProducts } from '~~/server/utils/storage'
 import { requireAuth } from '~~/server/utils/auth'
 import { sanitizeProduct } from '~~/server/utils/product'
+import { publishSiteUpdate } from '~~/server/utils/realtime'
 
 export default defineEventHandler(async (event) => {
   await requireAuth(event)
@@ -15,5 +16,6 @@ export default defineEventHandler(async (event) => {
   if (idx >= 0) products[idx] = product
   else products.unshift(product)
   await saveProducts(products)
+  publishSiteUpdate('catalog')
   return { success: true }
 })

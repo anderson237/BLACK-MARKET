@@ -1,6 +1,7 @@
 import { loadOrders, saveOrders, withLock } from '~~/server/utils/storage'
 import { requireAuth, rateLimit } from '~~/server/utils/auth'
 import { migratePreorderToOrder } from '~~/server/utils/chat'
+import { publishSiteUpdate } from '~~/server/utils/realtime'
 import { sendEmail } from '~~/server/utils/email'
 
 // Recipient for new-order notifications (env configurable, sane default).
@@ -106,6 +107,9 @@ export default defineEventHandler(async (event) => {
     if (created && order.userId) {
       notifyAdminNewOrder(order).catch((e) => console.error('[orders] admin email failed:', e))
     }
+
+    // Site-wide: the admin console + client space refresh instantly.
+    publishSiteUpdate('orders')
 
     return { success: true, order: idx >= 0 ? orders[idx] : order }
   })

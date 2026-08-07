@@ -194,6 +194,7 @@ onMounted(() => {
   window.addEventListener('focus', onTrackRefresh)
   window.addEventListener('storage', onStorage)
   document.addEventListener('visibilitychange', onVisibility)
+  window.addEventListener('bm:site', onSiteEvent)
   autoRefresh = setInterval(onTrackRefresh, 15_000)
 })
 onUnmounted(() => {
@@ -201,6 +202,7 @@ onUnmounted(() => {
   window.removeEventListener('focus', onTrackRefresh)
   window.removeEventListener('storage', onStorage)
   document.removeEventListener('visibilitychange', onVisibility)
+  window.removeEventListener('bm:site', onSiteEvent)
   if (refreshTimer) clearTimeout(refreshTimer)
   if (autoRefresh) clearInterval(autoRefresh)
   chat.stopRealtime()
@@ -223,6 +225,22 @@ function onVisibility() {
   if (document.visibilityState === 'visible') onTrackRefresh()
 }
 let autoRefresh: ReturnType<typeof setInterval> | null = null
+
+// Site-wide real-time: a new order / status change (SSE push) refreshes the
+// space instantly — silently, keeping the current content (no skeleton flash).
+function onSiteEvent(e: Event) {
+  const detail = (e as CustomEvent).detail
+  if (detail?.kind === 'orders') {
+    if (refreshTimer) clearTimeout(refreshTimer)
+    refreshTimer = setTimeout(() => {
+      if (auth.isAuthed && !needsCompletion.value) {
+        loadInteractions()
+        cart.load()
+        chat.load(true)
+      }
+    }, 400)
+  }
+}
 
 onMounted(fillForm)
 watch(() => auth.isAuthed, (v) => {
@@ -836,7 +854,11 @@ async function confirmAllPreorders() {
       <div class="mt-8">
         <p class="text-[9px] text-[#ff2a2a] font-mono uppercase font-bold tracking-wider mb-3">VOTRE ACTIVITÉ SUR DEEP ROOTS</p>
 
-        <div v-if="loadingData" class="space-y-3">
+        <!-- Chargement : squelettes UNIQUEMENT au premier chargement. Les
+             rafraîchissements suivants (15 s, focus, événements) gardent le
+             contenu affiché pour ne JAMAIS démonter le chat/panier en cours
+             de saisie (pas de flash, pas de message perdu). -->
+        <div v-if="loadingData && !data" class="space-y-3">
           <div v-for="n in 3" :key="n" class="skeleton h-16 rounded-xl" />
         </div>
 

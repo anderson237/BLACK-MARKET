@@ -47,10 +47,28 @@ const onIntersect = (entries: IntersectionObserverEntry[]) => {
   }
 }
 
+// Site-wide real-time: refresh the catalogue instantly when the admin
+// creates/updates/archives a product (SSE push), keeping the scroll position.
+// A 30s poll is the fallback: Netlify's in-memory pub/sub is per-instance, so a
+// push can be missed when the mutation lands on a different Lambda instance.
+function onSiteEvent(e: Event) {
+  const detail = (e as CustomEvent).detail
+  if (detail?.kind === 'catalog') store.refresh()
+}
+
+let catalogPoll: ReturnType<typeof setInterval> | null = null
+
 onMounted(() => {
   const obs = new IntersectionObserver(onIntersect, { rootMargin: '600px' })
   if (sentinel.value) obs.observe(sentinel.value)
   onBeforeUnmount(() => obs.disconnect())
+  window.addEventListener('bm:site', onSiteEvent)
+  catalogPoll = setInterval(() => store.refresh(), 30_000)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('bm:site', onSiteEvent)
+  if (catalogPoll) clearInterval(catalogPoll)
 })
 </script>
 

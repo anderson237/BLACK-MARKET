@@ -18,7 +18,30 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{ (e: 'sent'): void; (e: 'read'): void }>()
 
+// Draft persistant : le brouillon est sauvegardé en sessionStorage à chaque
+// frappe et restauré au montage. Même si la page se rafraîchit ou si le panneau
+// est démonté/remonté, un long message tapé n'est JAMAIS perdu.
+const draftKey = computed(() => `bm_chat_draft_${props.side}_${props.threadId}`)
 const text = ref('')
+if (import.meta.client) {
+  try {
+    const saved = sessionStorage.getItem(draftKey.value)
+    if (saved) text.value = saved
+  } catch { /* sessionStorage indisponible */ }
+}
+function saveDraft() {
+  try {
+    if (text.value.trim()) sessionStorage.setItem(draftKey.value, text.value)
+    else sessionStorage.removeItem(draftKey.value)
+  } catch { /* ignore */ }
+}
+watch(text, saveDraft)
+function clearDraft() {
+  try {
+    sessionStorage.removeItem(draftKey.value)
+  } catch { /* ignore */ }
+}
+
 const sending = ref(false)
 const error = ref('')
 const listEl = ref<HTMLElement | null>(null)
@@ -61,6 +84,7 @@ async function send() {
     const json = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(json?.statusMessage || json?.message || `Erreur ${res.status}`)
     text.value = ''
+    clearDraft()
     emit('sent')
     scrollBottom()
   } catch (e: any) {

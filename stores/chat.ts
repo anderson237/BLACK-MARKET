@@ -29,8 +29,14 @@ export const useChatStore = defineStore('chat', () => {
     try {
       const res = await fetch('/api/chat/threads', { headers: headers() })
       const json = await res.json().catch(() => ({}))
-      threads.value = Array.isArray(json.threads) ? json.threads : []
-      unread.value = Number(json.unread) || 0
+      // N'écrase l'état que si les données ont réellement changé : évite les
+      // re-renders inutiles du poll 2 s (et les micro-flashes associés).
+      const nextThreads = Array.isArray(json.threads) ? json.threads : []
+      const nextUnread = Number(json.unread) || 0
+      if (JSON.stringify(nextThreads) !== JSON.stringify(threads.value) || nextUnread !== unread.value) {
+        threads.value = nextThreads
+        unread.value = nextUnread
+      }
       loaded.value = true
     } catch {
       /* keep previous state */

@@ -52,3 +52,14 @@ export function publishChatUpdate(thread: { id: string; kind?: string; userId?: 
   if (thread.userId) publish(`user:${thread.userId}`, payload)
   publish('admin', payload)
 }
+
+// ---------------------------------------------------------------------------
+// Site-wide events: broadcast that the catalog / orders / stats changed so
+// every open page (public catalogue, product page, client space, admin
+// console) can refresh instantly instead of waiting for its slow poll or a
+// manual reload. Same per-instance caveat as chat: a public SSE fallback
+// poll keeps the site fresh even across serverless instance splits.
+// ---------------------------------------------------------------------------
+export function publishSiteUpdate(kind: 'catalog' | 'orders' | 'stats'): void {
+  publish('site', { type: 'site', kind, at: Date.now() })
+}

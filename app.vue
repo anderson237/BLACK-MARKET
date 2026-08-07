@@ -7,6 +7,18 @@ let timer: ReturnType<typeof setTimeout> | null = null
 const auth = useAuthStore()
 onMounted(() => auth.hydrate())
 
+// Site-wide real-time events: one public SSE connection per page. It only
+// forwards "something changed" hints (catalog / orders / ...); pages listen
+// for the kinds they care about and refresh instantly.
+let siteEvents: ReturnType<typeof useSiteEvents> | null = null
+onMounted(() => {
+  siteEvents = useSiteEvents()
+  siteEvents.start()
+})
+onBeforeUnmount(() => {
+  siteEvents?.stop()
+})
+
 function showToast(msg: string) {
   toast.value = msg
   if (timer) clearTimeout(timer)

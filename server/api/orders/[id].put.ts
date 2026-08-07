@@ -1,5 +1,6 @@
 import { loadOrders, saveOrders } from '~~/server/utils/storage'
 import { requireAuth, rateLimit } from '~~/server/utils/auth'
+import { publishSiteUpdate } from '~~/server/utils/realtime'
 
 export default defineEventHandler(async (event) => {
   await requireAuth(event)
@@ -17,5 +18,6 @@ export default defineEventHandler(async (event) => {
   if (body?.quantity) next.quantity = Math.max(1, Number(body.quantity) || 1)
   orders[idx] = next
   await saveOrders(orders)
+  publishSiteUpdate('orders')
   return { success: true, order: next }
 })

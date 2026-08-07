@@ -60,6 +60,11 @@ export default defineNuxtConfig({
         { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700;800&family=Share+Tech+Mono&display=swap" },
       ],
       script: [
+        // Anti-FOUC : applique le thème choisi sur <html> AVANT le premier
+        // rendu peint, pour supprimer le flash sombre<->clair à chaque page.
+        {
+          children: `(function(){try{var t=localStorage.getItem('bm_theme');if(t==='light'){document.documentElement.classList.add('light')}}catch(e){}})();`,
+        },
         {
           type: "application/ld+json",
           children: `{"@context":"https://schema.org","@type":"WebSite","name":"Deep Roots Logistics","alternateName":"Deep Roots Logistics Import Export","url":"https://deeproots-importexport.netlify.app","description":"Deep Roots Logistics — votre ancre mondiale pour le commerce international : import-export global, catalogue de produits tendance et précommande WhatsApp."}`,

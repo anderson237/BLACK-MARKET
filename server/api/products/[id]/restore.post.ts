@@ -1,5 +1,6 @@
 import { loadProducts, saveProducts } from '~~/server/utils/storage'
 import { requireAuth } from '~~/server/utils/auth'
+import { publishSiteUpdate } from '~~/server/utils/realtime'
 
 export default defineEventHandler(async (event) => {
   await requireAuth(event)
@@ -10,5 +11,6 @@ export default defineEventHandler(async (event) => {
   delete p.deleted
   delete p.deletedAt
   await saveProducts(products)
+  publishSiteUpdate('catalog')
   return { success: true, restored: true }
 })

@@ -27,6 +27,27 @@ onUnmounted(() => {
   adminChat.stopRealtime()
 })
 
+// Site-wide real-time: a new order / status change / product edit (SSE push)
+// refreshes the console data instantly instead of waiting for the manual
+// reload or the 12s dashboard timer.
+const store = useAdminStore()
+function onSiteEvent(e: Event) {
+  const detail = (e as CustomEvent).detail
+  if (!detail?.kind || !isAdmin.value) return
+  if (detail.kind === 'orders') {
+    store.loadOrders().catch(() => {})
+    store.loadStats().catch(() => {})
+  } else if (detail.kind === 'catalog') {
+    store.loadProducts().catch(() => {})
+  }
+}
+onMounted(() => {
+  window.addEventListener('bm:site', onSiteEvent)
+})
+onUnmounted(() => {
+  window.removeEventListener('bm:site', onSiteEvent)
+})
+
 // Admin console must never be indexed by search engines: it hosts login
 // forms and private data, and keeping it out of the crawl reduces the risk
 // of Google's Safe Browsing misclassifying the password form as phishing.

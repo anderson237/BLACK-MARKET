@@ -1,6 +1,7 @@
 import { loadProducts, saveProducts } from '~~/server/utils/storage'
 import { requireAuth, rateLimit } from '~~/server/utils/auth'
 import { sanitizeProduct } from '~~/server/utils/product'
+import { publishSiteUpdate } from '~~/server/utils/realtime'
 
 export default defineEventHandler(async (event) => {
   await requireAuth(event)
@@ -10,5 +11,6 @@ export default defineEventHandler(async (event) => {
   if (body.length > 500) throw createError({ statusCode: 400, statusMessage: 'Trop de produits dans une seule requête (max 500).' })
   const products = body.map(sanitizeProduct)
   await saveProducts(products)
+  publishSiteUpdate('catalog')
   return { success: true }
 })

@@ -29,14 +29,33 @@ function onVisible() {
   })
 }
 
+let productPoll: ReturnType<typeof setInterval> | null = null
+
+// Site-wide real-time: the instant the admin edits/archives/restores a product
+// (SSE push), re-fetch this product page so the change appears immediately.
+function onSiteEvent(e: Event) {
+  const detail = (e as CustomEvent).detail
+  if (detail?.kind === 'catalog') {
+    refresh().then(() => {
+      if (!product.value && !error.value) navigateTo('/')
+    })
+  }
+}
+
 onMounted(() => {
   window.addEventListener('focus', onVisible)
   document.addEventListener('visibilitychange', onVisible)
+  window.addEventListener('bm:site', onSiteEvent)
+  // Fallback poll: Netlify's in-memory pub/sub is per-instance, so an SSE push
+  // can be missed. A quiet 60s refresh keeps the page in sync anyway.
+  productPoll = setInterval(() => onVisible(), 60_000)
 })
 
 onUnmounted(() => {
   window.removeEventListener('focus', onVisible)
   document.removeEventListener('visibilitychange', onVisible)
+  window.removeEventListener('bm:site', onSiteEvent)
+  if (productPoll) clearInterval(productPoll)
 })
 
 useHead(() => {
