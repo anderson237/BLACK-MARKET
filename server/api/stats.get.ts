@@ -14,7 +14,8 @@ import { revenueRows } from '~~/server/utils/accounting'
 //  - Clicks come from social events (type 'click'), like counts come from the
 //    social like index (social.likes) -> no parallel counters anywhere.
 export default defineEventHandler(async (event) => {
-  await requireAuth(event)
+  const session = await requireAuth(event)
+  if (session.role !== 'admin') throw createError({ statusCode: 403, statusMessage: 'Accès administrateur requis.' })
   const [productsRaw, orders, social, accounts, events] = await Promise.all([loadProducts(), loadOrders(), getSocial(), loadAccounts(), getEvents()])
   const products = productsRaw.filter((p: any) => !p.deleted)
   const rows = revenueRows(orders, products)

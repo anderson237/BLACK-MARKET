@@ -93,13 +93,19 @@ function setStatus(o: any, s: string) {
   }
 }
 
+const removing = ref(false)
+
 async function remove(id: string) {
+  if (removing.value) return
+  removing.value = true
   try {
     await store.deleteOrder(id)
     deleting.value = null
     if (detailOrder.value?.id === id) { showDetail.value = false; detailOrder.value = null }
   } catch (e: any) {
     error.value = e?.message || 'Erreur'
+  } finally {
+    removing.value = false
   }
 }
 
@@ -367,7 +373,7 @@ function cleanPhone(p: string) {
               <AppIcon name="whatsapp" :size="13" /> WhatsApp
             </a>
             <button
-              @click="remove(detailOrder.id)"
+              @click="deleting = detailOrder.id"
               class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[10px] font-mono font-bold uppercase text-red-400 border border-red-500/30 bg-red-500/5 hover:bg-red-500/15 transition-all">
               <AppIcon name="trash" :size="13" /> Supprimer la commande
             </button>
@@ -416,6 +422,29 @@ function cleanPhone(p: string) {
             <button @click="showCreate = false" class="flex-1 text-[11px] font-mono text-zinc-300 border border-zinc-700 px-3 py-2.5 rounded-xl">Annuler</button>
             <button @click="submitCreate" :disabled="creating" class="flex-1 bg-[#ff2a2a] hover:bg-red-600 disabled:opacity-30 text-white text-[11px] font-mono font-bold px-3 py-2.5 rounded-xl">Créer</button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirm delete order -->
+    <div v-if="deleting" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" @click.self="deleting = null">
+      <div class="bg-[#0d0d14] border border-zinc-800 rounded-2xl w-full max-w-sm p-5 shadow-2xl">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-10 h-10 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-400 shrink-0">
+            <AppIcon name="trash" :size="18" />
+          </div>
+          <div>
+            <h3 class="text-sm font-extrabold text-white font-mono uppercase tracking-wider">Supprimer la commande</h3>
+            <p class="text-[9px] font-mono text-zinc-500 truncate max-w-[240px]">{{ deleting }}</p>
+          </div>
+        </div>
+        <p class="text-[11px] text-zinc-400 font-mono mb-5">Cette action est irréversible : la commande sera supprimée définitivement.</p>
+        <div class="flex gap-2">
+          <button @click="deleting = null" class="flex-1 text-[10px] font-mono text-zinc-300 border border-zinc-700 px-3 py-2.5 rounded-xl hover:border-zinc-500 transition-all">Annuler</button>
+          <button @click="remove(deleting)" :disabled="removing" class="flex-1 text-[10px] font-mono font-bold bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white px-3 py-2.5 rounded-xl transition-all">
+            <span v-if="removing" class="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin inline-block align-middle" />
+            <template v-else>Supprimer</template>
+          </button>
         </div>
       </div>
     </div>

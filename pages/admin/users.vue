@@ -110,6 +110,39 @@ async function setRole(login: any, role: string) {
     roleBusy.value = ''
   }
 }
+
+// ---- account deletion (any provider: Google, email/password, phone) ----
+const deletingUser = ref<any>(null)
+const deletingBusy = ref(false)
+
+// Only customer accounts can be deleted: never the owner, never the account
+// currently logged in, never an admin-allowlisted email (it would just be
+// recreated on their next Google login).
+function canDelete(u: any) {
+  if (!data.value) return false
+  if (u.email === data.value.owner) return false
+  if (u.email && u.email === data.value.currentEmail) return false
+  if (store.admins.includes(u.email)) return false
+  return true
+}
+
+async function confirmDelete() {
+  if (!deletingUser.value || deletingBusy.value) return
+  deletingBusy.value = true
+  error.value = ''
+  savedMsg.value = ''
+  const target = deletingUser.value
+  const key = target.id || target.email
+  try {
+    await store.deleteUser(key)
+    savedMsg.value = `Compte « ${target.email} » supprimé définitivement (panier et discussions supprimés, commandes conservées).`
+    deletingUser.value = null
+  } catch (e: any) {
+    error.value = e?.message || 'Erreur lors de la suppression du compte.'
+  } finally {
+    deletingBusy.value = false
+  }
+}
 </script>
 
 <template>
@@ -203,6 +236,14 @@ async function setRole(login: any, role: string) {
               >
                 Promouvoir
               </button>
+              <button
+                v-if="canDelete(u)"
+                @click="deletingUser = u"
+                class="inline-flex items-center gap-1 text-[9px] font-mono font-bold uppercase px-2.5 py-2 rounded-lg text-red-400 border border-red-500/30 bg-red-500/5 hover:bg-red-500/15 transition-all"
+                title="Supprimer définitivement ce compte"
+              >
+                <AppIcon name="trash" :size="11" /> Supprimer
+              </button>
             </div>
           </div>
         </div>
@@ -257,6 +298,32 @@ async function setRole(login: any, role: string) {
           <p class="text-[9px] font-mono text-zinc-600 leading-relaxed">
             Tout le monde peut se connecter avec « Se connecter avec Google ». L'email ajouté pourra ensuite accéder au panneau d'administration. Depuis la liste des comptes, élevez les rôles (Éditeur, Publieur…) quand vous le décidez.
           </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirm delete account -->
+    <div v-if="deletingUser" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" @click.self="deletingUser = null">
+      <div class="bg-[#0d0d14] border border-zinc-800 rounded-2xl w-full max-w-sm p-5 shadow-2xl">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-10 h-10 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-400 shrink-0">
+            <AppIcon name="trash" :size="18" />
+          </div>
+          <div>
+            <h3 class="text-sm font-extrabold text-white font-mono uppercase tracking-wider">Supprimer le compte</h3>
+            <p class="text-[9px] font-mono text-zinc-500 truncate max-w-[240px]">{{ deletingUser.email }}</p>
+          </div>
+        </div>
+        <p class="text-[11px] text-zinc-400 font-mono mb-2">
+          Cette action est irréversible : le compte ({{ deletingUser.provider === 'password' ? 'email' : deletingUser.provider }}), son panier et ses discussions seront supprimés définitivement.
+        </p>
+        <p class="text-[10px] text-zinc-500 font-mono mb-5">Les commandes passées sont conservées (historique commercial).</p>
+        <div class="flex gap-2">
+          <button @click="deletingUser = null" class="flex-1 text-[10px] font-mono text-zinc-300 border border-zinc-700 px-3 py-2.5 rounded-xl hover:border-zinc-500 transition-all">Annuler</button>
+          <button @click="confirmDelete" :disabled="deletingBusy" class="flex-1 text-[10px] font-mono font-bold bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white px-3 py-2.5 rounded-xl transition-all">
+            <span v-if="deletingBusy" class="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin inline-block align-middle" />
+            <template v-else>Supprimer</template>
+          </button>
         </div>
       </div>
     </div>

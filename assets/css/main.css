@@ -81,6 +81,7 @@ html.light .bg-\[\#12121a\] { background-color: #ffffff; }
 html.light .bg-\[\#15151e\] { background-color: #f0f0f4; }
 html.light .bg-\[\#16161d\] { background-color: #eef0f4; }
 html.light .bg-\[\#1a1a24\] { background-color: #ececf1; }
+html.light .bg-\[\#1c1c26\] { background-color: #ececf1; }
 html.light .bg-zinc-950 { background-color: #fafafa; }
 html.light .bg-zinc-900,
 html.light .bg-zinc-900\/40,
@@ -97,6 +98,7 @@ html.light .hover\:bg-zinc-800:hover,
 html.light .hover\:bg-zinc-800\/60:hover { background-color: #e3e3ea; }
 html.light .hover\:bg-zinc-700:hover { background-color: #d6d6dd; }
 /* Inputs & badges translucides */
+html.light .bg-black\/20 { background-color: rgba(17, 17, 24, 0.03); }
 html.light .bg-black\/30 { background-color: rgba(17, 17, 24, 0.04); }
 html.light .bg-black\/40 { background-color: rgba(17, 17, 24, 0.06); }
 html.light .bg-black\/50 { background-color: rgba(17, 17, 24, 0.08); }
@@ -152,6 +154,8 @@ html.light .bg-\[\#ff2a2a\].text-white,
 html.light .bg-\[\#ff2a2a\] .text-white,
 html.light .bg-\[\#ff2a2a\]\/80.text-white,
 html.light .bg-\[\#ff2a2a\]\/80 .text-white,
+html.light .bg-\[\#ff2a2a\]\/90.text-white,
+html.light .bg-\[\#ff2a2a\]\/90 .text-white,
 html.light .bg-red-600.text-white,
 html.light .bg-red-600 .text-white,
 html.light .bg-red-500.text-white,

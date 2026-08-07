@@ -4,7 +4,8 @@ import { sanitizeProduct } from '~~/server/utils/product'
 import { publishSiteUpdate } from '~~/server/utils/realtime'
 
 export default defineEventHandler(async (event) => {
-  await requireAuth(event)
+  const session = await requireAuth(event)
+  if (session.role !== 'admin') throw createError({ statusCode: 403, statusMessage: 'Accès administrateur requis.' })
   rateLimit(30, 60_000)(event)
   const body = await readBody(event)
   if (!Array.isArray(body)) throw createError({ statusCode: 400, statusMessage: 'Le corps doit être un tableau de produits.' })

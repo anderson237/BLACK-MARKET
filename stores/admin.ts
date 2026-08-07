@@ -209,6 +209,16 @@ export const useAdminStore = defineStore('admin', () => {
     }
   }
 
+  /** Permanently delete a customer account (any provider: Google, email, phone). */
+  async function deleteUser(id: string) {
+    const res = await fetch(`/api/users/${encodeURIComponent(id)}`, { method: 'DELETE', headers: headers() })
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      throw new Error(j?.statusMessage || `Erreur ${res.status}`)
+    }
+    await loadUsers()
+  }
+
   async function saveAdmins(list: string[]) {
     const res = await fetch('/api/users/admins', {
       method: 'PUT',
@@ -343,7 +353,7 @@ export const useAdminStore = defineStore('admin', () => {
     loaded, loading, authError,
     isAdmin, headers,
     loadProducts, loadOrders, loadStats, loadCustomers, loadAdmins, loadUsers,
-    saveAdmins,
+    saveAdmins, deleteUser,
     updateOrderStatus, deleteOrder, createOrder,
     createProduct, updateProduct, deleteProduct, restoreProduct, permanentDeleteProduct,
     refresh,

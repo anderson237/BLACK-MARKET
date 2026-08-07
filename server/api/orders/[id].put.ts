@@ -3,7 +3,8 @@ import { requireAuth, rateLimit } from '~~/server/utils/auth'
 import { publishSiteUpdate } from '~~/server/utils/realtime'
 
 export default defineEventHandler(async (event) => {
-  await requireAuth(event)
+  const session = await requireAuth(event)
+  if (session.role !== 'admin') throw createError({ statusCode: 403, statusMessage: 'Accès administrateur requis.' })
   rateLimit(30, 60_000)(event)
   const id = getRouterParam(event, 'id')
   const orders = await loadOrders()

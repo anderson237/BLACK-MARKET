@@ -383,7 +383,7 @@ const CATEGORIES: { key: CatKey; label: string; icon: string }[] = [
   { key: 'comments', label: 'Commentaires', icon: 'comment' },
   { key: 'orders', label: 'Commandes', icon: 'box' },
   { key: 'others', label: 'Autres réactions', icon: 'sparkles' },
-  { key: 'chat', label: 'Chat', icon: 'message' },
+  { key: 'chat', label: 'Chat avec l\'administrateur', icon: 'message' },
 ]
 const activeCat = ref<CatKey>('cart')
 const shown = reactive<Record<CatKey, number>>({ cart: PAGE, views: PAGE, likes: PAGE, shares: PAGE, comments: PAGE, orders: PAGE, others: PAGE, chat: PAGE })
@@ -427,7 +427,10 @@ const orderThreads = computed(() => chat.threads.filter((t) => t.kind === 'order
 const chatUnread = computed(() => chat.unread)
 const generalThread = computed(() => chat.threads.find((t) => t.kind === 'general') || null)
 const generalChatUnread = computed(() => generalThread.value?.unread || 0)
-const preChatUnread = computed(() => chat.threads.reduce((s, t) => s + (t.kind === 'preorder' ? t.unread || 0 : 0), 0))
+// Unread count on the Précommandes tab: only the per-article threads are
+// reachable from there (each item has its own "Message" button), so the
+// basket-level legacy thread is no longer counted.
+const preChatUnread = computed(() => chat.threads.reduce((s, t) => s + (t.kind === 'preorder' && t.productId ? t.unread || 0 : 0), 0))
 const ordersChatUnread = computed(() => chat.threads.reduce((s, t) => s + (t.kind === 'order' ? t.unread || 0 : 0), 0))
 
 // Which thread is open in the chat drawer (client side).
@@ -913,12 +916,6 @@ async function confirmAllPreorders() {
                   AUCUNE PRÉCOMMANDE — AJOUTEZ DES PRODUITS AU PANIER DEPUIS LE CATALOGUE.
                 </div>
                 <div v-else class="space-y-2">
-                  <button @click="openChat('preorder', preThread?.id || null)"
-                    class="w-full inline-flex items-center justify-center gap-2 border border-[#ff2a2a]/40 hover:border-[#ff2a2a]/80 text-[#ff2a2a] hover:bg-[#ff2a2a]/10 text-[10px] font-mono font-bold px-3 py-2.5 rounded-xl transition-all cursor-pointer">
-                    <AppIcon name="message" :size="13" />
-                    DISCUTER DE MES PRÉCOMMANDES
-                    <span v-if="preChatUnread" class="px-1.5 rounded-full bg-[#ff2a2a] text-white text-[9px] leading-4 min-w-[18px] text-center">{{ preChatUnread }}</span>
-                  </button>
                   <div v-for="item in cart.items" :key="item.productId" class="bg-black/30 border border-zinc-900 rounded-xl overflow-hidden">
                     <div class="flex items-center gap-3 p-3">
                       <NuxtLink :to="productUrl(item.productId)">

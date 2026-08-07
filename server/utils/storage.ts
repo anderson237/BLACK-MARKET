@@ -176,6 +176,18 @@ export async function saveCart(userId: string, items: CartItem[]): Promise<void>
   return writeJSON(CART_FILE, carts)
 }
 
+/** Remove a user's basket entirely (used when deleting a customer account). */
+export async function deleteCart(userId: string): Promise<void> {
+  if (!userId) return
+  const carts = await loadCartsFile()
+  if (!(userId in carts)) return
+  delete carts[userId]
+  if (isNetlifyRuntime()) {
+    return blobSet('bm-cart', 'carts.json', JSON.stringify(carts, null, 2))
+  }
+  return writeJSON(CART_FILE, carts)
+}
+
 // ---- abandoned-cart reminders ----
 export interface CartReminder {
   userId: string
