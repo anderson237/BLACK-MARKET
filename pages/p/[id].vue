@@ -128,7 +128,7 @@ onBeforeUnmount(() => cdTimer && clearInterval(cdTimer))
 const waUrl = computed(() => {
   const p = product.value
   if (!p) return ''
-  const priceStr = format(p.priceXof)
+  const priceStr = format(promoPrice(p))
   const pageUrl = `${config.public.siteUrl}/p/${p.id}.html`
   const msg = buildWaMessage(p, priceStr, pageUrl)
   const num = p.waNumber || config.public.phoneNumber
@@ -165,7 +165,8 @@ function preorder() {
         customerPhone: auth.user?.phone || '',
         customerLocation: auth.user?.country || '—',
         quantity: Math.max(1, Number(p.moq) || 1),
-        priceXof: p.priceXof,
+        // Toujours facturer le prix EFFECTIF (promo si active, sinon prix de base).
+        priceXof: promoPrice(p),
         priceEur: p.priceEur,
       }),
     }).catch(() => {})

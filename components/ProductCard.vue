@@ -39,7 +39,7 @@ function toggleMute() {
 }
 
 function preorder() {
-  const msg = `📦 ${props.product.title}\n💰 ${format(props.product.priceXof)}${Number(props.product.moq) > 0 ? `\n📌 MOQ : ${props.product.moq} min` : ''}${Number(props.product.stockQuantity) > 0 ? `\n🏷️ En stock : ${props.product.stockQuantity}` : ''}\nDécouvrez ce drop exclusif DEEP ROOTS :`
+  const msg = `📦 ${props.product.title}\n💰 ${format(discountPrice.value)}${Number(props.product.moq) > 0 ? `\n📌 MOQ : ${props.product.moq} min` : ''}${Number(props.product.stockQuantity) > 0 ? `\n🏷️ En stock : ${props.product.stockQuantity}` : ''}\nDécouvrez ce drop exclusif DEEP ROOTS :`
   const link = window.location.origin + url.value
   const num = props.product.waNumber || config.public.phoneNumber
   auth.requireAuth(
