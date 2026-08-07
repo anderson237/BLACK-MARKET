@@ -170,16 +170,15 @@ async function saveProduct(p: any) {
               </ul>
               <div class="mt-3 flex items-center gap-3">
                 <span class="text-base font-black text-[#ff2a2a]">{{ result.data.priceXof.toLocaleString('fr-FR') }} F CFA</span>
-                <span class="text-[10px] font-mono text-zinc-500">{{ result.data.priceEur }} €</span>
               </div>
               <p class="text-[9px] text-zinc-600 font-mono mt-1">{{ result.data.priceExplanation }}</p>
             </div>
             <div v-else class="space-y-2">
               <input v-model="editable.translatedTitle" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" />
               <textarea v-model="editable.salesPitch" rows="5" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" />
-              <div class="grid grid-cols-2 gap-3">
-                <input v-model.number="editable.priceEur" type="number" class="bg-black/40 border border-zinc-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200" />
-                <input v-model.number="editable.priceXof" type="number" class="bg-black/40 border border-zinc-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200" />
+              <div class="space-y-1">
+                <label class="text-[9px] text-zinc-500 font-mono uppercase tracking-widest">Prix de vente (F CFA)</label>
+                <input v-model.number="editable.priceXof" type="number" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" />
               </div>
             </div>
             <button

@@ -50,27 +50,24 @@ const blocksModeTech = ref(true)
 
 const categories = ['Techwear', 'Streetwear', 'Cyber Gadgets', 'Gaming Room', 'Accessoires', 'Exclusif', 'Nouveautés']
 
-// ---- Prix : achat fournisseur + transport + marge -> prix de vente ----
-const rmbToXofRate = computed(() => Number(config.public.rmbToXofRate) || 82)
-const xofToEurRate = computed(() => Number(config.public.xofToEurRate) || 655.957)
+// ---- Prix : achat fournisseur + transport (F CFA) + marge -> prix de vente ----
+const marginPercent = computed(() => Number(draft.marginPercent) || 0)
 
 function computeSellingXof(): number {
   const purchase = Number(draft.purchaseRmb) || 0
   const shipping = Number(draft.shippingRmb) || 0
-  const margin = Number(draft.marginPercent) || 0
-  const totalRmb = purchase + shipping
-  if (totalRmb <= 0) return 0
-  const raw = totalRmb * (1 + margin / 100) * rmbToXofRate.value
-  return Math.max(0, Math.round(raw / 100) * 100)
+  const margin = marginPercent.value
+  const total = purchase + shipping
+  if (total <= 0) return 0
+  const raw = total * (1 + margin / 100)
+  return Math.max(0, Math.round(raw / 50) * 50)
 }
 
 const sellingXof = computed(() => computeSellingXof())
-const sellingEur = computed(() => (sellingXof.value > 0 ? Math.round(sellingXof.value / xofToEurRate.value) : 0))
 
 function applySellingPrice() {
-  if (Number(draft.purchaseRmb) > 0 || draft.shippingRmb > 0 || Number(draft.marginPercent) > 0) {
+  if (Number(draft.purchaseRmb) > 0 || draft.shippingRmb > 0 || marginPercent.value > 0) {
     draft.priceXof = sellingXof.value
-    draft.priceEur = sellingEur.value
   }
 }
 watch([() => draft.purchaseRmb, () => draft.shippingRmb, () => draft.marginPercent], applySellingPrice)
@@ -471,34 +468,28 @@ async function handleVideoFile(e: Event) {
           </select>
         </div>
 
-        <!-- Prix & marge -->
+<!-- Prix & marge -->
         <div class="space-y-2">
           <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Prix & marge</label>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div class="space-y-2">
-              <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Prix d'achat fournisseur (¥)</label>
-              <input v-model.number="draft.purchaseRmb" type="number" min="0" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="200" />
+              <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Prix d'achat fournisseur (F CFA)</label>
+              <input v-model.number="draft.purchaseRmb" type="number" min="0" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="2000" />
             </div>
             <div class="space-y-2">
-              <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Transport (¥)</label>
-              <input v-model.number="draft.shippingRmb" type="number" min="0" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="30" />
+              <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Transport (F CFA)</label>
+              <input v-model.number="draft.shippingRmb" type="number" min="0" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="300" />
             </div>
             <div class="space-y-2">
               <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Bénéfice (%)</label>
               <input v-model.number="draft.marginPercent" type="number" min="0" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="80" />
             </div>
           </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div v-if="sellingXof > 0" class="space-y-2">
-              <label class="text-[10px] text-emerald-400 font-mono uppercase tracking-widest">Prix de vente auto (F CFA)</label>
-              <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-2.5 text-sm font-mono text-emerald-300">{{ sellingXof.toLocaleString('fr-FR') }} F CFA</div>
-            </div>
-            <div v-if="sellingEur > 0" class="space-y-2">
-              <label class="text-[10px] text-emerald-400 font-mono uppercase tracking-widest">Prix de vente auto (€)</label>
-              <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-2.5 text-sm font-mono text-emerald-300">{{ sellingEur }} €</div>
-            </div>
+          <div v-if="sellingXof > 0">
+            <label class="text-[10px] text-emerald-400 font-mono uppercase tracking-widest">Prix de vente auto</label>
+            <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-2.5 text-sm font-mono text-emerald-300">{{ formatPriceXof(sellingXof) }}</div>
           </div>
-<p class="text-[9px] text-zinc-600 font-mono">Prix de vente = (achat + transport) × (1 + marge%) × taux {{ rmbToXofRate }}. Dès qu'un coût est renseigné, il remplace automatiquement le prix de vente enregistré.</p>
+          <p class="text-[9px] text-zinc-600 font-mono">Prix de vente = (achat + transport) × (1 + marge%). Dès qu'un coût est renseigné, il remplace automatiquement le prix de vente enregistré.</p>
         </div>
 
         <!-- Promo & réduction -->
