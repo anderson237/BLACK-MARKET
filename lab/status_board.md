@@ -16,7 +16,7 @@
 | ST-008 | Admin : vue Paniers non confirmés (relance) | LIVE | ✅ Déployé | Page `/admin/carts` + route `/api/admin/carts` (joint comptes clients) : KPI (paniers/articles/valeur), recherche, détail des articles, bouton **RELANCER SUR WHATSAPP** avec message pré-rempli. Lecture panier en **consistance forte** (fix du flux client + admin). |
 | ST-009 | Export CSV des paniers non confirmés | LIVE | ✅ Déployé | Bouton **⬇ EXPORTER CSV** sur `/admin/carts` : exporte la liste filtrée (client, email, téléphone, pays, articles, total F CFA, dernière activité, détail, lien WhatsApp) au format Excel FR (BOM UTF-8, séparateur `;`). |
 | ST-010 | Rappel automatique des paniers abandonnés | LIVE | ✅ Déployé | Netlify Scheduled Function `netlify/functions/remind-carts.mjs` (`@hourly`) → POST `/api/admin/reminders/run` (auth par `x-task-secret` = `NUXT_TASK_SECRET`, ou session admin). Logique `server/utils/reminders.ts` : scan paniers inactifs ≥ 48 h, cooldown 72 h, journalisation `bm-reminders` anti-doublon. **Email réel ACTIF** (clé Resend configurée) : template percutant texte + HTML (branding rouge, images produits, bouton CTA « CONFIRMER MA PRÉCOMMANDE », ligne FOMO) ; sujet accrocheur. Bouton **⟳ LANCER LE RAPPEL** dans l'UI admin (dry-run sûr, résultats affichés). |
-| ST-012 | Chat commandes / précommandes (client ↔ admin) | DESIGN | 🔵 En cours | Threads de discussion : `pre:<userId>` (précommandes/panier) + `ord:<orderId>` (commandes). Client écrit depuis `/compte` (onglets Précommandes & Commandes), admin répond depuis `/admin/carts` & `/admin/orders`. Badges non-lus des deux côtés (sidebar admin + onglets client). Conservation des messages à la confirmation de précommande (migration pre→ord). Email admin à la confirmation de commande. Design doc : `lab/handoffs/2026-08-07_ST-012_design_tech.md`. |
+| ST-012 | Chat commandes / précommandes (client ↔ admin) | LIVE | ✅ Déployé | Threads de discussion : `pre:<userId>` (précommandes/panier) + `ord:<orderId>` (commandes) en blob `bm-chat`. Client écrit depuis `/compte` (onglets Précommandes & Commandes), admin répond depuis `/admin/carts` (panier) & `/admin/orders` (modal détail). Badges non-lus des deux côtés (sidebar admin poll 30 s + badges par thread). **Conservation des messages** à la confirmation de précommande (migration pre→ord). **Email admin** (Resend, util partagé `server/utils/email.ts`) à la confirmation d'une commande. Test e2e prod OK (user fictif ↔ admin fictif). Commit `29d090c`, deploy `6a76231a6a27afd09fa22933`. |
 
 ## Backlog
 
@@ -31,6 +31,7 @@
 
 | Date | Deploy URL | Contenu |
 |------|-----------|---------|
+| 2026-08-07 | 6a76231a6a27afd09fa22933 | Chat commandes/précommandes (ST-012) — threads client↔admin, badges, migration, email admin (build Nuxt) |
 | 2026-08-07 | 6a761db4dad05aab57c58cc1 | Template email percutant + fix cooldown (build Nuxt) |
 | 2026-08-07 | 6a761bae8e00e00d2bf33e26 | RESEND_API_KEY activée (redeploy) |
 | 2026-08-07 | 6a761965b8374a89a48e06d7 | Nettoyage legacy + export CSV + rappel auto (build Nuxt) |
