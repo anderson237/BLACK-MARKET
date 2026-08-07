@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import type { Product } from '~/types'
-import { promoPercent, promoPrice, promoCountdown, hasPromo, buildWaMessage } from '~/composables/useCatalog'
+import { promoPercent, promoPrice, promoCountdown, hasPromo } from '~/composables/useCatalog'
 import { useAuthStore } from '~/stores/auth'
 import { useTrack } from '~/composables/useTrack'
 import { useCurrency } from '~/composables/useCurrency'
+import { useCartStore } from '~/stores/cart'
 
 const route = useRoute()
 const config = useRuntimeConfig()
 const auth = useAuthStore()
-const { viewProduct, clickPreorder } = useTrack()
+const cart = useCartStore()
+const { viewProduct } = useTrack()
 const { code, format } = useCurrency()
 const productId = computed(() => String(route.params.id || '').replace(/\.html$/i, ''))
 
@@ -125,16 +127,6 @@ watch(() => product.value?.discountEndsAt, startCountdown)
 onMounted(() => startCountdown())
 onBeforeUnmount(() => cdTimer && clearInterval(cdTimer))
 
-const waUrl = computed(() => {
-  const p = product.value
-  if (!p) return ''
-  const priceStr = format(promoPrice(p))
-  const pageUrl = `${config.public.siteUrl}/p/${p.id}.html`
-  const msg = buildWaMessage(p, priceStr, pageUrl)
-  const num = p.waNumber || config.public.phoneNumber
-  return 'https://wa.me/' + num + '?text=' + encodeURIComponent(msg)
-})
-
 // Record the visit as a user event (drives the client space "Vues" stat).
 onMounted(() => {
   if (import.meta.client && product.value) {
@@ -142,36 +134,20 @@ onMounted(() => {
   }
 })
 
-// Preorder: fire the click event + create a pending order linked to the
-// account (deduped), then open WhatsApp. Fire-and-forget so the tab opens fast.
+// Preorder: adds the product to the basket (server-persisted). WhatsApp only
+// opens when the client confirms the preorder from their dashboard.
 const isStock = computed(() => product.value?.stockStatus === 'in_stock')
 function preorder() {
-  const url = waUrl.value
-  if (!url) return
-  auth.requireAuth(() => {
-    const p = product.value!
-    clickPreorder({ id: p.id, title: p.title })
-    fetch('/api/orders', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${auth.token}`,
-      },
-      body: JSON.stringify({
-        productId: p.id,
-        productTitle: p.title,
-        productImage: p.imageUrl,
-        customerName: auth.user?.name || auth.user?.pseudo || 'Client WhatsApp',
-        customerPhone: auth.user?.phone || '',
-        customerLocation: auth.user?.country || '—',
-        quantity: Math.max(1, Number(p.moq) || 1),
-        // Toujours facturer le prix EFFECTIF (promo si active, sinon prix de base).
-        priceXof: promoPrice(p),
-        priceEur: p.priceEur,
-      }),
-    }).catch(() => {})
-    window.open(url, '_blank', 'noopener,noreferrer')
-  }, isStock.value ? 'Connectez-vous pour commander ce drop' : 'Connectez-vous pour précommander ce drop')
+  const p = product.value
+  if (!p) return
+  cart.add({
+    productId: p.id,
+    title: p.title,
+    imageUrl: p.imageUrl,
+    priceXof: promoPrice(p),
+    priceEur: p.priceEur,
+    quantity: Math.max(1, Number(p.moq) || 1),
+  })
 }
 
 // Rich content: descriptions are AI-generated HTML -> render sanitized.
@@ -280,7 +256,7 @@ const techHtml = computed(() => sanitizeHtml(product.value?.originalDescription 
 
         <button @click="preorder"
           class="block w-full text-center bg-[#ff2a2a] hover:bg-red-600 text-white font-bold text-sm px-4 py-3 rounded-xl transition-all font-mono cursor-pointer">
-          {{ isStock ? 'COMMANDER SUR WHATSAPP' : 'PRÉCOMMANDER SUR WHATSAPP' }}
+          {{ isStock ? '🛒 AJOUTER AU PANIER' : '🛒 AJOUTER AUX PRÉCOMMANDES' }}
         </button>
 
         <ProductActions :product="product" />

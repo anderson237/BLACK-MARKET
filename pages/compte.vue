@@ -6,6 +6,7 @@ import { useAuthStore } from '~/stores/auth'
 import { useInteractionsStore } from '~/stores/interactions'
 import { useTrack } from '~/composables/useTrack'
 import { useCurrency } from '~/composables/useCurrency'
+import { useCartStore, type CartItem } from '~/stores/cart'
 
 const { isLight } = useTheme()
 
@@ -14,6 +15,7 @@ useSeoMeta({ title: 'Mon espace — DEEP ROOTS' })
 const auth = useAuthStore()
 const config = useRuntimeConfig()
 const inter = useInteractionsStore()
+const cart = useCartStore()
 const { like } = useTrack()
 const { format } = useCurrency()
 
@@ -217,7 +219,7 @@ function onVisibility() {
 let autoRefresh: ReturnType<typeof setInterval> | null = null
 
 onMounted(fillForm)
-watch(() => auth.isAuthed, (v) => { if (v) { fillForm(); loadInteractions() } }, { immediate: true })
+watch(() => auth.isAuthed, (v) => { if (v) { fillForm(); loadInteractions(); cart.load() } }, { immediate: true })
 
 function timeAgo(isoOrTs: string | number): string {
   const t = typeof isoOrTs === 'number' ? isoOrTs : new Date(isoOrTs).getTime()
@@ -341,24 +343,26 @@ function unlikeProduct(productId: string) {
 }
 
 // ---- activity tabs: categories + "voir plus" (9 first) ----
-type CatKey = 'views' | 'likes' | 'shares' | 'comments' | 'orders' | 'others'
+type CatKey = 'cart' | 'views' | 'likes' | 'shares' | 'comments' | 'orders' | 'others'
 const PAGE = 9
 const CATEGORIES: { key: CatKey; label: string; icon: string }[] = [
+  { key: 'cart', label: 'Précommandes', icon: 'cart' },
   { key: 'views', label: 'Pages consultées', icon: 'eye' },
   { key: 'likes', label: 'Likes', icon: 'heart' },
   { key: 'shares', label: 'Partages', icon: 'share' },
   { key: 'comments', label: 'Commentaires', icon: 'comment' },
-  { key: 'orders', label: 'Commandes', icon: 'cart' },
+  { key: 'orders', label: 'Commandes', icon: 'box' },
   { key: 'others', label: 'Autres réactions', icon: 'sparkles' },
 ]
-const activeCat = ref<CatKey>('views')
-const shown = reactive<Record<CatKey, number>>({ views: PAGE, likes: PAGE, shares: PAGE, comments: PAGE, orders: PAGE, others: PAGE })
+const activeCat = ref<CatKey>('cart')
+const shown = reactive<Record<CatKey, number>>({ cart: PAGE, views: PAGE, likes: PAGE, shares: PAGE, comments: PAGE, orders: PAGE, others: PAGE })
 
 function catIcon(key: CatKey): string {
   return CATEGORIES.find((c) => c.key === key)?.icon || 'sparkles'
 }
 
 function catItems(key: CatKey): any[] {
+  if (key === 'cart') return cart.items
   const d = data.value
   if (!d || !d.activity) return []
   if (key === 'comments') return d.comments
@@ -391,6 +395,80 @@ const totalActivity = computed(() => {
   return d.comments.length + d.orders.length
     + d.activity.views.length + d.activity.likes.length + d.activity.shares.length + d.activity.others.length
 })
+
+// ---- Précommandes (panier) : ajouter au panier puis CONFIRMER -> WhatsApp ----
+const cartTab = ref<'cart' | 'orders'>('cart')
+const confirmingId = ref<string | null>(null)
+const confirmingAll = ref(false)
+
+async function confirmPreorder(item: CartItem) {
+  if (!auth.isAuthed) return
+  confirmingId.value = item.productId
+  try {
+    // 1) create the pending order server-side (deduped per product)
+    const orderBody = {
+      productId: item.productId,
+      productTitle: item.title,
+      productImage: item.imageUrl || '',
+      customerName: auth.user?.name || auth.user?.pseudo || 'Client WhatsApp',
+      customerPhone: auth.user?.phone || '',
+      customerLocation: auth.user?.country || '—',
+      quantity: Math.max(1, Number(item.quantity) || 1),
+      priceXof: Number(item.priceXof) || 0,
+    }
+    await fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.token}` },
+      body: JSON.stringify(orderBody),
+    }).catch(() => {})
+    // 2) open WhatsApp with the preorder message
+    const msg = `Bonjour DEEP ROOTS, 👋\n\nJe souhaite CONFIRMER ma précommande :\n\n📦 PRODUIT : ${item.title.toUpperCase()}\n💰 PRIX : ${format(item.priceXof)}\n📌 QUANTITÉ : ${item.quantity}\n🔗 FICHE : ${config.public.siteUrl}/p/${item.productId}.html\n\nMerci de me confirmer la disponibilité et le paiement.`
+    const num = String(config.public.phoneNumber || '').replace(/[^0-9]/g, '')
+    window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(msg), '_blank', 'noopener,noreferrer')
+    // 3) remove from basket (already confirmed)
+    await cart.remove(item.productId)
+    window.dispatchEvent(new CustomEvent('bm:copied', { detail: '✓ Précommande confirmée — envoi sur WhatsApp' }))
+  } catch {
+    /* keep in basket on failure */
+  } finally {
+    confirmingId.value = null
+  }
+}
+
+async function confirmAllPreorders() {
+  if (!cart.items.length) return
+  confirmingAll.value = true
+  const totalCount = cart.items.length
+  try {
+    // Create every pending order + open WhatsApp with the full basket summary.
+    const lines = cart.items.map((c) => `• ${c.title.toUpperCase()} — ${c.quantity} × ${format(c.priceXof)}`)
+    const msg = `Bonjour DEEP ROOTS, 👋\n\nJe souhaite CONFIRMER mes précommandes (${cart.items.length}) :\n\n${lines.join('\n')}\n\nTOTAL : ${format(cart.totalXof)}\nMerci de me confirmer la disponibilité et le paiement.`
+    const num = String(config.public.phoneNumber || '').replace(/[^0-9]/g, '')
+    window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(msg), '_blank', 'noopener,noreferrer')
+    await Promise.all(cart.items.map((c) =>
+      fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.token}` },
+        body: JSON.stringify({
+          productId: c.productId,
+          productTitle: c.title,
+          productImage: c.imageUrl || '',
+          customerName: auth.user?.name || auth.user?.pseudo || 'Client WhatsApp',
+          customerPhone: auth.user?.phone || '',
+          customerLocation: auth.user?.country || '—',
+          quantity: Math.max(1, Number(c.quantity) || 1),
+          priceXof: Number(c.priceXof) || 0,
+        }),
+      }).catch(() => {}),
+    ))
+    await cart.clear()
+    window.dispatchEvent(new CustomEvent('bm:copied', { detail: `✓ ${totalCount} précommandes confirmées — envoi sur WhatsApp` }))
+  } catch {
+    /* keep basket */
+  } finally {
+    confirmingAll.value = false
+  }
+}
 </script>
 
 <template>
@@ -704,7 +782,7 @@ const totalActivity = computed(() => {
         </div>
 
         <template v-else-if="data">
-          <div v-if="totalActivity === 0" class="text-center py-10 text-zinc-600 font-mono text-[11px]">
+          <div v-if="totalActivity === 0 && cart.items.length === 0" class="text-center py-10 text-zinc-600 font-mono text-[11px]">
             AUCUNE ACTIVITÉ POUR L'INSTANT — PARCOUREZ LE CATALOGUE !
           </div>
 
@@ -723,8 +801,52 @@ const totalActivity = computed(() => {
             </div>
 
             <div class="space-y-2">
+              <!-- Précommandes (panier) : confirmer individuellement ou tout à la fois -->
+              <template v-if="activeCat === 'cart'">
+                <div v-if="cart.items.length === 0" class="text-center py-8 text-zinc-600 font-mono text-[11px]">
+                  AUCUNE PRÉCOMMANDE — AJOUTEZ DES PRODUITS AU PANIER DEPUIS LE CATALOGUE.
+                </div>
+                <div v-else class="space-y-2">
+                  <div v-for="item in cart.items" :key="item.productId" class="flex items-center gap-3 bg-black/30 border border-zinc-900 rounded-xl p-3">
+                    <NuxtLink :to="productUrl(item.productId)">
+                      <img v-if="item.imageUrl" :src="item.imageUrl" alt="" class="w-11 h-11 rounded-lg object-cover border border-zinc-800 shrink-0" />
+                      <div v-else class="w-11 h-11 rounded-lg bg-[#16161d] border border-zinc-800 flex items-center justify-center text-[#ff2a2a]">
+                        <AppIcon name="cart" :size="14" />
+                      </div>
+                    </NuxtLink>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-xs font-bold text-slate-200 truncate">{{ item.title }}</p>
+                      <p class="text-[10px] text-zinc-500 font-mono mt-0.5">x{{ item.quantity }} · {{ format(item.priceXof) }}</p>
+                    </div>
+                    <div class="flex flex-col gap-1.5 shrink-0">
+                      <button @click="confirmPreorder(item)" :disabled="confirmingId === item.productId"
+                        class="inline-flex items-center justify-center gap-1.5 bg-[#ff2a2a] hover:bg-red-600 disabled:opacity-40 text-white text-[10px] font-mono font-bold px-3 py-2 rounded-xl transition-all cursor-pointer">
+                        <span v-if="confirmingId === item.productId" class="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                        <template v-else><AppIcon name="whatsapp" :size="12" /> CONFIRMER</template>
+                      </button>
+                      <button @click="cart.remove(item.productId)"
+                        class="inline-flex items-center justify-center gap-1 text-[10px] font-mono text-zinc-500 hover:text-red-400 border border-zinc-800 px-3 py-1.5 rounded-xl transition-all cursor-pointer">
+                        <AppIcon name="trash" :size="11" /> Retirer
+                      </button>
+                    </div>
+                  </div>
+                  <div class="flex flex-col gap-2 pt-2 border-t border-zinc-900">
+                    <p class="text-[11px] font-mono text-zinc-400">
+                      <span class="text-zinc-500">TOTAL ({{ cart.items.length }} article{{ cart.items.length > 1 ? 's' : '' }}) :</span>
+                      <span class="text-[#ff2a2a] font-bold ml-1">{{ format(cart.totalXof) }}</span>
+                    </p>
+                    <button @click="confirmAllPreorders" :disabled="confirmingAll"
+                      class="w-full inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-mono font-bold px-4 py-3 rounded-xl transition-all cursor-pointer">
+                      <span v-if="confirmingAll" class="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      <template v-else><AppIcon name="whatsapp" :size="14" /> CONFIRMER TOUTES LES PRÉCOMMANDES</template>
+                    </button>
+                    <p class="text-[9px] text-zinc-600 font-mono">Confirmer envoie votre précommande sur WhatsApp et crée votre commande. Vous pouvez aussi confirmer chaque article séparément.</p>
+                  </div>
+                </div>
+              </template>
+
               <!-- Event categories: views / likes / shares / others -->
-              <template v-if="activeCat === 'views' || activeCat === 'likes' || activeCat === 'shares' || activeCat === 'others'">
+              <template v-else-if="activeCat === 'views' || activeCat === 'likes' || activeCat === 'shares' || activeCat === 'others'">
                 <div v-if="visibleItems(activeCat).length === 0" class="text-center py-8 text-zinc-600 font-mono text-[11px]">
                   AUCUNE ACTIVITÉ DE CE TYPE POUR L'INSTANT.
                 </div>
@@ -803,14 +925,14 @@ const totalActivity = computed(() => {
                 </div>
               </template>
 
-              <!-- Voir plus / moins -->
-              <div v-if="catItems(activeCat).length > shown[activeCat]" class="flex justify-center pt-1">
+              <!-- Voir plus / moins (le panier s'affiche toujours en entier) -->
+              <div v-if="activeCat !== 'cart' && catItems(activeCat).length > shown[activeCat]" class="flex justify-center pt-1">
                 <button @click="showMore(activeCat)"
                   class="text-[10px] font-mono text-zinc-400 hover:text-white border border-zinc-800 hover:border-[#ff2a2a]/50 px-4 py-2 rounded-xl transition-all inline-flex items-center gap-1.5">
                   <AppIcon name="chevronDown" :size="12" /> VOIR PLUS ({{ catItems(activeCat).length - shown[activeCat] }})
                 </button>
               </div>
-              <div v-else-if="catItems(activeCat).length > PAGE" class="flex justify-center pt-1">
+              <div v-else-if="activeCat !== 'cart' && catItems(activeCat).length > PAGE" class="flex justify-center pt-1">
                 <button @click="showLess(activeCat)"
                   class="text-[10px] font-mono text-zinc-500 hover:text-white border border-zinc-800 px-4 py-2 rounded-xl transition-all inline-flex items-center gap-1.5">
                   <AppIcon name="chevronUp" :size="12" /> VOIR MOINS

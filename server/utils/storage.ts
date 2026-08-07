@@ -123,6 +123,52 @@ export async function saveOrders(orders: any[]): Promise<void> {
   return writeJSON(ORDERS_FILE, orders)
 }
 
+// ---- cart (per-user preorder basket) ----
+export interface CartItem {
+  productId: string
+  title: string
+  imageUrl?: string
+  quantity: number
+  priceXof: number
+  priceEur?: number
+  addedAt: string
+}
+
+const CART_FILE = path.join(DATA_DIR, 'carts.json')
+
+async function loadCartsFile(): Promise<Record<string, CartItem[]>> {
+  if (isNetlifyRuntime()) {
+    const raw = await blobGet('bm-cart', 'carts.json', 'text')
+    if (raw != null) {
+      try {
+        const p = JSON.parse(raw)
+        if (p && typeof p === 'object') return p
+      } catch {
+        /* corrupted -> seed */
+      }
+    }
+    return {}
+  }
+  const p = await readJSON(CART_FILE)
+  return p && typeof p === 'object' ? p : {}
+}
+
+export async function loadCart(userId: string): Promise<CartItem[]> {
+  if (!userId) return []
+  const carts = await loadCartsFile()
+  return Array.isArray(carts[userId]) ? carts[userId] : []
+}
+
+export async function saveCart(userId: string, items: CartItem[]): Promise<void> {
+  if (!userId) return
+  const carts = await loadCartsFile()
+  carts[userId] = items
+  if (isNetlifyRuntime()) {
+    return blobSet('bm-cart', 'carts.json', JSON.stringify(carts, null, 2))
+  }
+  return writeJSON(CART_FILE, carts)
+}
+
 // ---- expenses (accounting) ----
 export async function loadExpenses(): Promise<any[]> {
   if (isNetlifyRuntime()) {

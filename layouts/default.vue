@@ -10,6 +10,7 @@ onMounted(() => init())
 
 const config = useRuntimeConfig()
 const { code, set } = useCurrency()
+const cart = useCartStore()
 const nav = [
   { label: 'ACCUEIL', to: '/' },
   { label: 'CYBER GADGETS', to: '/' },
@@ -23,7 +24,7 @@ function closeDrawer() {
 }
 
 function preorder() {
-  auth.requireAuth(() => window.open('https://wa.me/' + config.public.phoneNumber, '_blank', 'noopener,noreferrer'), 'Connectez-vous pour précommander')
+  auth.requireAuth(() => navigateTo('/compte'), 'Connectez-vous pour précommander')
 }
 
 const isAdmin = computed(() => auth.isAuthed && auth.role === 'admin')
@@ -77,6 +78,12 @@ function doLogout() {
             class="hidden md:inline-flex items-center gap-1.5 text-[10px] font-mono text-red-400 hover:text-red-300 border border-red-500/30 hover:border-red-500/60 px-3 py-2 rounded-xl transition-all" title="Se déconnecter">
             <AppIcon name="logout" :size="14" /><span class="hidden lg:inline">Déconnexion</span>
           </button>
+          <NuxtLink to="/compte" title="Mes précommandes"
+            class="relative inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-300 hover:text-white border border-zinc-800 hover:border-[#ff2a2a]/60 px-3 py-2 rounded-xl transition-all">
+            <AppIcon name="cart" :size="14" />
+            <span class="hidden sm:inline">PANIER</span>
+            <span v-if="cart.count > 0" class="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-[#ff2a2a] text-white text-[9px] font-black flex items-center justify-center shadow-lg shadow-[#ff2a2a]/30">{{ cart.count }}</span>
+          </NuxtLink>
           <button @click="preorder"
             class="bg-[#ff2a2a] hover:bg-red-600 text-white text-xs px-3 py-2 rounded-xl font-bold font-mono transition-all cursor-pointer inline-flex items-center gap-1.5"
             title="Précommander sur WhatsApp">
@@ -111,6 +118,10 @@ function doLogout() {
           </NuxtLink>
           <NuxtLink v-if="auth.isAuthed" to="/compte" @click="closeDrawer" class="flex items-center gap-2 px-3 py-3 rounded-lg text-[12px] font-mono font-bold text-zinc-300 hover:text-white hover:bg-zinc-800/60 transition-all uppercase tracking-widest">
             <AppIcon name="users" :size="15" /> Mon espace
+          </NuxtLink>
+          <NuxtLink to="/compte" @click="closeDrawer" class="relative flex items-center gap-2 px-3 py-3 rounded-lg text-[12px] font-mono font-bold text-zinc-300 hover:text-white hover:bg-zinc-800/60 transition-all uppercase tracking-widest">
+            <AppIcon name="cart" :size="15" /> Mes précommandes
+            <span v-if="cart.count > 0" class="ml-auto min-w-[20px] h-5 px-1.5 rounded-full bg-[#ff2a2a] text-white text-[10px] font-black flex items-center justify-center">{{ cart.count }}</span>
           </NuxtLink>
           <NuxtLink v-if="isAdmin" to="/admin" @click="closeDrawer" class="flex items-center gap-2 px-3 py-3 rounded-lg text-[12px] font-mono font-bold text-zinc-500 hover:text-white hover:bg-zinc-800/60 transition-all uppercase tracking-widest">
             <AppIcon name="dashboard" :size="15" /> Dashboard Admin

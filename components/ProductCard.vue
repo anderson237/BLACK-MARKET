@@ -3,10 +3,12 @@ import type { Product } from '~/types'
 import { promoPercent, promoPrice, promoCountdown, hasPromo } from '~/composables/useCatalog'
 import { useAuthStore } from '~/stores/auth'
 import { useCurrency } from '~/composables/useCurrency'
+import { useCartStore } from '~/stores/cart'
 
 const props = defineProps<{ product: Product; index: number }>()
 const config = useRuntimeConfig()
 const auth = useAuthStore()
+const cart = useCartStore()
 const { code, format } = useCurrency()
 
 const pct = computed(() => promoPercent(props.product))
@@ -39,13 +41,16 @@ function toggleMute() {
 }
 
 function preorder() {
-  const msg = `📦 ${props.product.title}\n💰 ${format(discountPrice.value)}${Number(props.product.moq) > 0 ? `\n📌 MOQ : ${props.product.moq} min` : ''}${Number(props.product.stockQuantity) > 0 ? `\n🏷️ En stock : ${props.product.stockQuantity}` : ''}\nDécouvrez ce drop exclusif DEEP ROOTS :`
-  const link = window.location.origin + url.value
-  const num = props.product.waNumber || config.public.phoneNumber
-  auth.requireAuth(
-    () => window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(msg + '\n' + link), '_blank', 'noopener,noreferrer'),
-    props.product.stockStatus === 'in_stock' ? 'Connectez-vous pour commander' : 'Connectez-vous pour précommander',
-  )
+  // Le bouton "PRÉCOMMANDER" ajoute le produit au panier. Le client confirme
+  // (-> WhatsApp) depuis son espace client.
+  const effectivePrice = promoPrice(props.product)
+  cart.add({
+    productId: props.product.id,
+    title: props.product.title,
+    imageUrl: props.product.imageUrl,
+    priceXof: effectivePrice,
+    quantity: Math.max(1, Number(props.product.moq) || 1),
+  })
 }
 
 const isStock = computed(() => props.product.stockStatus === 'in_stock')
