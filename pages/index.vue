@@ -14,7 +14,7 @@ useHead(() => {
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'ItemList',
-    name: 'BLACK MARKET — Sourcing exclusif Chine',
+    name: 'DEEP ROOTS — Import-Export Global',
     itemListElement: products.slice(0, 30).map((p, i) => ({
       '@type': 'ListItem',
       position: i + 1,
@@ -23,10 +23,10 @@ useHead(() => {
     })),
   }
   return {
-    title: 'BLACK MARKET — Sourcing exclusif Chine (Techwear / Cyberpunk)',
+    title: 'DEEP ROOTS — Import-Export Global',
     meta: [
       { property: 'og:type', content: 'website' },
-      { property: 'og:site_name', content: 'BLACK MARKET' },
+      { property: 'og:site_name', content: 'DEEP ROOTS' },
       { property: 'og:url', content: `${siteUrl}/` },
       { property: 'og:image', content: `${siteUrl}/og-image.png` },
       { name: 'twitter:card', content: 'summary_large_image' },
@@ -63,7 +63,7 @@ onMounted(() => {
           <h1 class="text-xl sm:text-2xl font-extrabold text-white uppercase font-mono tracking-widest">
             Drops <span class="text-[#ff2a2a]">Exclusifs</span>
           </h1>
-          <p class="text-[11px] text-zinc-500 font-mono mt-1">Import direct Chine · Précommande WhatsApp</p>
+          <p class="text-[11px] text-zinc-500 font-mono mt-1">Deep Roots Logistics · Votre ancre mondiale pour le commerce international</p>
         </div>
         <span class="bg-[#ff2a2a]/10 text-[#ff2a2a] border border-[#ff2a2a]/25 text-[10px] px-2.5 py-0.5 rounded font-mono font-bold">
           {{ store.total }} DROPS DISPONIBLES

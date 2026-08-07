@@ -3,7 +3,7 @@ import { useAdminStore } from '~/stores/admin'
 import { formatPriceXof } from '~/composables/useCatalog'
 
 definePageMeta({ layout: 'admin' })
-useSeoMeta({ title: 'Analyse KPI — BLACK MARKET' })
+useSeoMeta({ title: 'Analyse KPI — DEEP ROOTS' })
 
 const store = useAdminStore()
 const loading = ref(true)

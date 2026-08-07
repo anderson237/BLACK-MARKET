@@ -59,7 +59,7 @@ export default function ProductEditor({ product, categories, isNew, onClose, onS
           const spacingX = Math.max(200, Math.round(cw * 0.72));
           for (let dy = -ch; dy <= ch * 2; dy += spacingY) {
             for (let dx = -cw; dx <= cw * 2; dx += spacingX) {
-              ctx.fillText("BLACK MARKET © 2026", dx, dy);
+              ctx.fillText("DEEP ROOTS © 2026", dx, dy);
             }
           }
           ctx.restore();
@@ -400,7 +400,7 @@ export default function ProductEditor({ product, categories, isNew, onClose, onS
   const buildVideoSlides = () => {
     const priceXof = (draft.priceXof || 0).toLocaleString("fr-FR");
     return [
-      { title: draft.title, subtitle: "⚠️ EN DIRECT DE SHENZHEN - LIMITED DROP", text: "Sourcing direct sans intermédiaires via BLACK MARKET. Pièces vérifiées et filigranées.", badge: "EXCLUSIF" },
+      { title: draft.title, subtitle: "⚠️ EN DIRECT DE SHENZHEN - LIMITED DROP", text: "Sourcing direct sans intermédiaires via DEEP ROOTS. Pièces vérifiées et filigranées.", badge: "EXCLUSIF" },
       { title: "PITCH PREMIUM", subtitle: "🔥 COP DIRECT", text: (draft.description || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 140) + "...", badge: "COPYWRITING IA" },
       { title: "SPÉCIFICATIONS", subtitle: "⚙️ ENQUÊTE QUALITÉ", text: (draft.features[0] || "Produit sélectionné par nos soins."), badge: "CONTRÔLE QUALITÉ" },
       { title: `TARIF : ${priceXof} F CFA`, subtitle: "💬 COMMANDE WHATSAPP IMMÉDIATE", text: "Cliquez sur 'Commander' pour ouvrir WhatsApp avec le bon de précommande pré-rempli.", badge: "TARIF USINE" },
@@ -512,7 +512,7 @@ export default function ProductEditor({ product, categories, isNew, onClose, onS
     ctx.textAlign = "center";
     const spacing = 240;
     for (let d = -H; d < H; d += spacing) {
-      ctx.fillText("BLACK MARKET", 0, d);
+      ctx.fillText("DEEP ROOTS", 0, d);
     }
     ctx.restore();
 
@@ -549,7 +549,7 @@ export default function ProductEditor({ product, categories, isNew, onClose, onS
                 <h3 className="font-extrabold text-sm uppercase tracking-wider font-mono">
                   {isNew ? "Nouveau Produit" : "Éditeur Produit WYSIWYG"}
                 </h3>
-                <p className="text-[10px] text-white/80">BLACK MARKET // Fiche #{product.id}</p>
+                <p className="text-[10px] text-white/80">DEEP ROOTS // Fiche #{product.id}</p>
               </div>
             </div>
             <button onClick={onClose} className="bg-black/40 hover:bg-black/70 text-white p-1.5 rounded-full transition-colors">

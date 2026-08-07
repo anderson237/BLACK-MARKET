@@ -8,7 +8,7 @@ interface TabNavProps {
 }
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode; index: string }[] = [
-  { id: "catalog", label: "CATALOGUE BLACK MARKET", icon: <Layers className="w-4 h-4" />, index: "1" },
+  { id: "catalog", label: "CATALOGUE DEEP ROOTS", icon: <Layers className="w-4 h-4" />, index: "1" },
   { id: "ai_generator", label: "GÉNÉRATEUR DE FICHES IA", icon: <Sparkles className="w-4 h-4 text-yellow-400 fill-yellow-400" />, index: "2" },
 ];
 
@@ -27,7 +27,7 @@ export default function TabNav({ activeTab, onTabChange }: TabNavProps) {
           REVOLUTIONNEZ VOS IMPORTATIONS DEPUIS LA CHINE
         </h2>
         <p className="text-zinc-400 text-xs sm:text-sm leading-relaxed max-w-3xl">
-          Bienvenue sur la plateforme exclusive de sourcing <strong className="text-white">BLACK MARKET</strong>.
+          Bienvenue sur la plateforme exclusive de sourcing <strong className="text-white">DEEP ROOTS</strong>.
           Traduisez les lots de Taobao / 1688 avec l'IA Gemini, configurez votre catalogue en 1 clic et redirigez vos
           clients directement sur WhatsApp pour finaliser les ventes en devises locales (EUR &amp; Franc CFA).
         </p>

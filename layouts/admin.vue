@@ -100,8 +100,8 @@ function closeDrawer() {
       <div class="min-h-screen bg-[#08080c]">
         <div class="max-w-[1400px] mx-auto px-4 py-4 flex items-center justify-between">
           <NuxtLink to="/" class="flex items-center gap-2">
-            <span class="w-10 h-10 shrink-0 rounded-lg bg-[#ff2a2a] flex items-center justify-center text-white font-black text-lg">B</span>
-            <span class="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">BLACK MARKET · ADMIN</span>
+            <span class="w-10 h-10 shrink-0 rounded-lg bg-[#ff2a2a] flex items-center justify-center text-white font-black text-lg">D</span>
+            <span class="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">DEEP ROOTS · ADMIN</span>
           </NuxtLink>
           <NuxtLink to="/" class="text-[10px] font-mono text-zinc-400 hover:text-[#ff2a2a] border border-zinc-800 px-3 py-1.5 rounded-lg transition-all">← Voir le site</NuxtLink>
           <button @click="toggle()" :title="isLight ? 'Mode sombre' : 'Mode clair'"
@@ -128,9 +128,9 @@ function closeDrawer() {
             <AppIcon name="menu" :size="16" />
           </button>
           <NuxtLink to="/admin" class="flex items-center gap-1.5 sm:gap-2 min-w-0">
-            <span class="w-7 h-7 sm:w-8 sm:h-8 shrink-0 rounded-lg bg-[#ff2a2a] flex items-center justify-center text-white font-black text-base sm:text-lg">B</span>
+            <span class="w-7 h-7 sm:w-8 sm:h-8 shrink-0 rounded-lg bg-[#ff2a2a] flex items-center justify-center text-white font-black text-base sm:text-lg">D</span>
             <div class="leading-none min-w-0">
-              <p class="text-[11px] sm:text-sm font-extrabold tracking-widest text-white font-mono truncate">BLACK MARKET</p>
+              <p class="text-[11px] sm:text-sm font-extrabold tracking-widest text-white font-mono truncate">DEEP ROOTS</p>
               <p class="hidden sm:block text-[8px] sm:text-[9px] text-zinc-500 font-mono uppercase tracking-widest">Admin console</p>
             </div>
           </NuxtLink>

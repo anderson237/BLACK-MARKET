@@ -11,7 +11,7 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     public: {
-      siteUrl: "https://blackmarket-import-export.netlify.app",
+      siteUrl: "https://deeproots-importexport.netlify.app",
       phoneNumber: "237683963007",
       currency: "XOF",
       rmbToXofRate: 85,
@@ -33,22 +33,22 @@ export default defineNuxtConfig({
   },
   app: {
     head: {
-      title: "BLACK MARKET — Sourcing exclusif Chine (Techwear / Cyberpunk)",
+      title: "Deep Roots Logistics — Votre ancre mondiale pour le commerce international",
       meta: [
-        { name: "description", content: "BLACK MARKET - SOURCING EXCLUSIF CHINE. Découvrez notre catalogue exclusif de produits tendance importés directement d'usines chinoises (Taobao, 1688) avec prix d'usine, précommande WhatsApp et livraison sécurisée." },
+        { name: "description", content: "Deep Roots Logistics — Votre ancre mondiale pour le commerce international. Découvrez notre catalogue exclusif de produits tendance avec précommande WhatsApp et livraison sécurisée dans le monde entier." },
         { name: "viewport", content: "width=device-width, initial-scale=1" },
         { name: "theme-color", content: "#0d0d14" },
         { name: "robots", content: "index, follow, max-image-preview:large", key: "robots" },
         { name: "google-site-verification", content: process.env.GOOGLE_SITE_VERIFICATION || "ee8d421bcc36433e" },
-        { property: "og:site_name", content: "BLACK MARKET" },
+        { property: "og:site_name", content: "Deep Roots Logistics" },
         { property: "og:locale", content: "fr_FR" },
         { property: "og:type", content: "website" },
-        { property: "og:description", content: "BLACK MARKET — catalogue exclusif de produits tendance importés directement d'usines chinoises (Taobao, 1688) : techwear, cyberpunk, prix d'usine, précommande WhatsApp." },
-        { property: "og:image", content: "https://blackmarket-import-export.netlify.app/og-image.png" },
+        { property: "og:description", content: "Deep Roots Logistics — votre ancre mondiale pour le commerce international : import-export, catalogue de produits tendance, précommande WhatsApp." },
+        { property: "og:image", content: "https://deeproots-importexport.netlify.app/og-image.png" },
         { property: "og:image:width", content: "1200" },
         { property: "og:image:height", content: "630" },
         { name: "twitter:card", content: "summary_large_image" },
-        { name: "twitter:image", content: "https://blackmarket-import-export.netlify.app/og-image.png" },
+        { name: "twitter:image", content: "https://deeproots-importexport.netlify.app/og-image.png" },
       ],
       link: [
         { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
@@ -59,7 +59,7 @@ export default defineNuxtConfig({
       script: [
         {
           type: "application/ld+json",
-          children: `{"@context":"https://schema.org","@type":"WebSite","name":"BLACK MARKET","alternateName":"Black Market Import Export","url":"https://blackmarket-import-export.netlify.app","description":"Sourcing exclusif Chine — techwear, cyberpunk et produits tendance importés d'usines chinoises avec prix d'usine et précommande WhatsApp."}`,
+          children: `{"@context":"https://schema.org","@type":"WebSite","name":"Deep Roots Logistics","alternateName":"Deep Roots Logistics Import Export","url":"https://deeproots-importexport.netlify.app","description":"Deep Roots Logistics — votre ancre mondiale pour le commerce international : import-export global, catalogue de produits tendance et précommande WhatsApp."}`,
         },
       ],
     },

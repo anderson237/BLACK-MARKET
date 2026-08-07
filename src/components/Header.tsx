@@ -18,7 +18,7 @@ export default function Header({ config, onConfigChange, onLogout }: HeaderProps
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="text-xl font-black text-white tracking-widest font-mono glow-red">BLACK MARKET</span>
+              <span className="text-xl font-black text-white tracking-widest font-mono glow-red">DEEP ROOTS</span>
               <span className="text-[9px] font-mono font-bold bg-brand-red/25 text-brand-red border border-brand-red/45 px-1.5 py-0.2 rounded">K-STREET</span>
             </div>
             <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wide">

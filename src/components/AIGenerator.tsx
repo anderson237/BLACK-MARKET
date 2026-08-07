@@ -84,11 +84,11 @@ export default function AIGenerator({
                   <img src={aiImagePreview} alt="Preview" className="max-h-36 mx-auto object-contain" />
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-20">
                     <span className="text-white font-extrabold text-lg font-mono border border-white/50 px-2 py-0.5 rotate-12 tracking-wider">
-                      BLACK MARKET
+                      DEEP ROOTS
                     </span>
                   </div>
                 </div>
-                <p className="text-[9px] text-brand-red font-bold font-mono">IMAGE CHARGÉE - FILIGRANE BLACK MARKET INTÉGRÉ</p>
+                <p className="text-[9px] text-brand-red font-bold font-mono">IMAGE CHARGÉE - FILIGRANE DEEP ROOTS INTÉGRÉ</p>
                 <button
                   onClick={(e) => {
                     e.preventDefault();
@@ -241,7 +241,7 @@ export default function AIGenerator({
             <div className="space-y-1">
               <p className="text-slate-200 text-xs font-bold font-mono animate-pulse uppercase tracking-widest">GEMINI TERMINAL : ANALYSE EN COURS...</p>
               <p className="text-[10px] text-zinc-500 max-w-md mx-auto">
-                Interprétation de l'image, conversion monétaire RMB vers EUR et XOF, et application des watermarks BLACK MARKET de sécurité.
+                Interprétation de l'image, conversion monétaire RMB vers EUR et XOF, et application des watermarks DEEP ROOTS de sécurité.
               </p>
             </div>
           </div>

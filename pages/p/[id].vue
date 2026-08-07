@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Product } from '~/types'
-import { formatPriceXof, buildWaMessage } from '~/composables/useCatalog'
+import { formatPriceXof, promoPercent, promoPrice, promoCountdown, hasPromo, buildWaMessage } from '~/composables/useCatalog'
 import { useAuthStore } from '~/stores/auth'
 import { useTrack } from '~/composables/useTrack'
 
@@ -104,6 +104,24 @@ const media = computed<{ type: 'image' | 'video'; src: string }[]>(() => {
 })
 
 const current = ref(0)
+
+// ---- Promo : réduction, prix barré et compte à rebours ----
+const pct = computed(() => promoPercent(product.value || {}))
+const discountPrice = computed(() => promoPrice(product.value || {}))
+const countdown = ref(promoCountdown(product.value?.discountEndsAt))
+let cdTimer: ReturnType<typeof setInterval> | undefined
+function startCountdown() {
+  if (!product.value || !hasPromo(product.value)) return
+  countdown.value = promoCountdown(product.value.discountEndsAt)
+  if (!countdown.value) return
+  cdTimer = setInterval(() => {
+    countdown.value = promoCountdown(product.value?.discountEndsAt)
+    if (!countdown.value && cdTimer) clearInterval(cdTimer)
+  }, 1000)
+}
+watch(() => product.value?.discountEndsAt, startCountdown)
+onMounted(() => startCountdown())
+onBeforeUnmount(() => cdTimer && clearInterval(cdTimer))
 
 const waUrl = computed(() => {
   const p = product.value
@@ -225,8 +243,22 @@ const techHtml = computed(() => sanitizeHtml(product.value?.originalDescription 
         </div>
 
         <div class="bg-gradient-to-r from-[#ff2a2a]/10 to-transparent p-3 rounded-xl border-l-4 border-[#ff2a2a]">
-          <p class="text-[8px] text-zinc-400 uppercase font-mono font-bold tracking-widest">PRIX DE VENTE SPECIAL</p>
-          <p class="text-2xl font-extrabold text-[#ff2a2a] font-mono">{{ formatPriceXof(product.priceXof) }}</p>
+          <div class="flex items-center gap-2 mb-1">
+            <p class="text-[8px] text-zinc-400 uppercase font-mono font-bold tracking-widest">PRIX DE VENTE SPECIAL</p>
+            <span v-if="pct > 0" class="bg-[#ff2a2a] text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse">−{{ pct }}%</span>
+          </div>
+          <template v-if="pct > 0">
+            <span class="text-sm text-zinc-500 font-mono line-through mr-2">{{ formatPriceXof(product.priceXof) }}</span>
+            <span class="text-3xl font-extrabold text-[#ff2a2a] font-mono">{{ formatPriceXof(discountPrice) }}</span>
+          </template>
+          <p v-else class="text-2xl font-extrabold text-[#ff2a2a] font-mono">{{ formatPriceXof(product.priceXof) }}</p>
+          <div v-if="pct > 0 && countdown" class="mt-2 inline-flex items-center gap-2 bg-black/50 border border-amber-500/40 text-amber-300 text-[11px] font-mono font-bold px-3 py-1.5 rounded-lg">
+            <span class="relative flex h-2 w-2">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-60" />
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-400" />
+            </span>
+            La promo se termine dans {{ countdown }}
+          </div>
         </div>
 
         <div v-if="Number(product.moq) > 0 || Number(product.stockQuantity) > 0" class="flex flex-wrap gap-2">

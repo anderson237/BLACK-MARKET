@@ -30,7 +30,7 @@ Exigences :
 - Concis, premium, adapté à une vitrine streetwear/tech import Chine.
 Renvoie uniquement le texte du titre, sans ponctuation finale ni saut de ligne.`
     : target === 'description'
-      ? `Tu es un copywriter d'élite pour la marque de précommande BLACK MARKET (import Chine, marché francophone).
+      ? `Tu es un copywriter d'élite pour la marque de précommande DEEP ROOTS (import Chine, marché francophone).
 Rédige ou optimise l'ARGUMENTAIRE DE VENTE du produit « ${cleanTitle} » (catégorie : ${cleanCategory || 'non précisée'}).
 ${cleanCurrent ? `Reprends les informations utiles de l'argumentaire actuel et optimise-le pour le rendre plus percutant, plus structuré et plus orienté bénéfices clients : "${cleanCurrent}".` : 'Crée un argumentaire de vente premium de toutes pièces.'}
 Exigences :

@@ -67,7 +67,7 @@ function onLike() {
 }
 
 function onShareWa() {
-  const msg = `📦 ${props.product.title}\n💰 ${props.product.priceXof} F CFA\nDécouvrez ce drop exclusif BLACK MARKET :`
+  const msg = `📦 ${props.product.title}\n💰 ${props.product.priceXof} F CFA\nDécouvrez ce drop exclusif DEEP ROOTS :`
   const url = window.location.origin + '/p/' + props.product.id + '.html'
   const num = props.product.waNumber || config.public.phoneNumber
   window.open(
@@ -139,3 +139,4 @@ function onComment() {
     </button>
   </div>
 </template>
+

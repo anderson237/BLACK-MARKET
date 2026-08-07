@@ -21,6 +21,8 @@ export function sanitizeProduct(body: any): any {
       : [],
     priceEur: Number(body?.priceEur) || 0,
     priceXof: Number(body?.priceXof) || 0,
+    discountPercent: Math.max(0, Math.min(100, Number(body?.discountPercent) || 0)),
+    discountEndsAt: body?.discountEndsAt ? String(body.discountEndsAt).slice(0, 40) : undefined,
     sourceRmb: body?.sourceRmb ? Number(body.sourceRmb) : undefined,
     whatsappClicks: Number(body?.whatsappClicks) || 0,
     waNumber: body?.waNumber ? String(body.waNumber).replace(/[^0-9]/g, '').slice(0, 20) : undefined,

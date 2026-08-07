@@ -135,7 +135,7 @@ function cleanPhone(p: string) {
 function genWa(p: Product) {
   const price = formatPriceXof(p.priceXof)
   const text = [
-    'Bonjour BLACK MARKET, 👋',
+    'Bonjour DEEP ROOTS, 👋',
     '',
     'Je souhaite passer une PRÉCOMMANDE pour le produit suivant :',
     '',
@@ -235,9 +235,9 @@ function copyLink(p: Product) {
             <img :src="p.imageUrl || `/api/img/${encodeURIComponent(p.id)}.jpg`" :alt="p.title"
               class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-80 group-hover:opacity-100" />
 
-            <!-- Filigrane BLACK MARKET -->
+            <!-- Filigrane DEEP ROOTS -->
             <div class="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden opacity-25">
-              <span class="text-white font-extrabold text-3xl font-mono border-4 border-white/50 px-4 py-2 rotate-12 tracking-widest uppercase">BLACK MARKET</span>
+              <span class="text-white font-extrabold text-3xl font-mono border-4 border-white/50 px-4 py-2 rotate-12 tracking-widest uppercase">DEEP ROOTS</span>
             </div>
 
             <!-- Top-left tags -->

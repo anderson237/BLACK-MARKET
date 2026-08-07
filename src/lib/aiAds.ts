@@ -52,7 +52,7 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-// Draw the generated image with the official BLACK MARKET © watermark baked in.
+// Draw the generated image with the official DEEP ROOTS © watermark baked in.
 export function watermarkCanvas(img: HTMLImageElement, targetW = 720, targetH = 1280): string {
   const canvas = document.createElement("canvas");
   canvas.width = targetW;
@@ -70,7 +70,7 @@ export function watermarkCanvas(img: HTMLImageElement, targetW = 720, targetH = 
   ctx.fillStyle = "rgba(0,0,0,0.30)";
   ctx.fillRect(0, 0, targetW, targetH);
 
-  // BLACK MARKET © 2026 diagonal watermark
+  // DEEP ROOTS © 2026 diagonal watermark
   ctx.save();
   ctx.translate(targetW / 2, targetH / 2);
   ctx.rotate(-Math.PI / 6);
@@ -80,7 +80,7 @@ export function watermarkCanvas(img: HTMLImageElement, targetW = 720, targetH = 
   ctx.textBaseline = "middle";
   const spacing = Math.round(targetH * 0.32);
   for (let d = -targetH; d < targetH * 2; d += spacing) {
-    ctx.fillText("BLACK MARKET © 2026", 0, d);
+    ctx.fillText("DEEP ROOTS © 2026", 0, d);
   }
   ctx.restore();
 

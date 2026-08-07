@@ -186,12 +186,12 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
 
   // Calculate WhatsApp Link according to prompt requirements
   const getProductSiteUrl = (productId: string) => {
-    return `https://blackmarket-import-export.netlify.app/p/${productId}.html`;
+    return `https://deeproots-importexport.netlify.app/p/${productId}.html`;
   };
 
   const buildWaMessage = (product: Product, priceFormatted: string, productUrl: string) => {
     return [
-      "Bonjour BLACK MARKET, 👋",
+      "Bonjour DEEP ROOTS, 👋",
       "",
       "Je souhaite passer une PRÉCOMMANDE pour le produit suivant :",
       "",
@@ -317,7 +317,7 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
       {
         title: product.title,
         subtitle: "⚠️ EN DIRECT DE SHENZHEN - LIMITED DROP",
-        text: "Fabrication d'origine vérifiée. Sourcing direct sans intermédiaires via BLACK MARKET.",
+        text: "Fabrication d'origine vérifiée. Sourcing direct sans intermédiaires via DEEP ROOTS.",
         badge: "EXCLUSIF",
         bgClass: "from-red-950 via-slate-950 to-black"
       },
@@ -472,7 +472,7 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
       ctx.fillStyle = "#e11d48";
       ctx.font = "bold 26px monospace";
       ctx.textAlign = "center";
-      ctx.fillText("BLACK MARKET © 2026", W / 2, H - 124);
+      ctx.fillText("DEEP ROOTS © 2026", W / 2, H - 124);
     }
 
     // Security watermark (diagonal, repeated)
@@ -484,7 +484,7 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
     ctx.textAlign = "center";
     const spacing = 240;
     for (let d = -H; d < H; d += spacing) {
-      ctx.fillText("BLACK MARKET", 0, d);
+      ctx.fillText("DEEP ROOTS", 0, d);
     }
     ctx.restore();
 
@@ -631,7 +631,7 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
             <span>● 🔴 DROP EN COURS SINO-PREP</span>
             <span className="text-white">● CLÉ API GEMINI ACTIVÉE : TRADUCTION CHINOIS EN TEMPS RÉEL</span>
             <span>● PROGRES EXPÉDITION : AIR CARGO SHENZHEN TO ABIDJAN / EUROPE OK</span>
-            <span className="text-white">● WATERMARK ACTIF : [BLACK MARKET] APPLIQUÉ SUR TOUS LES VISUELS</span>
+            <span className="text-white">● WATERMARK ACTIF : [DEEP ROOTS] APPLIQUÉ SUR TOUS LES VISUELS</span>
             <span>● TAILLE DU LOT LIMITÉE À 100 EX_</span>
             <span>● BOUTON WHATSAPP SYNCHRONISÉ</span>
           </div>
@@ -639,7 +639,7 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
             <span>● 🔴 DROP EN COURS SINO-PREP</span>
             <span className="text-white">● CLÉ API GEMINI ACTIVÉE : TRADUCTION CHINOIS EN TEMPS RÉEL</span>
             <span>● PROGRES EXPÉDITION : AIR CARGO SHENZHEN TO ABIDJAN / EUROPE OK</span>
-            <span className="text-white">● WATERMARK ACTIF : [BLACK MARKET] APPLIQUÉ SUR TOUS LES VISUELS</span>
+            <span className="text-white">● WATERMARK ACTIF : [DEEP ROOTS] APPLIQUÉ SUR TOUS LES VISUELS</span>
             <span>● TAILLE DU LOT LIMITÉE À 100 EX_</span>
             <span>● BOUTON WHATSAPP SYNCHRONISÉ</span>
           </div>
@@ -752,7 +752,7 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
           <div className="flex items-center justify-between border-b border-zinc-800 pb-3 mb-3">
             <h3 className="font-mono text-xs font-bold text-slate-100 uppercase tracking-widest flex items-center gap-1.5">
               <Flame className="w-3.5 h-3.5 text-brand-red fill-brand-red" />
-              Indicateurs BLACK MARKET _
+              Indicateurs DEEP ROOTS _
             </h3>
             <span className="text-[8px] bg-zinc-900 text-brand-red border border-brand-red/40 px-1.5 rounded font-mono">
               HOT
@@ -800,7 +800,7 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
           <input
             type="text"
             className="w-full pl-10 pr-4 py-2.5 bg-black/60 border border-zinc-800 rounded-xl text-slate-200 text-xs focus:outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red transition-all placeholder:text-zinc-600 font-mono"
-            placeholder="Rechercher sur le BLACK MARKET (Titre, Code d'usine...)"
+            placeholder="Rechercher sur le DEEP ROOTS (Titre, Code d'usine...)"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -888,10 +888,10 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-80 group-hover:opacity-100"
                   />
 
-                  {/* 🔴 MANDATORY USER SPECIFIED WATERMARK: "BLACK MARKET" */}
+                  {/* 🔴 MANDATORY USER SPECIFIED WATERMARK: "DEEP ROOTS" */}
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden opacity-25">
                     <span className="text-white font-extrabold text-3xl font-mono border-4 border-white/50 px-4 py-2 rotate-12 tracking-widest uppercase">
-                      BLACK MARKET
+                      DEEP ROOTS
                     </span>
                   </div>
 
@@ -1021,7 +1021,7 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
                   </div>
                   <div>
                     <h4 className="font-extrabold text-sm uppercase tracking-wider font-mono">Bouton WhatsApp Dynamique</h4>
-                    <p className="text-[10px] text-zinc-200">Génération automatique du lien BLACK MARKET</p>
+                    <p className="text-[10px] text-zinc-200">Génération automatique du lien DEEP ROOTS</p>
                   </div>
                 </div>
                 <button
@@ -1056,7 +1056,7 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
                   {/* Speech Bubble */}
                   <div className="bg-brand-red/10 border border-brand-red/20 text-slate-300 p-3 rounded-2xl rounded-tl-none text-xs leading-relaxed max-w-[90%] shadow-xs space-y-2">
                     <p className="font-semibold text-slate-100">
-                      Bonjour BLACK MARKET, 👋
+                      Bonjour DEEP ROOTS, 👋
                     </p>
                     <p>
                       Je souhaite passer une PRÉCOMMANDE pour le produit suivant :
@@ -1137,13 +1137,13 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
                 {/* Rotating subtle visual backdrop */}
                 <div className="absolute inset-0 bg-cover bg-center mix-blend-overlay opacity-25 blur-xs scale-110" style={{ backgroundImage: `url(${activeVideoProduct.imageUrl})` }}></div>
 
-                {/* 🔒 WATERMARK BLACK MARKET OVERLAY IN VIDEO SLIDESHOW */}
+                {/* 🔒 WATERMARK DEEP ROOTS OVERLAY IN VIDEO SLIDESHOW */}
                 <div className="absolute inset-0 flex flex-col justify-between p-12 pointer-events-none select-none overflow-hidden opacity-15">
                   <span className="text-white font-extrabold text-2xl font-mono tracking-widest text-center border border-white/40 rotate-[-15deg] py-1">
-                    BLACK MARKET
+                    DEEP ROOTS
                   </span>
                   <span className="text-white font-extrabold text-2xl font-mono tracking-widest text-center border border-white/40 rotate-15 py-1">
-                    BLACK MARKET
+                    DEEP ROOTS
                   </span>
                 </div>
 
@@ -1204,10 +1204,10 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
                     ) : (
                       <div className="bg-black/50 text-slate-300 backdrop-blur-md rounded-xl py-2 px-3 text-[9px] flex items-center justify-center gap-1.5 border border-zinc-800">
                         <MessageSquare className="w-3.5 h-3.5 text-brand-red" />
-                        <span>BLACK MARKET CO_</span>
+                        <span>DEEP ROOTS CO_</span>
                       </div>
                     )}
-                    <p className="text-[7px] text-zinc-500 tracking-widest uppercase font-mono">FILIGRANÉ SECURISÉ : [BLACK MARKET] ORIGINAL</p>
+                    <p className="text-[7px] text-zinc-500 tracking-widest uppercase font-mono">FILIGRANÉ SECURISÉ : [DEEP ROOTS] ORIGINAL</p>
                   </div>
                 </div>
 
@@ -1230,7 +1230,7 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
                       <span className="bg-brand-red/20 text-brand-red text-[9px] font-bold px-2.5 py-1 rounded border border-brand-red/30 uppercase font-mono">
                         Modèle de Diaporama Vidéo
                       </span>
-                      <h4 className="text-xl font-bold text-slate-100 mt-2 font-sans uppercase">Générateur d'Annonces BLACK MARKET</h4>
+                      <h4 className="text-xl font-bold text-slate-100 mt-2 font-sans uppercase">Générateur d'Annonces DEEP ROOTS</h4>
                       <p className="text-zinc-400 text-xs">
                         Ce lecteur interactif prévisualise le modèle d'annonce vidéo automatique avec le filigrane officiel requis par le cahier des charges.
                       </p>
@@ -1278,7 +1278,7 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
                     <p className="font-bold text-slate-100 text-xs font-mono">🎬 GÉNÉRATION VIDÉO INTÉGRÉE (SANS MAKE)</p>
                     <p>
                       L'annonce est rendue <strong className="text-zinc-200">directement dans votre navigateur</strong> en
-                      9:16 (720×1280), avec le filigrane <strong className="text-brand-red">BLACK MARKET © 2026</strong> incrusté
+                      9:16 (720×1280), avec le filigrane <strong className="text-brand-red">DEEP ROOTS © 2026</strong> incrusté
                       dans chaque image, puis enregistrée en fichier vidéo prêt à publier (WhatsApp/TikTok/Reels).
                     </p>
                     <ul className="space-y-1.5 list-disc pl-4 mt-1 text-zinc-400">
@@ -1286,7 +1286,7 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
                         <strong className="text-zinc-200 font-mono">4 slides automatiques</strong> : badge exclusif, pitch IA, spécifications, tarif + CTA WhatsApp.
                       </li>
                       <li>
-                        <strong className="text-zinc-200 font-mono">Filigrane indélébile</strong> : « BLACK MARKET © 2026 » est dessiné sur chaque frame du rendu — impossible à retirer sans dégrader la vidéo.
+                        <strong className="text-zinc-200 font-mono">Filigrane indélébile</strong> : « DEEP ROOTS © 2026 » est dessiné sur chaque frame du rendu — impossible à retirer sans dégrader la vidéo.
                       </li>
                       <li>
                         <strong className="text-zinc-200 font-mono">Visuels IA (optionnel)</strong> : générez un fond Flux par slide via Pollinations (gratuit, sans clé) pour une pub 100% AI-driven.
@@ -1353,7 +1353,7 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
                   <span className="text-xs font-mono text-zinc-500 uppercase tracking-widest">FICHE PRODUIT CLIENT</span>
                 </div>
                 <h3 className="text-sm font-extrabold text-brand-red font-mono tracking-widest uppercase">
-                  BLACK MARKET PROFILE
+                  DEEP ROOTS PROFILE
                 </h3>
                 <button
                   onClick={() => setSelectedProductForDetails(null)}
@@ -1393,7 +1393,7 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
                           {/* Watermark overlay */}
                           <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden opacity-30">
                             <span className="text-white font-extrabold text-4xl font-mono border-4 border-white/50 px-6 py-3 rotate-12 tracking-widest uppercase">
-                              BLACK MARKET
+                              DEEP ROOTS
                             </span>
                           </div>
 
@@ -1464,7 +1464,7 @@ export default function Catalog({ products, config, onIncrementClicks, onDeleteP
 
                     {/* Price Section */}
                     <div className="bg-gradient-to-r from-brand-red/10 to-transparent p-4 rounded-2xl border-l-4 border-brand-red">
-                      <p className="text-[9px] text-zinc-400 uppercase font-mono tracking-widest font-bold">PRIX DE VENTE SPECIAL BLACK MARKET</p>
+                      <p className="text-[9px] text-zinc-400 uppercase font-mono tracking-widest font-bold">PRIX DE VENTE SPECIAL DEEP ROOTS</p>
                       <p className="text-2xl font-extrabold text-brand-red">
                         <span className="text-slate-100 font-sans">
                           {config.currency === "EUR"

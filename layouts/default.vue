@@ -46,10 +46,10 @@ function doLogout() {
     <header class="sticky top-0 z-30 bg-[#0d0d14]/85 backdrop-blur-md border-b border-zinc-800/60">
       <div class="max-w-[1400px] mx-auto px-4 py-3 flex items-center justify-between gap-4">
         <NuxtLink to="/" class="flex items-center gap-2.5 min-w-0">
-          <span class="w-8 h-8 rounded-lg bg-[#ff2a2a] flex items-center justify-center text-white font-black text-lg shadow-lg shadow-[#ff2a2a]/30 shrink-0">B</span>
+          <span class="w-8 h-8 rounded-lg bg-[#ff2a2a] flex items-center justify-center text-white font-black text-lg shadow-lg shadow-[#ff2a2a]/30 shrink-0">D</span>
           <div class="leading-none min-w-0">
-            <p class="text-sm font-extrabold tracking-widest text-white font-mono truncate">BLACK MARKET</p>
-            <p class="text-[9px] text-[#ff2a2a] font-mono font-bold tracking-widest uppercase">K-Street Sourcing</p>
+            <p class="text-sm font-extrabold tracking-widest text-white font-mono truncate">DEEP ROOTS</p>
+            <p class="text-[9px] text-[#ff2a2a] font-mono font-bold tracking-widest uppercase">Import-Export Global</p>
           </div>
         </NuxtLink>
         <div class="flex items-center gap-2">

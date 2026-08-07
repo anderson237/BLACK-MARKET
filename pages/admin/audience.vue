@@ -2,7 +2,7 @@
 import { useAdminStore } from '~/stores/admin'
 
 definePageMeta({ layout: 'admin' })
-useSeoMeta({ title: 'Audience géographique — BLACK MARKET' })
+useSeoMeta({ title: 'Audience géographique — DEEP ROOTS' })
 
 const store = useAdminStore()
 const loading = ref(true)

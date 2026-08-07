@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Product } from '~/types'
+import { formatPriceXof, promoPrice, promoCountdown, saleBasePrice } from '~/composables/useCatalog'
 
 const props = defineProps<{ product: Product | null }>()
 const emit = defineEmits<{ saved: [p: Product]; deleted: [id: string]; close: [] }>()
@@ -18,8 +19,10 @@ const draft = reactive({
   originalDescription: props.product?.originalDescription || '',
   chineseDescription: props.product?.chineseDescription || '',
   features: [...(props.product?.features || [])],
-  priceEur: props.product?.priceEur || 0,
+priceEur: props.product?.priceEur || 0,
   priceXof: props.product?.priceXof || 0,
+  discountPercent: props.product?.discountPercent || 0,
+  discountEndsAt: props.product?.discountEndsAt || '',
   imageUrl: props.product?.imageUrl || '',
   gallery: [...(props.product?.gallery || [])],
   videoUrl: props.product?.videoUrl || '',
@@ -91,7 +94,9 @@ async function save() {
       stockStatus: draft.stockStatus || 'preorder',
       stockQuantity: Math.max(0, Number(draft.stockQuantity) || 0),
       moq: Math.max(0, Number(draft.moq) || 0),
-      featuredMedia: draft.videoUrl ? draft.featuredMedia || 'video' : 'image',
+featuredMedia: draft.videoUrl ? draft.featuredMedia || 'video' : 'image',
+      discountPercent: Math.min(100, Math.max(0, Number(draft.discountPercent) || 0)),
+      discountEndsAt: draft.discountEndsAt || undefined,
     }
     const saved = isNew ? await store.createProduct(body) : await store.updateProduct(body)
     emit('saved', saved)
@@ -236,7 +241,7 @@ function startDictation(field: DictationField) {
 
 onUnmounted(() => stopDictation())
 
-// ---- Filigrane canvas: bake "BLACK MARKET © 2026" onto any image ----
+// ---- Filigrane canvas: bake "DEEP ROOTS © 2026" onto any image ----
 function watermarkDataUrl(img: HTMLImageElement, targetW = 720, targetH = 720): string {
   const canvas = document.createElement('canvas')
   canvas.width = targetW
@@ -257,7 +262,7 @@ function watermarkDataUrl(img: HTMLImageElement, targetW = 720, targetH = 720): 
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   const spacing = Math.round(targetH * 0.3)
-  for (let d = -targetH; d < targetH * 2; d += spacing) ctx.fillText('BLACK MARKET © 2026', 0, d)
+  for (let d = -targetH; d < targetH * 2; d += spacing) ctx.fillText('DEEP ROOTS © 2026', 0, d)
   ctx.restore()
   return canvas.toDataURL('image/jpeg', 0.9)
 }
@@ -287,7 +292,7 @@ const MAX_VIDEO_MB = 60
 async function handleMainFile(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
-  aiBusy.value = 'Application du filigrane BLACK MARKET…'
+  aiBusy.value = 'Application du filigrane DEEP ROOTS…'
   try {
     const img = await readImageFile(file)
     const dataUrl = watermarkDataUrl(img)
@@ -493,7 +498,32 @@ async function handleVideoFile(e: Event) {
               <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-2.5 text-sm font-mono text-emerald-300">{{ sellingEur }} €</div>
             </div>
           </div>
-          <p class="text-[9px] text-zinc-600 font-mono">Prix de vente = (achat + transport) × (1 + marge%) × taux {{ rmbToXofRate }}. Dès qu'un coût est renseigné, il remplace automatiquement le prix de vente enregistré.</p>
+<p class="text-[9px] text-zinc-600 font-mono">Prix de vente = (achat + transport) × (1 + marge%) × taux {{ rmbToXofRate }}. Dès qu'un coût est renseigné, il remplace automatiquement le prix de vente enregistré.</p>
+        </div>
+
+        <!-- Promo & réduction -->
+        <div class="space-y-3 border border-[#ff2a2a]/20 rounded-2xl p-3 bg-[#1a1020]">
+          <div class="flex items-center justify-between">
+            <label class="text-[10px] text-[#ff2a2a] font-mono uppercase tracking-widest">🎁 PROMO & RÉDUCTION</label>
+            <span v-if="draft.discountPercent > 0" class="bg-[#ff2a2a]/15 text-[#ff2a2a] border border-[#ff2a2a]/30 text-[9px] font-mono font-bold px-2 py-0.5 rounded">-{{ draft.discountPercent }}%</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="space-y-2">
+              <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Réduction (%)</label>
+              <input v-model.number="draft.discountPercent" type="number" min="0" max="100" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="0" />
+            </div>
+            <div class="space-y-2">
+              <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Fin de la promo</label>
+              <input v-model="draft.discountEndsAt" type="datetime-local" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none [color-scheme:dark]" />
+            </div>
+          </div>
+          <p v-if="draft.discountPercent > 0" class="text-[10px] text-emerald-400 font-mono">
+            Prix barré : {{ formatPriceXof(saleBasePrice(draft.priceXof)) }}
+            <span class="text-zinc-400">→</span>
+            <span class="text-emerald-300 font-bold">{{ formatPriceXof(promoPrice({ priceXof: draft.priceXof, discountPercent: draft.discountPercent, discountEndsAt: draft.discountEndsAt })) }}</span>
+            <span v-if="draft.discountEndsAt" class="text-zinc-400"> · se termine dans {{ promoCountdown(draft.discountEndsAt) }}</span>
+          </p>
+          <p v-if="draft.discountPercent < 0 || draft.discountPercent > 100" class="text-[10px] text-red-400 font-mono">La réduction doit être comprise entre 0 et 100 %.</p>
         </div>
 
         <!-- Stock : statut + quantité + MOQ -->

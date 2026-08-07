@@ -143,7 +143,7 @@ watch(() => auth.modalOpen, (open) => {
           <div class="mb-5">
             <span class="w-9 h-9 rounded-lg bg-[#ff2a2a] flex items-center justify-center text-white font-black text-lg mb-2">B</span>
             <h2 class="text-lg font-extrabold text-slate-100 font-mono tracking-wide uppercase">{{ view === 'login' ? 'Connexion' : 'Inscription' }}</h2>
-            <p class="text-[11px] text-zinc-500 font-mono mt-1">{{ auth.pendingAction?.label || 'Accédez à votre compte BLACK MARKET' }}</p>
+            <p class="text-[11px] text-zinc-500 font-mono mt-1">{{ auth.pendingAction?.label || 'Accédez à votre compte DEEP ROOTS' }}</p>
           </div>
 
           <!-- Google -->

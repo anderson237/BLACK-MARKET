@@ -4,8 +4,8 @@
 > vers le marché francophone / africain. Console d'administration sécurisée + catalogue public
 > avec boutons de précommande WhatsApp, traductions IA Gemini et persistance Netlify Blobs.
 
-- **Boutique publique** : `https://blackmarket-import-export.netlify.app/`
-- **Console admin** : `https://blackmarket-import-export.netlify.app/admin`
+- **Boutique publique** : `https://deeproots-importexport.netlify.app/`
+- **Console admin** : `https://deeproots-importexport.netlify.app/admin`
 
 ---
 

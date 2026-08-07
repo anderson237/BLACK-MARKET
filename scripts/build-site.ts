@@ -5,7 +5,7 @@ import { INITIAL_PRODUCTS } from "../src/data";
 import { getProductPageHtml } from "../src/lib/productPage";
 import { getHtmlTemplateCode } from "../src/lib/template";
 
-const BASE_URL = "https://blackmarket-import-export.netlify.app/";
+const BASE_URL = "https://deeproots-importexport.netlify.app/";
 const PHONE_NUMBER = "237683963007";
 const ROOT = path.join(process.cwd(), "client-site");
 const IMG_DIR = path.join(ROOT, "img");
@@ -19,7 +19,7 @@ function watermarkSvg(w: number, h: number): Buffer {
   for (let dy = -h; dy <= h * 2; dy += spacingY) {
     for (let dx = -w; dx <= w * 2; dx += spacingX) {
       texts.push(
-        `<text x="${dx}" y="${dy}" transform="rotate(-25 ${dx} ${dy})" text-anchor="middle" dominant-baseline="middle">BLACK MARKET © 2026</text>`
+        `<text x="${dx}" y="${dy}" transform="rotate(-25 ${dx} ${dy})" text-anchor="middle" dominant-baseline="middle">DEEP ROOTS © 2026</text>`
       );
     }
   }
@@ -58,8 +58,8 @@ function brandLogoSvg(w = 1200, h = 630): Buffer {
   <rect x="${badgeX}" y="${badgeY}" width="${badge}" height="${badge}" rx="${Math.round(badge * 0.22)}" fill="#ff2a2a"/>
   <path d="${flame}" fill="#ffffff"/>
   <path d="${flameInner}" fill="#ffbfbf"/>
-  <text x="${w / 2}" y="${h * 0.74}" text-anchor="middle" font-family="monospace" font-weight="bold" font-size="${fs}" fill="#ff2a2a" letter-spacing="${Math.round(fs * 0.28)}">BLACK MARKET</text>
-  <text x="${w / 2}" y="${h * 0.86}" text-anchor="middle" font-family="monospace" font-weight="bold" font-size="${Math.round(fs * 0.42)}" fill="#9ca3af" letter-spacing="${Math.round(fs * 0.55)}">SOURCING EXCLUSIF CHINE</text>
+  <text x="${w / 2}" y="${h * 0.74}" text-anchor="middle" font-family="monospace" font-weight="bold" font-size="${fs}" fill="#ff2a2a" letter-spacing="${Math.round(fs * 0.28)}">DEEP ROOTS</text>
+  <text x="${w / 2}" y="${h * 0.86}" text-anchor="middle" font-family="monospace" font-weight="bold" font-size="${Math.round(fs * 0.42)}" fill="#9ca3af" letter-spacing="${Math.round(fs * 0.55)}">LOGISTIQUES — IMPORT-EXPORT GLOBAL</text>
 </svg>`;
   return Buffer.from(svg);
 }

@@ -86,7 +86,7 @@ export default function Settings({ config, onConfigChange }: SettingsProps) {
 
         <Field label="URL du site (fiches produits partagées)" icon={<Globe className="w-3 h-3" />}>
           <input
-            value={draft.siteUrl || "https://blackmarket-import-export.netlify.app/"}
+            value={draft.siteUrl || "https://deeproots-importexport.netlify.app/"}
             onChange={(e) => update({ siteUrl: e.target.value })}
             className={inputCls}
           />

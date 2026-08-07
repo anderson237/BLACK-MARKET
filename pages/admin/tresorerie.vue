@@ -5,7 +5,7 @@ import { EXPENSE_PAYMENT_METHODS, EXPENSE_PAYMENT_LABEL } from '~/data/expenseCa
 
 definePageMeta({ layout: 'admin' })
 
-useSeoMeta({ title: 'Trésorerie — BLACK MARKET' })
+useSeoMeta({ title: 'Trésorerie — DEEP ROOTS' })
 
 const store = useAdminStore()
 const loading = ref(true)

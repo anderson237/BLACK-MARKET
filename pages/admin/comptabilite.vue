@@ -5,7 +5,7 @@ import { EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABEL, EXPENSE_PAYMENT_METHODS, EX
 
 definePageMeta({ layout: 'admin' })
 
-useSeoMeta({ title: 'Comptabilité — BLACK MARKET' })
+useSeoMeta({ title: 'Comptabilité — DEEP ROOTS' })
 
 const store = useAdminStore()
 const loading = ref(true)

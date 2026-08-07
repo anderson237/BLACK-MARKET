@@ -8,7 +8,7 @@ import { useTrack } from '~/composables/useTrack'
 
 const { isLight } = useTheme()
 
-useSeoMeta({ title: 'Mon espace — BLACK MARKET' })
+useSeoMeta({ title: 'Mon espace — DEEP ROOTS' })
 
 const auth = useAuthStore()
 const config = useRuntimeConfig()
@@ -241,7 +241,7 @@ const eventLabel: Record<string, string> = {
 }
 
 const avatarUrl = computed(() => themedAvatarUri(auth.user?.picture || '', isLight.value))
-const displayName = computed(() => auth.user?.pseudo || auth.user?.name || 'Client BLACK MARKET')
+const displayName = computed(() => auth.user?.pseudo || auth.user?.name || 'Client DEEP ROOTS')
 const initials = computed(() => displayName.value.slice(0, 2).toUpperCase())
 const currentMood = computed(() => moodOf(auth.user?.mood))
 const productUrl = (id?: string) => (id ? `/p/${id}.html` : '/')
@@ -695,7 +695,7 @@ const totalActivity = computed(() => {
 
       <!-- Interactions -->
       <div class="mt-8">
-        <p class="text-[9px] text-[#ff2a2a] font-mono uppercase font-bold tracking-wider mb-3">VOTRE ACTIVITÉ SUR BLACK MARKET</p>
+        <p class="text-[9px] text-[#ff2a2a] font-mono uppercase font-bold tracking-wider mb-3">VOTRE ACTIVITÉ SUR DEEP ROOTS</p>
 
         <div v-if="loadingData" class="space-y-3">
           <div v-for="n in 3" :key="n" class="skeleton h-16 rounded-xl" />

@@ -3,7 +3,7 @@ import { requireAuth } from '~~/server/utils/auth'
 
 const MAX = 120
 
-// Client space: every interaction this user has had with BLACK MARKET
+// Client space: every interaction this user has had with DEEP ROOTS
 // (comments, views, clicks, likes, shares) + their preorders/orders.
 export default defineEventHandler(async (event) => {
   const session = await requireAuth(event)

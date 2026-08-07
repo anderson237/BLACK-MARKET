@@ -9,6 +9,10 @@ export interface Product {
   priceEur: number
   priceXof: number
   currency?: string
+  /** Promo / réduction : pourcentage à appliquer (ex. 25 = -25%) */
+  discountPercent?: number
+  /** Fin de la promo (ISO). Compte à rebours affiché sur la fiche. */
+  discountEndsAt?: string
   imageUrl: string
   gallery?: string[]
   videoUrl?: string

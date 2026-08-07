@@ -2,7 +2,7 @@
 // reflects the current siteUrl and blocks sensitive paths from indexation.
 export default defineEventHandler((event) => {
   const config = useRuntimeConfig()
-  const siteUrl = config.public.siteUrl || 'https://blackmarket-import-export.netlify.app'
+  const siteUrl = config.public.siteUrl || 'https://deeproots-importexport.netlify.app'
 
   const body = [
     'User-agent: *',

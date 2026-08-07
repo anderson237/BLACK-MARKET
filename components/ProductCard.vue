@@ -1,11 +1,27 @@
 <script setup lang="ts">
 import type { Product } from '~/types'
-import { formatPriceXof } from '~/composables/useCatalog'
+import { formatPriceXof, promoPercent, promoPrice, promoCountdown, hasPromo } from '~/composables/useCatalog'
 import { useAuthStore } from '~/stores/auth'
 
 const props = defineProps<{ product: Product; index: number }>()
 const config = useRuntimeConfig()
 const auth = useAuthStore()
+
+const pct = computed(() => promoPercent(props.product))
+const discountPrice = computed(() => promoPrice(props.product))
+const countdown = ref(promoCountdown(props.product.discountEndsAt))
+let cdTimer: ReturnType<typeof setInterval> | undefined
+function startCountdown() {
+  if (!hasPromo(props.product)) return
+  countdown.value = promoCountdown(props.product.discountEndsAt)
+  if (!countdown.value) return
+  cdTimer = setInterval(() => {
+    countdown.value = promoCountdown(props.product.discountEndsAt)
+    if (!countdown.value && cdTimer) clearInterval(cdTimer)
+  }, 1000)
+}
+onMounted(startCountdown)
+onBeforeUnmount(() => cdTimer && clearInterval(cdTimer))
 
 // Pinterest-style: varied image heights create the staggered masonry offset.
 const heights = [380, 260, 340, 240, 300, 420, 280, 360, 220, 320]
@@ -21,7 +37,7 @@ function toggleMute() {
 }
 
 function preorder() {
-  const msg = `📦 ${props.product.title}\n💰 ${formatPriceXof(props.product.priceXof)} F CFA${Number(props.product.moq) > 0 ? `\n📌 MOQ : ${props.product.moq} min` : ''}${Number(props.product.stockQuantity) > 0 ? `\n🏷️ En stock : ${props.product.stockQuantity}` : ''}\nDécouvrez ce drop exclusif BLACK MARKET :`
+  const msg = `📦 ${props.product.title}\n💰 ${formatPriceXof(props.product.priceXof)} F CFA${Number(props.product.moq) > 0 ? `\n📌 MOQ : ${props.product.moq} min` : ''}${Number(props.product.stockQuantity) > 0 ? `\n🏷️ En stock : ${props.product.stockQuantity}` : ''}\nDécouvrez ce drop exclusif DEEP ROOTS :`
   const link = window.location.origin + url.value
   const num = props.product.waNumber || config.public.phoneNumber
   auth.requireAuth(
@@ -86,7 +102,10 @@ const truncatedTitle = computed(() => {
           v-else
           class="absolute top-9 left-3 bg-amber-500/95 text-black text-[9px] uppercase font-bold tracking-widest px-2.5 py-1 rounded shadow-lg"
         >
-          📦 PRÉCOMMANDE
+📦 PRÉCOMMANDE
+        </span>
+        <span v-if="pct > 0" class="absolute top-9 right-3 bg-[#ff2a2a] text-white text-[11px] font-black tracking-wider px-2.5 py-1 rounded-full shadow-lg shadow-[#ff2a2a]/30 animate-pulse">
+          -{{ pct }}%
         </span>
         <span v-if="product.videoUrl" class="absolute top-3 right-3 bg-black/60 text-white text-[8px] uppercase font-bold tracking-widest px-2 py-1 rounded border border-white/20 flex items-center gap-1">
           <AppIcon name="video" :size="10" /> VIDEO
@@ -101,7 +120,14 @@ const truncatedTitle = computed(() => {
         </h3>
       </NuxtLink>
       <div class="mt-2 flex items-center justify-between pt-2 border-t border-zinc-900">
-        <span class="font-extrabold text-slate-100 text-sm font-mono">{{ formatPriceXof(product.priceXof) }}</span>
+        <div class="flex items-baseline gap-2 flex-wrap">
+          <template v-if="pct > 0">
+            <span class="text-[10px] text-zinc-500 font-mono line-through">{{ formatPriceXof(product.priceXof) }}</span>
+            <span class="font-extrabold text-[#ff2a2a] text-sm font-mono">{{ formatPriceXof(discountPrice) }}</span>
+            <span v-if="countdown" class="w-full text-[9px] text-amber-400 font-mono font-bold">⏳ Fin dans {{ countdown }}</span>
+          </template>
+          <span v-else class="font-extrabold text-slate-100 text-sm font-mono">{{ formatPriceXof(product.priceXof) }}</span>
+        </div>
       </div>
 
       <div v-if="Number(product.moq) > 0 || Number(product.stockQuantity) > 0" class="mt-2 flex flex-wrap gap-1.5">

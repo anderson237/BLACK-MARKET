@@ -2,7 +2,7 @@
 // catalog so new products are crawlable immediately after being published.
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig()
-  const siteUrl = (config.public.siteUrl || 'https://blackmarket-import-export.netlify.app').replace(/\/+$/, '')
+  const siteUrl = (config.public.siteUrl || 'https://deeproots-importexport.netlify.app').replace(/\/+$/, '')
 
   let products: any[] = []
   try {

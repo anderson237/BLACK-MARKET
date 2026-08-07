@@ -4,30 +4,30 @@
 import { GOOGLE_CLIENT_ID } from "./constants";
 
 export function getHtmlTemplateCode(opts?: { siteUrl?: string }): string {
-  const siteUrl = (opts && opts.siteUrl) || "https://blackmarket-import-export.netlify.app/";
+  const siteUrl = (opts && opts.siteUrl) || "https://deeproots-importexport.netlify.app/";
   const ogImage = siteUrl + "img/brand.jpg?v=2";
   return `<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BLACK MARKET - SOURCING EXCLUSIF CHINE</title>
+  <title>DEEP ROOTS - SOURCING EXCLUSIF CHINE</title>
 
   <!-- SEO Optimization -->
-  <meta name="description" content="BLACK MARKET - SOURCING EXCLUSIF CHINE. Découvrez notre catalogue exclusif de produits tendance importés directement d'usines chinoises (Taobao, 1688) avec prix d'usine, précommande WhatsApp et livraison sécurisée.">
-  <meta name="keywords" content="sourcing chine, import chine, streetwear coréen, techwear, black market, grossiste chine, précommande chine, taobao, 1688, aliexpress">
+  <meta name="description" content="DEEP ROOTS - SOURCING EXCLUSIF CHINE. Découvrez notre catalogue exclusif de produits tendance importés directement d'usines chinoises (Taobao, 1688) avec prix d'usine, précommande WhatsApp et livraison sécurisée.">
+  <meta name="keywords" content="sourcing chine, import chine, streetwear coréen, techwear, DEEP ROOTS, grossiste chine, précommande chine, taobao, 1688, aliexpress">
   <meta name="robots" content="index, follow">
 
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="${siteUrl}">
-  <meta property="og:title" content="BLACK MARKET - SOURCING EXCLUSIF CHINE">
+  <meta property="og:title" content="DEEP ROOTS - SOURCING EXCLUSIF CHINE">
   <meta property="og:description" content="Découvrez nos drops de sourcing exclusifs depuis la Chine (Taobao, 1688). Commandez directement d'usine via WhatsApp en toute sécurité.">
   <meta property="og:image" content="${ogImage}">
 
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
-  <meta property="twitter:title" content="BLACK MARKET - SOURCING EXCLUSIF CHINE">
+  <meta property="twitter:title" content="DEEP ROOTS - SOURCING EXCLUSIF CHINE">
   <meta property="twitter:description" content="Découvrez nos drops de sourcing exclusifs depuis la Chine. Commandez directement d'usine via WhatsApp.">
   <meta property="twitter:image" content="${ogImage}">
 
@@ -70,7 +70,7 @@ export function getHtmlTemplateCode(opts?: { siteUrl?: string }): string {
   <header class="bg-[#0d0d14] border-b border-brand-red/30 py-4 shadow-md sticky top-0 z-30">
     <div class="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-4">
       <div class="flex items-center gap-2">
-        <span class="text-xl font-black tracking-widest text-white font-mono">BLACK MARKET</span>
+        <span class="text-xl font-black tracking-widest text-white font-mono">DEEP ROOTS</span>
         <span class="text-[9px] bg-brand-red/20 text-brand-red px-1.5 py-0.5 rounded border border-brand-red/35 font-mono font-bold">K-STREET</span>
       </div>
       <div class="flex items-center gap-2">
@@ -87,7 +87,7 @@ export function getHtmlTemplateCode(opts?: { siteUrl?: string }): string {
   <!-- Marquee Header -->
   <div class="bg-black py-1.5 border-b border-brand-red/20 overflow-hidden relative">
     <div class="whitespace-nowrap flex text-[10px] font-mono tracking-widest text-brand-red uppercase">
-      <span class="px-4">● DROP DE SOURCING CHINOIS EN COURS (TAOBAO & 1688) ● EXCLUSIVITÉS BLACK MARKET ● FILIGRANE INCRUSTÉ DE SÉCURITÉ</span>
+      <span class="px-4">● DROP DE SOURCING CHINOIS EN COURS (TAOBAO & 1688) ● EXCLUSIVITÉS DEEP ROOTS ● FILIGRANE INCRUSTÉ DE SÉCURITÉ</span>
     </div>
   </div>
 
@@ -123,7 +123,7 @@ export function getHtmlTemplateCode(opts?: { siteUrl?: string }): string {
           <span class="w-2 h-2 rounded-full bg-[#ff2a2a] animate-ping"></span>
           <span class="text-xs font-mono text-zinc-500 uppercase tracking-widest">FICHE PRODUIT EXCLUSIVE</span>
         </div>
-        <h3 class="text-sm font-extrabold text-brand-red font-mono tracking-widest uppercase">BLACK MARKET</h3>
+        <h3 class="text-sm font-extrabold text-brand-red font-mono tracking-widest uppercase">DEEP ROOTS</h3>
         <button onclick="closeDetailsModal()" class="bg-zinc-900 hover:bg-brand-red/20 text-zinc-400 hover:text-brand-red p-1.5 rounded-full transition-all border border-zinc-800" aria-label="Fermer">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
@@ -166,7 +166,7 @@ export function getHtmlTemplateCode(opts?: { siteUrl?: string }): string {
 
   <!-- Footer -->
   <footer class="bg-black py-6 text-center border-t border-zinc-900 text-xs text-zinc-600 font-mono">
-    <p>© 2026 BLACK MARKET CO. ALL VISUALS SECURED UNDER AUTOMATIC WATERMARK</p>
+    <p>© 2026 DEEP ROOTS CO. ALL VISUALS SECURED UNDER AUTOMATIC WATERMARK</p>
   </footer>
 
   <!-- Login Modal (Google) -->
@@ -222,7 +222,7 @@ export function getHtmlTemplateCode(opts?: { siteUrl?: string }): string {
           ctx.textBaseline = "middle";
           ctx.shadowColor = "rgba(0,0,0,0.75)";
           ctx.shadowBlur = 5;
-          var text = "BLACK MARKET © 2026";
+          var text = "DEEP ROOTS © 2026";
           var spacing = Math.round(h * 0.30);
           var step = Math.round(w * 0.75);
           for (var dy = -h; dy <= h; dy += spacing) {
@@ -347,7 +347,7 @@ export function getHtmlTemplateCode(opts?: { siteUrl?: string }): string {
 
     // ===== MESSAGE WHATSAPP POLI & STRUCTURÉ (partagé) =====
     function buildWaMessage(product, priceStr, productUrl) {
-      return "Bonjour BLACK MARKET, 👋\\n\\n" +
+      return "Bonjour DEEP ROOTS, 👋\\n\\n" +
         "Je souhaite passer une PRÉCOMMANDE pour le produit suivant :\\n\\n" +
         "  📦 PRODUIT : " + String(product.title || "").toUpperCase() + "\\n" +
         "  💰 PRIX : " + priceStr + "\\n" +

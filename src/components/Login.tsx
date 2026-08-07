@@ -104,7 +104,7 @@ export default function Login({
           </div>
           <div>
             <div className="flex items-center justify-center gap-2">
-              <span className="text-2xl font-black text-white tracking-widest font-mono">BLACK MARKET</span>
+              <span className="text-2xl font-black text-white tracking-widest font-mono">DEEP ROOTS</span>
               <span className="text-[9px] font-mono font-bold bg-brand-red/25 text-brand-red border border-brand-red/45 px-1.5 py-0.5 rounded">SÉCURISÉ</span>
             </div>
             <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-widest mt-1">

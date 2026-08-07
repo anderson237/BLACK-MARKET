@@ -172,7 +172,7 @@ else {
 
         <div>
           <label class="flex items-center gap-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-wider mb-1.5">🔗 URL du site (fiches produits partagées)</label>
-          <input :value="draft.siteUrl" @input="update({ siteUrl: ($event.target as HTMLInputElement).value })" placeholder="https://blackmarket-import-export.netlify.app/"
+          <input :value="draft.siteUrl" @input="update({ siteUrl: ($event.target as HTMLInputElement).value })" placeholder="https://deeproots-importexport.netlify.app/"
             class="w-full bg-black border border-zinc-800 rounded-xl px-3 py-2.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-[#ff2a2a]/50 placeholder-zinc-600" />
         </div>
       </form>

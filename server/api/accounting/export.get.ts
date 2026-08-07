@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
   const allExpenses = expenses.reduce((s: number, e: any) => s + (Number(e.amountXof) || 0), 0)
 
   const out: (string | number)[][] = []
-  out.push(['RAPPORT COMPTABLE BLACK MARKET'])
+  out.push(['RAPPORT COMPTABLE DEEP ROOTS'])
   out.push(['Généré le', now.toLocaleDateString('fr-FR'), now.toLocaleTimeString('fr-FR')])
   out.push([])
   out.push(['Chiffre d\'affaires total (FCFA)', rows.reduce((s, r) => s + r.revenueXof, 0)])

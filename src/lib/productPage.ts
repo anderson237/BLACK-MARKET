@@ -33,7 +33,7 @@ export function getProductPageHtml(p: Product, baseUrl: string, phoneNumber: str
         .map((b) => `<p class="text-xs text-zinc-300 leading-relaxed indent-4">${escapeHtml(b.trim())}</p>`)
         .join("\n              ");
   const message =
-    "Bonjour BLACK MARKET, 👋\n\n" +
+    "Bonjour DEEP ROOTS, 👋\n\n" +
     "Je souhaite passer une PRÉCOMMANDE pour le produit suivant :\n\n" +
     "  📦 PRODUIT : " + String(p.title || "").toUpperCase() + "\n" +
     "  💰 PRIX : " + priceXof + " F CFA" + (p.priceEur ? " (≈ " + p.priceEur + " €)" : "") + "\n" +
@@ -102,7 +102,7 @@ export function getProductPageHtml(p: Product, baseUrl: string, phoneNumber: str
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title} - BLACK MARKET</title>
+  <title>${title} - DEEP ROOTS</title>
   <meta name="description" content="${descriptionMeta}">
   <meta property="og:type" content="product">
   <meta property="og:url" content="${pageUrl}">
@@ -133,7 +133,7 @@ export function getProductPageHtml(p: Product, baseUrl: string, phoneNumber: str
 
   <header class="bg-[#0d0d14] border-b border-brand-red/30 py-4 shadow-md">
     <div class="max-w-5xl mx-auto px-4 flex items-center justify-between gap-4">
-      <a href="${escapeHtml(baseUrl)}" class="text-xl font-black tracking-widest text-white font-mono">BLACK MARKET<span class="text-[9px] bg-brand-red/20 text-brand-red px-1.5 py-0.5 rounded border border-brand-red/35 font-mono font-bold ml-2">K-STREET</span></a>
+      <a href="${escapeHtml(baseUrl)}" class="text-xl font-black tracking-widest text-white font-mono">DEEP ROOTS<span class="text-[9px] bg-brand-red/20 text-brand-red px-1.5 py-0.5 rounded border border-brand-red/35 font-mono font-bold ml-2">K-STREET</span></a>
       <a href="${escapeHtml(baseUrl)}" class="text-[10px] font-mono text-zinc-400 hover:text-brand-red border border-zinc-800 px-3 py-1.5 rounded-lg">← TOUT LE CATALOGUE</a>
     </div>
   </header>
@@ -177,7 +177,7 @@ ${descriptionBlocks}
         </div>
       </div>
     </div>
-    <p class="text-center text-[10px] text-zinc-600 font-mono mt-6">© 2026 BLACK MARKET CO. IMAGES PROTÉGÉES PAR FILIGRANE AUTOMATIQUE</p>
+    <p class="text-center text-[10px] text-zinc-600 font-mono mt-6">© 2026 DEEP ROOTS CO. IMAGES PROTÉGÉES PAR FILIGRANE AUTOMATIQUE</p>
   </main>
   <script>
     // Real activity tracking: feeds the admin dashboard (clicks + pending lead order)

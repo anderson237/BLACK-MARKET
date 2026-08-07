@@ -1,6 +1,6 @@
 {
-  "name": "BLACK MARKET",
-  "description": "Plateforme No-Code de Sourcing & Précommandes d'importation Chine avec un style Cyberpunk-Streetwear Coréen noir et rouge.",
+  "name": "Deep Roots Logistics",
+  "description": "Deep Roots Logistics — Votre ancre mondiale pour le commerce international : import-export global, catalogue de produits tendance et précommande WhatsApp.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

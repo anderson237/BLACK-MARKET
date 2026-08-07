@@ -525,7 +525,7 @@ export default function App() {
 
       <footer className="bg-[#0b0b10] border-t border-zinc-900 py-8 mt-12 text-center text-xs text-zinc-500 font-mono">
         <div className="max-w-7xl mx-auto px-4 space-y-1">
-          <p>© 2026 BLACK MARKET SINO-PREP SYSTEM // KOREAN STREET STYLE</p>
+          <p>© 2026 DEEP ROOTS SINO-PREP SYSTEM // KOREAN STREET STYLE</p>
           <p>Toutes les images et vidéos prévisualisées reçoivent le filigrane indélébile obligatoire.</p>
         </div>
       </footer>
