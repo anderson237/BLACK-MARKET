@@ -27,8 +27,22 @@ function scrollBottom() {
   })
 }
 
-onMounted(scrollBottom)
-watch(() => props.messages?.length, scrollBottom)
+let lastLen = 0
+onMounted(() => {
+  scrollBottom()
+  lastLen = props.messages?.length || 0
+  if (lastLen) markRead()
+})
+
+// Real-time: when new messages arrive while the panel is open, mark them as
+// read immediately (clears the badge on both sides) and scroll down.
+watch(() => props.messages?.length, (n) => {
+  scrollBottom()
+  if (n && n !== lastLen) {
+    lastLen = n
+    markRead()
+  }
+})
 
 async function send() {
   const body = text.value.trim()
@@ -63,10 +77,6 @@ function markRead() {
   }).catch(() => {})
   emit('read')
 }
-
-onMounted(() => {
-  if (props.messages?.length) markRead()
-})
 
 function fmt(ts: number): string {
   if (!ts) return ''

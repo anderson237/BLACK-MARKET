@@ -8,11 +8,23 @@ const auth = useAuthStore()
 const { isLight, toggle, init } = useTheme()
 onMounted(() => init())
 
-// Chat badge (ST-012): poll unread admin messages for the sidebar.
+// Chat badge (ST-012): real-time SSE push + fast fallback poll. The badge and
+// any open chat panel update instantly when a client sends a message.
 const adminChat = useAdminChatStore()
-onMounted(() => {
-  adminChat.pollUnread()
-  setInterval(() => adminChat.pollUnread(), 30_000)
+watch(
+  () => auth.initialized && auth.isAuthed && auth.role === 'admin',
+  (v) => {
+    if (v) {
+      adminChat.startRealtime()
+      adminChat.load()
+    } else {
+      adminChat.stopRealtime()
+    }
+  },
+  { immediate: true },
+)
+onUnmounted(() => {
+  adminChat.stopRealtime()
 })
 
 // Admin console must never be indexed by search engines: it hosts login

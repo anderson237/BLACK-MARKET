@@ -203,6 +203,7 @@ onUnmounted(() => {
   document.removeEventListener('visibilitychange', onVisibility)
   if (refreshTimer) clearTimeout(refreshTimer)
   if (autoRefresh) clearInterval(autoRefresh)
+  chat.stopRealtime()
 })
 function onTrackRefresh() {
   if (refreshTimer) clearTimeout(refreshTimer)
@@ -224,7 +225,13 @@ function onVisibility() {
 let autoRefresh: ReturnType<typeof setInterval> | null = null
 
 onMounted(fillForm)
-watch(() => auth.isAuthed, (v) => { if (v) { fillForm(); loadInteractions(); cart.load(); chat.load() } }, { immediate: true })
+watch(() => auth.isAuthed, (v) => {
+  if (v) {
+    fillForm(); loadInteractions(); cart.load(); chat.load(); chat.startRealtime()
+  } else {
+    chat.stopRealtime()
+  }
+}, { immediate: true })
 
 function timeAgo(isoOrTs: string | number): string {
   const t = typeof isoOrTs === 'number' ? isoOrTs : new Date(isoOrTs).getTime()

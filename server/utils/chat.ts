@@ -1,4 +1,5 @@
 import { loadChat, saveChat, withLock, type ChatThread, type ChatMessage } from '~~/server/utils/storage'
+import { publishChatUpdate } from '~~/server/utils/realtime'
 
 export interface ChatUnread {
   threadId: string
@@ -80,6 +81,8 @@ export async function addMessage(
     if (from === 'client') t.clientReadTs = now
     else t.adminReadTs = now
     await saveChat(threads)
+    // Real-time: push the update to the owner + the admin console.
+    publishChatUpdate(t, 'message')
     return t
   })
 }
@@ -91,6 +94,7 @@ export async function markClientRead(threadId: string, ts?: number): Promise<voi
     if (!t) return
     t.clientReadTs = ts || Date.now()
     await saveChat(threads)
+    publishChatUpdate(t, 'read')
   })
 }
 
@@ -101,6 +105,7 @@ export async function markAdminRead(threadId: string, ts?: number): Promise<void
     if (!t) return
     t.adminReadTs = ts || Date.now()
     await saveChat(threads)
+    publishChatUpdate(t, 'read')
   })
 }
 
@@ -139,6 +144,9 @@ export async function migratePreorderToOrder(orderId: string, userId: string, me
     }
     ord.updatedAt = now
     await saveChat(threads)
+    // Real-time: both sides should refresh to see the conversation carried over.
+    publishChatUpdate(pre, 'migrated')
+    publishChatUpdate(ord, 'migrated')
     return ord
   })
 }
