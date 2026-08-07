@@ -5,6 +5,7 @@ import { MOODS, moodOf } from '~/data/moods'
 import { useAuthStore } from '~/stores/auth'
 import { useInteractionsStore } from '~/stores/interactions'
 import { useTrack } from '~/composables/useTrack'
+import { useCurrency } from '~/composables/useCurrency'
 
 const { isLight } = useTheme()
 
@@ -14,6 +15,7 @@ const auth = useAuthStore()
 const config = useRuntimeConfig()
 const inter = useInteractionsStore()
 const { like } = useTrack()
+const { format } = useCurrency()
 
 // Guard: must be logged in to reach the client space.
 onMounted(() => {
@@ -795,7 +797,7 @@ const totalActivity = computed(() => {
                   </div>
                   <div class="flex-1 min-w-0">
                     <p class="text-xs font-bold text-slate-200 truncate">Commande — {{ o.productTitle || o.id }}</p>
-                    <p class="text-[10px] text-zinc-500 font-mono mt-0.5">x{{ o.quantity }} · {{ o.priceXof ? o.priceXof.toLocaleString('fr-FR') + ' F CFA' : '' }} · {{ timeAgo(o.createdAt) }}</p>
+                    <p class="text-[10px] text-zinc-500 font-mono mt-0.5">x{{ o.quantity }} · {{ o.priceXof ? format(o.priceXof) : '' }} · {{ timeAgo(o.createdAt) }}</p>
                   </div>
                   <span class="text-[9px] font-mono uppercase tracking-widest px-2 py-1 rounded border" :class="o.status === 'completed' ? 'text-emerald-400 border-emerald-500/30' : o.status === 'cancelled' ? 'text-red-400 border-red-500/30' : 'text-amber-400 border-amber-500/30'">{{ o.status }}</span>
                 </div>

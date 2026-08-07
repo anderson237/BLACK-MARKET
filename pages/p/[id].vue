@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import type { Product } from '~/types'
-import { formatPriceXof, promoPercent, promoPrice, promoCountdown, hasPromo, buildWaMessage } from '~/composables/useCatalog'
+import { promoPercent, promoPrice, promoCountdown, hasPromo, buildWaMessage } from '~/composables/useCatalog'
 import { useAuthStore } from '~/stores/auth'
 import { useTrack } from '~/composables/useTrack'
+import { useCurrency } from '~/composables/useCurrency'
 
 const route = useRoute()
 const config = useRuntimeConfig()
 const auth = useAuthStore()
 const { viewProduct, clickPreorder } = useTrack()
+const { code, format } = useCurrency()
 const productId = computed(() => String(route.params.id || '').replace(/\.html$/i, ''))
 
 const { data: product, error, refresh } = await useAsyncData<Product | null>(
@@ -126,7 +128,7 @@ onBeforeUnmount(() => cdTimer && clearInterval(cdTimer))
 const waUrl = computed(() => {
   const p = product.value
   if (!p) return ''
-  const priceStr = formatPriceXof(p.priceXof)
+  const priceStr = format(p.priceXof)
   const pageUrl = `${config.public.siteUrl}/p/${p.id}.html`
   const msg = buildWaMessage(p, priceStr, pageUrl)
   const num = p.waNumber || config.public.phoneNumber
@@ -248,10 +250,10 @@ const techHtml = computed(() => sanitizeHtml(product.value?.originalDescription 
             <span v-if="pct > 0" class="bg-[#ff2a2a] text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse">−{{ pct }}%</span>
           </div>
           <template v-if="pct > 0">
-            <span class="text-sm text-zinc-500 font-mono line-through mr-2">{{ formatPriceXof(product.priceXof) }}</span>
-            <span class="text-3xl font-extrabold text-[#ff2a2a] font-mono">{{ formatPriceXof(discountPrice) }}</span>
+            <span class="text-sm text-zinc-500 font-mono line-through mr-2">{{ format(product.priceXof) }}</span>
+            <span class="text-3xl font-extrabold text-[#ff2a2a] font-mono">{{ format(discountPrice) }}</span>
           </template>
-          <p v-else class="text-2xl font-extrabold text-[#ff2a2a] font-mono">{{ formatPriceXof(product.priceXof) }}</p>
+          <p v-else class="text-2xl font-extrabold text-[#ff2a2a] font-mono">{{ format(product.priceXof) }}</p>
           <div v-if="pct > 0 && countdown" class="mt-2 inline-flex items-center gap-2 bg-black/50 border border-amber-500/40 text-amber-300 text-[11px] font-mono font-bold px-3 py-1.5 rounded-lg">
             <span class="relative flex h-2 w-2">
               <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-60" />

@@ -9,6 +9,7 @@ const { isLight, toggle, init } = useTheme()
 onMounted(() => init())
 
 const config = useRuntimeConfig()
+const { code, set } = useCurrency()
 const nav = [
   { label: 'ACCUEIL', to: '/' },
   { label: 'CYBER GADGETS', to: '/' },
@@ -57,6 +58,13 @@ function doLogout() {
             class="hidden md:inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-300 hover:text-white border border-zinc-800 hover:border-[#ff2a2a]/60 px-3 py-2 rounded-xl transition-all" title="Mon espace client">
             <AppIcon name="users" :size="14" /><span class="hidden lg:inline">Mon espace</span>
           </NuxtLink>
+          <select :value="code" @change="set(($event.target as HTMLSelectElement).value as 'XOF' | 'EUR' | 'USD')"
+            class="hidden md:inline-flex items-center text-[10px] font-mono text-zinc-300 hover:text-white border border-zinc-800 hover:border-[#ff2a2a]/60 px-2 py-2 rounded-xl bg-transparent cursor-pointer transition-all focus:outline-none"
+            title="Afficher les prix dans une autre devise">
+            <option value="XOF" class="bg-[#12121a]">F CFA</option>
+            <option value="EUR" class="bg-[#12121a]">€ EUR</option>
+            <option value="USD" class="bg-[#12121a]">$ USD</option>
+          </select>
           <NuxtLink v-if="isAdmin" to="/admin"
             class="inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-300 hover:text-white border border-zinc-800 px-3 py-2 rounded-xl transition-all" title="Ouvrir le dashboard admin">
             <AppIcon name="dashboard" :size="14" /><span class="hidden sm:inline">Dashboard Admin</span>
@@ -109,6 +117,13 @@ function doLogout() {
           </NuxtLink>
         </nav>
         <div class="p-4 border-t border-zinc-800 space-y-2">
+          <select :value="code" @change="set(($event.target as HTMLSelectElement).value as 'XOF' | 'EUR' | 'USD')"
+            class="w-full text-[11px] font-mono text-zinc-300 border border-zinc-800 bg-transparent px-3 py-2.5 rounded-xl cursor-pointer focus:outline-none uppercase tracking-widest"
+            title="Afficher les prix dans une autre devise">
+            <option value="XOF" class="bg-[#12121a]">F CFA (Franc CFA)</option>
+            <option value="EUR" class="bg-[#12121a]">EUR (Euro)</option>
+            <option value="USD" class="bg-[#12121a]">USD (Dollar)</option>
+          </select>
           <a :href="`https://wa.me/${String(config.public.phoneNumber || '').replace(/[^0-9]/g, '')}`" target="_blank" rel="noopener"
              class="flex items-center justify-center gap-2 text-center text-[11px] font-mono text-emerald-400 border border-emerald-500/30 px-3 py-2.5 rounded-xl transition-all uppercase tracking-widest">
             <AppIcon name="whatsapp" :size="14" /> WhatsApp Direct

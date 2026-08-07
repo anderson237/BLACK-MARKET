@@ -214,10 +214,16 @@ const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json')
 
 export interface SiteSettings {
   ga4Id: string
+  /** Devise d'affichage par défaut du store (XOF par défaut). */
+  currency: 'XOF' | 'EUR' | 'USD'
 }
 
 export function normalizeSettings(raw: any): SiteSettings {
-  return { ga4Id: String(raw?.ga4Id || '').trim() }
+  const cur = String(raw?.currency || '').toUpperCase()
+  return {
+    ga4Id: String(raw?.ga4Id || '').trim(),
+    currency: cur === 'EUR' || cur === 'USD' ? cur : 'XOF',
+  }
 }
 
 export async function loadSettings(): Promise<SiteSettings> {
@@ -231,7 +237,7 @@ export async function loadSettings(): Promise<SiteSettings> {
         /* corrupted -> seed */
       }
     }
-    return { ga4Id: '' }
+    return { ga4Id: '', currency: 'XOF' }
   }
   return normalizeSettings(await readJSON(SETTINGS_FILE))
 }

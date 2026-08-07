@@ -3,6 +3,7 @@ import type { Product } from '~/types'
 import { useTrack } from '~/composables/useTrack'
 import { useAuthStore } from '~/stores/auth'
 import { useCommentsStore } from '~/stores/comments'
+import { useCurrency } from '~/composables/useCurrency'
 
 const props = defineProps<{ product: Product; compact?: boolean }>()
 const { track, like, share } = useTrack()
@@ -10,6 +11,7 @@ const inter = useInteractionsStore()
 const auth = useAuthStore()
 const config = useRuntimeConfig()
 const commentsStore = useCommentsStore()
+const { format } = useCurrency()
 
 // Seed the counts from the SSR payload (product.likeCount/commentCount) so the
 // server-rendered HTML already shows the real numbers — no "flash to 0" after
@@ -67,7 +69,7 @@ function onLike() {
 }
 
 function onShareWa() {
-  const msg = `📦 ${props.product.title}\n💰 ${props.product.priceXof} F CFA\nDécouvrez ce drop exclusif DEEP ROOTS :`
+  const msg = `📦 ${props.product.title}\n💰 ${format(props.product.priceXof)}\nDécouvrez ce drop exclusif DEEP ROOTS :`
   const url = window.location.origin + '/p/' + props.product.id + '.html'
   const num = props.product.waNumber || config.public.phoneNumber
   window.open(

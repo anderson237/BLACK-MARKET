@@ -78,7 +78,7 @@ onMounted(() => {
 const KEY = 'bm_admin_config_v1'
 const draft = reactive({
   phoneNumber: '',
-  currency: 'XOF' as 'XOF' | 'EUR',
+  currency: 'XOF' as 'XOF' | 'EUR' | 'USD',
   siteUrl: '',
   githubRepo: '',
   githubBranch: 'main',
@@ -91,7 +91,7 @@ function loadDraft() {
   const baseUrl = String(config.public.siteUrl || '')
   Object.assign(draft, {
     phoneNumber: basePhone,
-    currency: (config.public.currency === 'EUR' ? 'EUR' : 'XOF') as 'XOF' | 'EUR',
+    currency: (config.public.currency === 'EUR' || config.public.currency === 'USD' ? config.public.currency : 'XOF') as 'XOF' | 'EUR' | 'USD',
     siteUrl: baseUrl,
     githubRepo: '',
     githubBranch: 'main',
@@ -105,6 +105,17 @@ function loadDraft() {
       if (p && typeof p === 'object') Object.assign(draft, p)
     }
   } catch { /* ignore */ }
+  // Devise par défaut = celle persistée côté serveur (surcharge localStorage).
+  fetch('/api/settings', { headers: { Accept: 'application/json' } })
+    .then((r) => r.json().catch(() => ({})))
+    .then((json: any) => {
+      const cur = String(json?.settings?.currency || '').toUpperCase()
+      if (cur === 'EUR' || cur === 'USD') {
+        draft.currency = cur
+        update({ currency: cur })
+      }
+    })
+    .catch(() => { /* garde la valeur locale */ })
 }
 
 function update(patch: Partial<typeof draft>) {
@@ -116,6 +127,12 @@ function submit() {
   try {
     if (import.meta.client) localStorage.setItem(KEY, JSON.stringify(draft))
     if (import.meta.client) localStorage.setItem('bm_admin_wa', draft.phoneNumber)
+    // Persister la devise côté serveur -> appliquée à tout le store.
+    fetch('/api/settings', {
+      method: 'PUT',
+      headers: store.headers(),
+      body: JSON.stringify({ currency: draft.currency }),
+    }).catch(() => { /* le reste est sauvegardé localement */ })
     saved.value = true
     setTimeout(() => { saved.value = false }, 2500)
   } catch { /* ignore */ }
@@ -127,7 +144,7 @@ else {
   const baseUrl = String(config.public.siteUrl || '')
   Object.assign(draft, {
     phoneNumber: basePhone,
-    currency: (config.public.currency === 'EUR' ? 'EUR' : 'XOF') as 'XOF' | 'EUR',
+    currency: (config.public.currency === 'EUR' || config.public.currency === 'USD' ? config.public.currency : 'XOF') as 'XOF' | 'EUR' | 'USD',
     siteUrl: baseUrl,
   })
 }
@@ -163,10 +180,11 @@ else {
 
         <div>
           <label class="flex items-center gap-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-wider mb-1.5">🌍 Devise par défaut</label>
-          <select :value="draft.currency" @change="update({ currency: ($event.target as HTMLSelectElement).value as 'XOF' | 'EUR' })"
+          <select :value="draft.currency" @change="update({ currency: ($event.target as HTMLSelectElement).value as 'XOF' | 'EUR' | 'USD' })"
             class="w-full bg-black border border-zinc-800 rounded-xl px-3 py-2.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-[#ff2a2a]/50 cursor-pointer">
-            <option value="XOF" class="bg-[#0d0d14]">XOF (Franc CFA)</option>
+            <option value="XOF" class="bg-[#0d0d14]">XOF (Franc CFA) — défaut</option>
             <option value="EUR" class="bg-[#0d0d14]">EUR (Euro)</option>
+            <option value="USD" class="bg-[#0d0d14]">USD (Dollar)</option>
           </select>
         </div>
 

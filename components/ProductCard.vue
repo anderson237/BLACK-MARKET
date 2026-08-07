@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import type { Product } from '~/types'
-import { formatPriceXof, promoPercent, promoPrice, promoCountdown, hasPromo } from '~/composables/useCatalog'
+import { promoPercent, promoPrice, promoCountdown, hasPromo } from '~/composables/useCatalog'
 import { useAuthStore } from '~/stores/auth'
+import { useCurrency } from '~/composables/useCurrency'
 
 const props = defineProps<{ product: Product; index: number }>()
 const config = useRuntimeConfig()
 const auth = useAuthStore()
+const { code, format } = useCurrency()
 
 const pct = computed(() => promoPercent(props.product))
 const discountPrice = computed(() => promoPrice(props.product))
@@ -37,7 +39,7 @@ function toggleMute() {
 }
 
 function preorder() {
-  const msg = `📦 ${props.product.title}\n💰 ${formatPriceXof(props.product.priceXof)} F CFA${Number(props.product.moq) > 0 ? `\n📌 MOQ : ${props.product.moq} min` : ''}${Number(props.product.stockQuantity) > 0 ? `\n🏷️ En stock : ${props.product.stockQuantity}` : ''}\nDécouvrez ce drop exclusif DEEP ROOTS :`
+  const msg = `📦 ${props.product.title}\n💰 ${format(props.product.priceXof)}${Number(props.product.moq) > 0 ? `\n📌 MOQ : ${props.product.moq} min` : ''}${Number(props.product.stockQuantity) > 0 ? `\n🏷️ En stock : ${props.product.stockQuantity}` : ''}\nDécouvrez ce drop exclusif DEEP ROOTS :`
   const link = window.location.origin + url.value
   const num = props.product.waNumber || config.public.phoneNumber
   auth.requireAuth(
@@ -122,11 +124,11 @@ const truncatedTitle = computed(() => {
       <div class="mt-2 flex items-center justify-between pt-2 border-t border-zinc-900">
         <div class="flex items-baseline gap-2 flex-wrap">
           <template v-if="pct > 0">
-            <span class="text-[10px] text-zinc-500 font-mono line-through">{{ formatPriceXof(product.priceXof) }}</span>
-            <span class="font-extrabold text-[#ff2a2a] text-sm font-mono">{{ formatPriceXof(discountPrice) }}</span>
+            <span class="text-[10px] text-zinc-500 font-mono line-through">{{ format(product.priceXof) }}</span>
+            <span class="font-extrabold text-[#ff2a2a] text-sm font-mono">{{ format(discountPrice) }}</span>
             <span v-if="countdown" class="w-full text-[9px] text-amber-400 font-mono font-bold">⏳ Fin dans {{ countdown }}</span>
           </template>
-          <span v-else class="font-extrabold text-slate-100 text-sm font-mono">{{ formatPriceXof(product.priceXof) }}</span>
+          <span v-else class="font-extrabold text-slate-100 text-sm font-mono">{{ format(product.priceXof) }}</span>
         </div>
       </div>
 
