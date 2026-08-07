@@ -91,18 +91,15 @@ const truncatedTitle = computed(() => {
         >
           <AppIcon :name="videoMuted ? 'muted' : 'sound'" :size="14" />
         </button>
-        <span class="absolute top-3 left-3 bg-[#ff2a2a] text-white text-[9px] uppercase font-bold tracking-widest px-2.5 py-1 rounded">
-          {{ product.category || 'EXCLUSIF' }}
-        </span>
         <span
           v-if="isStock"
-          class="absolute top-9 left-3 bg-emerald-500 text-black text-[9px] uppercase font-bold tracking-widest px-2.5 py-1 rounded shadow-lg"
+          class="absolute top-3 left-3 bg-emerald-500 text-black text-[9px] uppercase font-bold tracking-widest px-2.5 py-1 rounded shadow-lg"
         >
           ✓ EN STOCK
         </span>
         <span
           v-else
-          class="absolute top-9 left-3 bg-amber-500/95 text-black text-[9px] uppercase font-bold tracking-widest px-2.5 py-1 rounded shadow-lg"
+          class="absolute top-3 left-3 bg-amber-500/95 text-black text-[9px] uppercase font-bold tracking-widest px-2.5 py-1 rounded shadow-lg"
         >
 📦 PRÉCOMMANDE
         </span>
@@ -126,7 +123,7 @@ const truncatedTitle = computed(() => {
           <template v-if="pct > 0">
             <span class="text-[10px] text-zinc-500 font-mono line-through">{{ format(product.priceXof) }}</span>
             <span class="font-extrabold text-[#ff2a2a] text-sm font-mono">{{ format(discountPrice) }}</span>
-            <span v-if="countdown" class="w-full text-[9px] text-amber-400 font-mono font-bold">⏳ Fin dans {{ countdown }}</span>
+            <span v-if="countdown" class="w-full text-[9px] text-amber-400 font-mono font-bold">⏳ Fin promo dans {{ countdown }}</span>
           </template>
           <span v-else class="font-extrabold text-slate-100 text-sm font-mono">{{ format(product.priceXof) }}</span>
         </div>
