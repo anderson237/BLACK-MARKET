@@ -106,6 +106,19 @@ netlify.toml
   cooldown de 72 h, journalise dans `bm-reminders`. **Dry-run par défaut** : aucun email tant que
   `RESEND_API_KEY` n'est pas configurée (l'UI admin permet de lancer un pass manuellement).
 
+#### Activer l'envoi réel des emails (Resend)
+
+1. Créez un compte sur **https://resend.com** (gratuit, ~100 emails/jour).
+2. **API Keys** → Create API Key → copiez la clé (`re_…`).
+3. Optionnel mais recommandé : **Domains** → Add Domain → suivez la vérification DNS (SPF/DKIM)
+   pour expédier depuis votre propre domaine. Sans domaine vérifié, utilisez l'adresse de test
+   `onboarding@resend.dev` pour valider le flux.
+4. Définissez les variables dans **Netlify → Site settings → Environment variables** :
+   - `RESEND_API_KEY` = `re_…`
+   - `RESEND_FROM` = `"Deep Roots Logistics <no-reply@votre-domaine.com>"` (ou `"onboarding@resend.dev"` pour tester)
+5. Redéployez (`netlify deploy --prod --dir="dist" --functions=".netlify/functions-internal"`).
+   Le panneau « LANCER LE RAPPEL » de `/admin/carts` affiche alors **Mode ACTIF** et les emails partent réellement.
+
 ## Sécurité implémentée (voir `SECURITY.md` pour le détail)
 
 - Authentification **côté serveur uniquement** (aucun fallback client). Sessions persistées côté serveur.
