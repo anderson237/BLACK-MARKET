@@ -88,6 +88,71 @@ async function onCopy() {
   window.dispatchEvent(new CustomEvent('bm:copied', { detail: 'Lien copié dans le presse-papiers !' }))
 }
 
+// ---- share menu (WhatsApp / Facebook / Messenger / TikTok / Gmail / copy) ----
+const shareOpen = ref(false)
+const productUrl = () => window.location.origin + '/p/' + props.product.id + '.html'
+const shareMsg = () => `📦 ${props.product.title}\n💰 ${format(promoPrice(props.product))}\nDécouvrez ce drop exclusif DEEP ROOTS :`
+
+function openShare() {
+  shareOpen.value = !shareOpen.value
+}
+
+/** Web Share API when available (mobile: opens the system sheet incl. TikTok/Messenger), else fallback. */
+async function nativeShareFallback(label: string) {
+  const url = productUrl()
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: props.product.title, text: shareMsg(), url })
+      share(props.product, 'messenger')
+      return
+    } catch {
+      /* user cancelled -> fall through to copy */
+    }
+  }
+  await navigator.clipboard?.writeText(url).catch(() => {})
+  share(props.product, 'copy')
+  window.dispatchEvent(new CustomEvent('bm:copied', { detail: `${label} : lien copié dans le presse-papiers !` }))
+}
+
+function shareTo(platform: 'wa' | 'fb' | 'gmail' | 'messenger' | 'tiktok') {
+  const url = productUrl()
+  const msg = shareMsg()
+  shareOpen.value = false
+
+  if (platform === 'wa') {
+    const num = props.product.waNumber || config.public.phoneNumber
+    window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(msg + '\n' + url), '_blank', 'noopener,noreferrer')
+    share(props.product, 'wa')
+  } else if (platform === 'fb') {
+    window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(url), '_blank', 'noopener,noreferrer')
+    share(props.product, 'fb')
+  } else if (platform === 'gmail') {
+    window.open(
+      'https://mail.google.com/mail/?view=cm&fs=1&to=&su=' + encodeURIComponent(`${props.product.title} — DEEP ROOTS`) + '&body=' + encodeURIComponent(msg + '\n' + url),
+      '_blank',
+      'noopener,noreferrer',
+    )
+    share(props.product, 'gmail')
+  } else {
+    // Messenger & TikTok have no public web share dialog: prefer the native
+    // system share sheet (mobile), fallback to copying the link.
+    nativeShareFallback(platform === 'messenger' ? 'Messenger' : 'TikTok')
+  }
+}
+
+const shareItems = [
+  { id: 'wa', label: 'WhatsApp', emoji: '💬', color: 'text-green-400 hover:bg-green-500/10', iconBg: 'bg-green-500/15' },
+  { id: 'fb', label: 'Facebook', emoji: '📘', color: 'text-blue-400 hover:bg-blue-500/10', iconBg: 'bg-blue-500/15' },
+  { id: 'messenger', label: 'Messenger', emoji: '✈️', color: 'text-sky-400 hover:bg-sky-500/10', iconBg: 'bg-sky-500/15' },
+  { id: 'tiktok', label: 'TikTok', emoji: '🎵', color: 'text-cyan-300 hover:bg-cyan-500/10', iconBg: 'bg-cyan-500/15' },
+  { id: 'gmail', label: 'Gmail', emoji: '📧', color: 'text-red-400 hover:bg-red-500/10', iconBg: 'bg-red-500/15' },
+  { id: 'copy', label: 'Copier le lien', emoji: '🔗', color: 'text-zinc-300 hover:bg-zinc-700/40', iconBg: 'bg-zinc-700/40' },
+]
+function onShareItem(item: any) {
+  if (item.id === 'copy') { onCopy(); return }
+  shareTo(item.id)
+}
+
 function onComment() {
   const url = '/p/' + props.product.id + '.html#commentaires'
   if (window.location.pathname.startsWith('/p/')) {
@@ -123,14 +188,34 @@ function onComment() {
       <span class="hidden sm:inline">{{ commentCount }}</span>
     </button>
 
-    <!-- Share WhatsApp -->
-    <button
-      @click="onShareWa"
-      class="flex items-center justify-center gap-1.5 px-2 py-2 rounded-xl border bg-black/30 border-zinc-800 text-zinc-400 hover:border-green-500/40 hover:text-green-400 transition-all text-[11px] font-mono font-bold"
-      aria-label="Partager sur WhatsApp"
-    >
-      <AppIcon name="share" :size="15" />
-    </button>
+    <!-- Share menu (WhatsApp, Facebook, Messenger, TikTok, Gmail, copy) -->
+    <div class="relative z-20">
+      <button
+        @click="openShare"
+        class="flex items-center justify-center gap-1.5 px-2 py-2 rounded-xl border transition-all text-[11px] font-mono font-bold"
+        :class="shareOpen
+          ? 'bg-[#ff2a2a]/15 border-[#ff2a2a]/50 text-[#ff2a2a]'
+          : 'bg-black/30 border-zinc-800 text-zinc-400 hover:border-green-500/40 hover:text-green-400'"
+        aria-label="Partager le produit"
+      >
+        <AppIcon name="share" :size="15" />
+      </button>
+
+      <template v-if="shareOpen">
+        <div class="fixed inset-0 z-40" @click="shareOpen = false" />
+        <div class="absolute right-0 top-full mt-2 z-50 w-48 bg-[#12121a] border border-zinc-800 rounded-2xl p-1.5 shadow-2xl shadow-black/60">
+          <button
+            v-for="s in shareItems" :key="s.id"
+            @click="onShareItem(s)"
+            class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-[11px] font-mono font-bold transition-all hover:bg-zinc-800/60"
+            :class="s.color"
+          >
+            <span class="w-6 h-6 rounded-lg flex items-center justify-center text-sm" :class="s.iconBg">{{ s.emoji }}</span>
+            {{ s.label }}
+          </button>
+        </div>
+      </template>
+    </div>
 
     <!-- Copy link -->
     <button

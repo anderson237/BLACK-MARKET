@@ -70,6 +70,41 @@ async function removeEntry(id: string) {
   }
 }
 
+// ---- éditer un mouvement manuel ----
+const editing = ref<any>(null)
+const editMsg = ref('')
+function openEdit(m: any) {
+  editing.value = {
+    id: String(m.id || '').replace(/^man_/, ''),
+    type: m.type,
+    label: m.label,
+    amountXof: m.amountXof,
+    date: m.date,
+    method: m.method,
+    note: m.note || '',
+  }
+  editMsg.value = ''
+}
+async function saveEdit() {
+  if (!editing.value) return
+  const e = editing.value
+  editMsg.value = ''
+  try {
+    const res = await fetch(`/api/treasury/entries/${e.id}`, {
+      method: 'PUT',
+      headers: store.headers(),
+      body: JSON.stringify({ type: e.type, label: e.label, amountXof: e.amountXof, date: e.date, method: e.method, note: e.note }),
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(json?.statusMessage || json?.message || 'Modification impossible.')
+    editMsg.value = 'Mouvement modifié ✓'
+    editing.value = null
+    await load()
+  } catch (err: any) {
+    error.value = err?.message || 'Erreur.'
+  }
+}
+
 // ---- solde initial ----
 const showInit = ref(false)
 const initInput = ref(0)
@@ -284,10 +319,16 @@ const sourceLabel: Record<string, string> = {
               </p>
               <p class="text-[8px] font-mono text-zinc-600">solde {{ fmt(m.balanceXof) }}</p>
             </div>
-            <button v-if="m.source === 'manual'" @click="removeEntry(m.id.replace(/^man_/, ''))" title="Supprimer"
-              class="w-7 h-7 shrink-0 rounded-lg border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-red-400 hover:border-red-500/50 transition-all">
-              <AppIcon name="trash2" :size="12" />
-            </button>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button v-if="m.source === 'manual'" @click="openEdit(m)" title="Modifier"
+                class="w-7 h-7 rounded-lg border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-emerald-400 hover:border-emerald-500/50 transition-all">
+                <AppIcon name="edit" :size="12" />
+              </button>
+              <button v-if="m.source === 'manual'" @click="removeEntry(m.id.replace(/^man_/, ''))" title="Supprimer"
+                class="w-7 h-7 rounded-lg border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-red-400 hover:border-red-500/50 transition-all">
+                <AppIcon name="trash2" :size="12" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -304,6 +345,54 @@ const sourceLabel: Record<string, string> = {
         <div class="flex gap-2 mt-4">
           <button @click="saveInit" class="flex-1 bg-[#ff2a2a] hover:bg-red-600 text-white text-xs font-bold px-4 py-3 rounded-xl transition-all font-mono">Enregistrer</button>
           <button @click="showInit = false" class="border border-zinc-800 text-zinc-400 hover:text-white text-xs font-bold px-4 py-3 rounded-xl transition-all font-mono">Annuler</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modifier un mouvement manuel -->
+    <div v-if="editing" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" @click="editing = null" />
+      <div class="relative w-full max-w-md bg-[#12121a] border border-zinc-800 rounded-3xl p-5 max-h-[90vh] overflow-y-auto">
+        <h3 class="text-sm font-extrabold text-white font-mono uppercase tracking-wider mb-4">Modifier le mouvement</h3>
+        <div class="grid grid-cols-2 gap-2 mb-3">
+          <button type="button" @click="editing.type = 'in'"
+            class="py-2.5 rounded-xl border text-xs font-bold font-mono transition-all"
+            :class="editing.type === 'in' ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-400' : 'bg-black/40 border-zinc-800 text-zinc-400 hover:border-zinc-600'">+ Entrée</button>
+          <button type="button" @click="editing.type = 'out'"
+            class="py-2.5 rounded-xl border text-xs font-bold font-mono transition-all"
+            :class="editing.type === 'out' ? 'bg-red-500/15 border-red-500/50 text-red-400' : 'bg-black/40 border-zinc-800 text-zinc-400 hover:border-zinc-600'">− Sortie</button>
+        </div>
+        <div class="space-y-3">
+          <div class="space-y-1">
+            <label class="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Libellé *</label>
+            <input v-model="editing.label" placeholder="Ex : retrait, remboursement…" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" />
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div class="space-y-1">
+              <label class="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Montant (F CFA) *</label>
+              <input v-model.number="editing.amountXof" type="number" min="0" step="50" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" />
+            </div>
+            <div class="space-y-1">
+              <label class="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Date</label>
+              <input v-model="editing.date" type="date" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" />
+            </div>
+          </div>
+          <div class="space-y-1">
+            <label class="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Moyen</label>
+            <select v-model="editing.method" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none">
+              <option v-for="m in EXPENSE_PAYMENT_METHODS" :key="m.value" :value="m.value" class="bg-[#0d0d14]">{{ m.label }}</option>
+            </select>
+          </div>
+          <div class="space-y-1">
+            <label class="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Note (optionnel)</label>
+            <textarea v-model="editing.note" rows="2" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none resize-none" />
+          </div>
+          <p v-if="editMsg" class="text-[10px] font-mono text-emerald-400">{{ editMsg }}</p>
+          <div class="flex gap-2">
+            <button @click="saveEdit" :disabled="!editing.label || !editing.amountXof"
+              class="flex-1 bg-[#ff2a2a] hover:bg-red-600 text-white text-xs font-bold px-4 py-3 rounded-xl transition-all font-mono disabled:opacity-50">Enregistrer</button>
+            <button @click="editing = null" class="border border-zinc-800 text-zinc-400 hover:text-white text-xs font-bold px-4 py-3 rounded-xl transition-all font-mono">Annuler</button>
+          </div>
         </div>
       </div>
     </div>

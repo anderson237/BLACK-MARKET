@@ -20,6 +20,7 @@ interface AdminStats {
   }
   salesByCategory: { category: string; orders: number; revenueXof: number }[]
   revenueSeries: { label: string; revenueXof: number; revenueEur: number; orders: number }[]
+  clickSeries: { label: string; clicks: number }[]
   topProducts: { id: string; title: string; imageUrl: string; clicks: number; revenueXof: number; revenueEur: number }[]
   analytics: {
     totalUsers: number
@@ -96,6 +97,7 @@ export const useAdminStore = defineStore('admin', () => {
   const auth = useAuthStore()
   const products = ref<Product[]>([])
   const orders = ref<AdminOrder[]>([])
+  const trashOrders = ref<AdminOrder[]>([])
   const customers = ref<AdminCustomer[]>([])
   const stats = ref<AdminStats | null>(null)
   const admins = ref<string[]>([])
@@ -155,6 +157,7 @@ export const useAdminStore = defineStore('admin', () => {
       if (!res.ok) throw new Error(String(res.status))
       const json = await res.json()
       orders.value = Array.isArray(json?.orders) ? json.orders : []
+      trashOrders.value = Array.isArray(json?.trash) ? json.trash : []
     } catch (e: any) {
       authError.value = e?.message || 'Impossible de charger les commandes.'
     }
@@ -271,7 +274,45 @@ export const useAdminStore = defineStore('admin', () => {
       const j = await res.json().catch(() => ({}))
       throw new Error(j?.statusMessage || `Erreur ${res.status}`)
     }
+    const j = await res.json().catch(() => ({}))
+    const trashed = j?.trashed
+    const order = orders.value.find((o) => o.id === id)
     orders.value = orders.value.filter((o) => o.id !== id)
+    if (trashed && order) {
+      trashOrders.value.unshift({ ...order, deleted: true, deletedAt: new Date().toISOString() })
+    }
+    // Keep the dashboard KPI (Commandes / Revenu) in sync right away, not only
+    // on the 12s timer or the intra-instance SSE push.
+    await loadStats().catch(() => {})
+  }
+
+  /** Restore a soft-deleted order from the admin trash. */
+  async function restoreOrder(id: string) {
+    const res = await fetch(`/api/orders/${encodeURIComponent(id)}/restore`, { method: 'POST', headers: headers() })
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      throw new Error(j?.statusMessage || `Erreur ${res.status}`)
+    }
+    const restored = trashOrders.value.find((o) => o.id === id)
+    trashOrders.value = trashOrders.value.filter((o) => o.id !== id)
+    if (restored) {
+      const clean = { ...restored }
+      delete clean.deleted
+      delete clean.deletedAt
+      orders.value.unshift(clean)
+    }
+    await loadStats().catch(() => {})
+  }
+
+  /** Permanently purge an order (no way back). */
+  async function deleteOrderPermanent(id: string) {
+    const res = await fetch(`/api/orders/${encodeURIComponent(id)}/permanent`, { method: 'DELETE', headers: headers() })
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      throw new Error(j?.statusMessage || `Erreur ${res.status}`)
+    }
+    trashOrders.value = trashOrders.value.filter((o) => o.id !== id)
+    await loadStats().catch(() => {})
   }
 
   async function createProduct(body: Product) {
@@ -349,12 +390,12 @@ export const useAdminStore = defineStore('admin', () => {
 
   return {
     products, orders, customers, stats, admins, users,
-    trashProducts, activeProducts,
+    trashProducts, activeProducts, trashOrders,
     loaded, loading, authError,
     isAdmin, headers,
     loadProducts, loadOrders, loadStats, loadCustomers, loadAdmins, loadUsers,
     saveAdmins, deleteUser,
-    updateOrderStatus, deleteOrder, createOrder,
+    updateOrderStatus, deleteOrder, createOrder, restoreOrder, deleteOrderPermanent,
     createProduct, updateProduct, deleteProduct, restoreProduct, permanentDeleteProduct,
     refresh,
   }

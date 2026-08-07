@@ -175,12 +175,23 @@ const statusClass: Record<string, string> = {
 const fmtShortDate = (iso: string) =>
   new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })
 
-const trends = {
-  revenue: { up: true, value: '+12.4%' },
-  orders: { up: true, value: '+8.2%' },
-  clicks: { up: true, value: '+15.7%' },
-  products: { up: false, value: '-2.1%' },
+/** Real trend (last half vs first half of the displayed 7-day series). */
+function trendFromSeries(series: { value: number }[]): { up: boolean; value: string } | null {
+  if (!series || series.length < 2) return null
+  const mid = Math.floor(series.length / 2)
+  const first = series.slice(0, mid).reduce((s, d) => s + d.value, 0)
+  const last = series.slice(mid).reduce((s, d) => s + d.value, 0)
+  if (first <= 0 && last <= 0) return { up: true, value: '0%' }
+  if (first <= 0 && last > 0) return { up: true, value: 'Nouveau' }
+  const pct = Math.round(((last - first) / first) * 1000) / 10
+  return { up: pct >= 0, value: `${pct >= 0 ? '+' : ''}${pct}%` }
 }
+
+const revenueTrend = computed(() => trendFromSeries((stats.value?.revenueSeries || []).map((d) => ({ value: d.revenueXof }))))
+const ordersTrend = computed(() => trendFromSeries((stats.value?.revenueSeries || []).map((d) => ({ value: d.orders }))))
+const clicksTrend = computed(() => trendFromSeries((stats.value?.clickSeries || []).map((d) => ({ value: d.clicks }))))
+// No 7-day product series yet -> neutral badge.
+const productsTrend = computed<{ up: boolean; value: string } | null>(() => null)
 
 /* ---------------- Interaction analytics ---------------- */
 const inter = computed(() => stats.value?.interactions)
@@ -265,13 +276,14 @@ const USER_TOP_CONFIG = computed(() => {
         <div>
           <h4 class="text-2xl font-black font-mono text-white leading-none">{{ formatMoney(revenue) }}</h4>
           <div class="flex items-center gap-2 mt-2">
-            <span class="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border"
-              :class="trends.revenue.up ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-red-500/10 text-red-400 border-red-500/30'">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <span v-if="revenueTrend" class="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border"
+              :class="revenueTrend.up ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-red-500/10 text-red-400 border-red-500/30'">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" :class="revenueTrend.up ? '' : 'rotate-180'">
                 <path d="M7 7h10v10" /><path d="M7 17 17 7" />
               </svg>
-              {{ trends.revenue.value }}
+              {{ revenueTrend.value }}
             </span>
+            <span v-else class="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border bg-zinc-500/10 text-zinc-400 border-zinc-600/30">—</span>
             <span class="text-[9px] font-mono text-zinc-500">Toutes commandes</span>
           </div>
         </div>
@@ -289,13 +301,14 @@ const USER_TOP_CONFIG = computed(() => {
         <div>
           <h4 class="text-2xl font-black font-mono text-white leading-none">{{ totalOrders }}</h4>
           <div class="flex items-center gap-2 mt-2">
-            <span class="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border"
-              :class="trends.orders.up ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-red-500/10 text-red-400 border-red-500/30'">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <span v-if="ordersTrend" class="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border"
+              :class="ordersTrend.up ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-red-500/10 text-red-400 border-red-500/30'">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" :class="ordersTrend.up ? '' : 'rotate-180'">
                 <path d="M7 7h10v10" /><path d="M7 17 17 7" />
               </svg>
-              {{ trends.orders.value }}
+              {{ ordersTrend.value }}
             </span>
+            <span v-else class="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border bg-zinc-500/10 text-zinc-400 border-zinc-600/30">—</span>
             <span class="text-[9px] font-mono text-zinc-500">Enregistrées</span>
           </div>
         </div>
@@ -313,13 +326,14 @@ const USER_TOP_CONFIG = computed(() => {
         <div>
           <h4 class="text-2xl font-black font-mono text-white leading-none">{{ totalClicks }}</h4>
           <div class="flex items-center gap-2 mt-2">
-            <span class="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border"
-              :class="trends.clicks.up ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-red-500/10 text-red-400 border-red-500/30'">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <span v-if="clicksTrend" class="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border"
+              :class="clicksTrend.up ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-red-500/10 text-red-400 border-red-500/30'">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" :class="clicksTrend.up ? '' : 'rotate-180'">
                 <path d="M7 7h10v10" /><path d="M7 17 17 7" />
               </svg>
-              {{ trends.clicks.value }}
+              {{ clicksTrend.value }}
             </span>
+            <span v-else class="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border bg-zinc-500/10 text-zinc-400 border-zinc-600/30">—</span>
             <span class="text-[9px] font-mono text-zinc-500">Clics PRÉCOMMANDER</span>
           </div>
         </div>
@@ -337,13 +351,14 @@ const USER_TOP_CONFIG = computed(() => {
         <div>
           <h4 class="text-2xl font-black font-mono text-white leading-none">{{ totalProducts }}</h4>
           <div class="flex items-center gap-2 mt-2">
-            <span class="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border"
-              :class="trends.products.up ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-red-500/10 text-red-400 border-red-500/30'">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <span v-if="productsTrend" class="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border"
+              :class="productsTrend.up ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-red-500/10 text-red-400 border-red-500/30'">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" :class="productsTrend.up ? '' : 'rotate-180'">
                 <path d="m7 7 10 10" /><path d="M17 7v10H7" />
               </svg>
-              {{ trends.products.value }}
+              {{ productsTrend.value }}
             </span>
+            <span v-else class="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border bg-zinc-500/10 text-zinc-400 border-zinc-600/30">—</span>
             <span class="text-[9px] font-mono text-zinc-500">Au catalogue</span>
           </div>
         </div>

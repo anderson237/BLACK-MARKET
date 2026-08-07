@@ -104,8 +104,17 @@ export async function saveProducts(products: any[]): Promise<void> {
 
 // ---- orders ----
 export async function loadOrders(): Promise<any[]> {
+  const all = await loadAllOrders()
+  // Trash: orders with deleted flag are hidden everywhere (stats, accounting,
+  // treasury, chat, client space). Only the admin trash view / restore /
+  // permanent delete use loadAllOrders().
+  return all.filter((o: any) => !o.deleted)
+}
+
+/** Every order INCLUDING soft-deleted ones (admin trash, restore, purge). */
+export async function loadAllOrders(): Promise<any[]> {
   if (isNetlifyRuntime()) {
-    const raw = await blobGet('bm-orders', 'orders.json', 'text')
+    const raw = await blobGet('bm-orders', 'orders.json', 'text', 'strong')
     if (raw != null) {
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed)) return parsed
@@ -273,7 +282,9 @@ const SEED_TREASURY: TreasuryData = { settings: { initialBalanceXof: 0 }, entrie
 
 export async function loadTreasury(): Promise<TreasuryData> {
   if (isNetlifyRuntime()) {
-    const raw = await blobGet('bm-treasury', 'treasury.json', 'text')
+    // Strong consistency: entries are read right after a POST (edit/delete on
+    // the same id would otherwise 404 on an eventual-stale read).
+    const raw = await blobGet('bm-treasury', 'treasury.json', 'text', 'strong')
     if (raw != null) {
       const parsed = JSON.parse(raw)
       if (parsed && typeof parsed === 'object') {
@@ -373,7 +384,7 @@ export type BMUsers = { admins: string[]; logins: any[]; accounts: any[] }
 export async function loadUsers(): Promise<BMUsers> {
   const seed = (): BMUsers => ({ admins: [], logins: [], accounts: [] })
   if (isNetlifyRuntime()) {
-    const raw = await blobGet('bm-users', 'users.json', 'text')
+    const raw = await blobGet('bm-users', 'users.json', 'text', 'strong')
     if (raw != null) {
       const parsed = JSON.parse(raw)
       if (parsed && Array.isArray(parsed.accounts)) return parsed
@@ -418,7 +429,7 @@ const ACCOUNTS_FILE = path.join(DATA_DIR, 'accounts.json')
 
 async function loadAccountsFile(): Promise<PublicAccount[]> {
   if (isNetlifyRuntime()) {
-    const raw = await blobGet('bm-accounts', 'accounts.json', 'text')
+    const raw = await blobGet('bm-accounts', 'accounts.json', 'text', 'strong')
     if (raw != null) {
       const p = JSON.parse(raw)
       if (Array.isArray(p)) return p
@@ -634,6 +645,41 @@ async function mutateSocial<T>(
     const social = await loadSocial()
     const { next, value } = mutate(social)
     if (next != null) await saveSocial(social)
+    return value
+  })
+}
+
+// Atomic read-modify-write on the orders store.
+// Without this, two serverless instances doing create/soft-delete/restore/purge
+// at the same time overwrite each other (a restored order silently disappears).
+// Mirrors mutateSocial(): distributed blob lock in production, in-process mutex
+// in local dev.
+export async function mutateOrders<T>(
+  mutate: (orders: any[]) => { next: any[] | null; value: T },
+): Promise<T> {
+  if (isNetlifyRuntime()) {
+    return withBlobLock('bm-orders', 'orders.json', async () => {
+      const s = getStore({ name: 'bm-orders' })
+      let orders: any[] = []
+      try {
+        const raw = await s.get('orders.json', { type: 'text', consistency: 'strong' } as any)
+        if (raw != null) {
+          const parsed = JSON.parse(String(raw))
+          if (Array.isArray(parsed)) orders = parsed
+        }
+      } catch (err) {
+        console.error('[BLOBS] orders read failed:', err)
+      }
+      const { next, value } = mutate(JSON.parse(JSON.stringify(orders)))
+      if (next == null) return value
+      await s.set('orders.json', JSON.stringify(next, null, 2))
+      return value
+    })
+  }
+  return withLock('orders', async () => {
+    const orders = await loadAllOrders()
+    const { next, value } = mutate(orders)
+    if (next != null) await saveOrders(orders)
     return value
   })
 }
@@ -1091,4 +1137,22 @@ export async function saveChat(threads: ChatThread[]): Promise<void> {
     return blobSet('bm-chat', 'chat.json', JSON.stringify(threads, null, 2))
   }
   return writeJSON(CHAT_FILE, threads)
+}
+
+/** Permanently delete the chat thread(s) of an order (`ord:<orderId>`). */
+export async function removeChatThreadForOrder(orderId: string): Promise<number> {
+  const threads = await loadChat()
+  const kept = threads.filter((t) => !(t.orderId === orderId || t.id === `ord:${orderId}`))
+  const removed = threads.length - kept.length
+  if (removed > 0) await saveChat(kept)
+  return removed
+}
+
+/** Purge the pre-order chat threads of a user (`pre:<userId>` + per-article). */
+export async function removePreorderThreadsFor(userId: string): Promise<number> {
+  const threads = await loadChat()
+  const kept = threads.filter((t) => !(t.userId === userId && String(t.id || '').startsWith(`pre:${userId}`)))
+  const removed = threads.length - kept.length
+  if (removed > 0) await saveChat(kept)
+  return removed
 }

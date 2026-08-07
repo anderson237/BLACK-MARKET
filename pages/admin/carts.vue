@@ -20,6 +20,29 @@ const chatOpen = ref<Record<string, boolean>>({})
 const reminderLoading = ref(false)
 const reminderResult = ref<any>(null)
 
+// Email test (RESEND config validation) — sends ONE email to the given address.
+const testEmail = ref('')
+const testSending = ref(false)
+const testResult = ref<any>(null)
+async function sendTestEmail() {
+  testSending.value = true
+  testResult.value = null
+  try {
+    const res = await fetch('/api/admin/email-test', {
+      method: 'POST',
+      headers: store.headers(),
+      body: JSON.stringify({ to: testEmail.value.trim() || undefined }),
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok && json.success === undefined) throw new Error(json?.statusMessage || `Erreur ${res.status}`)
+    testResult.value = json
+  } catch (e: any) {
+    testResult.value = { success: false, reason: e?.message || 'Erreur réseau.' }
+  } finally {
+    testSending.value = false
+  }
+}
+
 async function load() {
   loading.value = true
   error.value = ''
@@ -63,7 +86,7 @@ onMounted(() => {
 })
 
 // Chat helpers (ST-012) — preorder threads (basket + per article) unread per
-// basket + toggle panels (basket, per article, general).
+// basket + toggle panels (basket, per article).
 const preChatUnreadFor = (userId: string) =>
   adminChat.threads.reduce((s, t) => s + (t.kind === 'preorder' && t.userId === userId ? t.unread || 0 : 0), 0)
 function toggleChat(userId: string) {
@@ -73,7 +96,6 @@ function toggleChat(userId: string) {
 function onAdminChatSent() {
   adminChat.refresh()
 }
-const generalChatOpen = ref<Record<string, boolean>>({})
 const itemChatOpen = ref<Record<string, boolean>>({})
 const itemChatKey = (userId: string, productId: string) => `${userId}::${productId}`
 function itemThreadFor(userId: string, productId: string) {
@@ -87,14 +109,6 @@ function toggleItemChat(userId: string, productId: string) {
   const k = itemChatKey(userId, productId)
   itemChatOpen.value[k] = !itemChatOpen.value[k]
   if (itemChatOpen.value[k]) adminChat.load(true)
-}
-function generalChatUnreadFor(userId: string) {
-  const t = adminChat.threadFor(`general:${userId}`)
-  return t ? t.unread || 0 : 0
-}
-function toggleGeneralChat(userId: string) {
-  generalChatOpen.value[userId] = !generalChatOpen.value[userId]
-  if (generalChatOpen.value[userId]) adminChat.load(true)
 }
 
 const filtered = computed(() => {
@@ -129,6 +143,21 @@ function timeAgo(iso: string): string {
   const days = Math.floor(hours / 24)
   if (days < 30) return `il y a ${days} j`
   return new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+}
+
+/** Remove a non-confirmed basket entirely (admin cleanup). */
+async function removeCart(c: any) {
+  if (!c?.userId) return
+  const name = String(c.customer?.name || c.userId).slice(0, 40)
+  if (!confirm(`Supprimer définitivement le panier non confirmé de « ${name} » ?\n\nCette action retire la précommande et son fil de discussion.`)) return
+  try {
+    const res = await fetch(`/api/admin/carts/${encodeURIComponent(c.userId)}`, { method: 'DELETE', headers: store.headers() })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(json?.statusMessage || json?.message || `Erreur ${res.status}`)
+    await load()
+  } catch (e: any) {
+    error.value = e?.message || 'Impossible de supprimer ce panier.'
+  }
 }
 
 /** CSV export of the current (filtered) baskets — Excel FR friendly. */
@@ -216,7 +245,7 @@ function relanceUrl(c: any): string {
         <div>
           <p class="text-[10px] font-mono text-zinc-400 uppercase tracking-widest">Rappel automatique des paniers abandonnés</p>
           <p class="text-[10px] font-mono text-zinc-600 mt-1">
-            Tâche planifiée (toutes les heures). Mode <span class="text-emerald-400">dry-run</span> tant que <span class="text-zinc-300">RESEND_API_KEY</span> n'est pas configurée — aucun email réel envoyé.
+            Tâche planifiée (toutes les heures) : envoie de vrais emails si <span class="text-zinc-300">RESEND_API_KEY</span> est configurée. Le bouton ci-dessous lance un <span class="text-emerald-400">test à blanc (dry-run)</span> — aucun email réel envoyé.
           </p>
         </div>
         <button @click="runReminder" :disabled="reminderLoading"
@@ -224,6 +253,29 @@ function relanceUrl(c: any): string {
           <span v-if="reminderLoading" class="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
           <template v-else>⟳ LANCER LE RAPPEL</template>
         </button>
+      </div>
+
+      <!-- Email config test (RESEND) -->
+      <div class="mt-3 border-t border-zinc-900 pt-3">
+        <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-2">
+          📧 Tester l'envoi d'email (Resend) — <span class="text-zinc-300">envoie UN email de test</span>
+        </p>
+        <div class="flex flex-col sm:flex-row gap-2">
+          <input v-model="testEmail" placeholder="Adresse de destination (vide = votre adresse admin)"
+            class="flex-1 bg-black border border-zinc-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-[#ff2a2a]/50 placeholder-zinc-600" />
+          <button @click="sendTestEmail" :disabled="testSending"
+            class="shrink-0 inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-mono font-bold px-4 py-2 rounded-xl transition-all">
+            <span v-if="testSending" class="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+            <template v-else>ENVOYER LE TEST</template>
+          </button>
+        </div>
+        <p v-if="testResult" class="mt-2 text-[11px] font-mono rounded-lg p-2 border"
+          :class="testResult.success ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-red-500/10 border-red-500/30 text-red-400'">
+          {{ testResult.success ? `✅ Email envoyé vers ${testResult.to} (expéditeur : ${testResult.from}) — vérifiez votre boîte mail.` : `❌ Échec : ${testResult.reason || testResult.status || 'erreur inconnue'}` }}
+        </p>
+        <p class="mt-1 text-[9px] font-mono text-zinc-600">
+          Mode test (onboarding@resend.dev) : seul votre adresse Resend peut recevoir. Mode production : domaine vérifié requis pour envoyer aux clients.
+        </p>
       </div>
       <div v-if="reminderResult" class="mt-3 border-t border-zinc-900 pt-3 grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
         <div class="bg-black/40 border border-zinc-900 rounded-lg p-2">
@@ -338,18 +390,17 @@ function relanceUrl(c: any): string {
           </button>
           <button @click="toggleChat(c.userId)"
             class="inline-flex items-center gap-1.5 text-[10px] font-mono text-[#ff2a2a] hover:text-white border border-[#ff2a2a]/40 hover:border-[#ff2a2a]/80 px-3 py-2 rounded-xl transition-all">
-            <AppIcon name="message" :size="12" /> {{ chatOpen[c.userId] ? 'FERMER LE CHAT' : 'DISCUTER' }}
+            <AppIcon name="message" :size="12" /> {{ chatOpen[c.userId] ? 'FERMER LE CHAT' : 'DISCUTER AVEC LE CLIENT' }}
             <span v-if="preChatUnreadFor(c.userId)" class="px-1 rounded-full bg-[#ff2a2a] text-white text-[9px] leading-4 min-w-[16px] text-center">{{ preChatUnreadFor(c.userId) }}</span>
-          </button>
-          <button @click="toggleGeneralChat(c.userId)"
-            class="inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-300 hover:text-white border border-zinc-700 hover:border-zinc-500 px-3 py-2 rounded-xl transition-all">
-            <AppIcon name="message" :size="12" /> {{ generalChatOpen[c.userId] ? 'FERMER GÉNÉRAL' : 'CHAT GÉNÉRAL' }}
-            <span v-if="generalChatUnreadFor(c.userId)" class="px-1 rounded-full bg-[#ff2a2a] text-white text-[9px] leading-4 min-w-[16px] text-center">{{ generalChatUnreadFor(c.userId) }}</span>
           </button>
           <a :href="relanceUrl(c)" target="_blank" rel="noopener"
             class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-mono font-bold px-3 py-2 rounded-xl transition-all">
             <AppIcon name="whatsapp" :size="12" /> RELANCER SUR WHATSAPP
           </a>
+          <button @click="removeCart(c)"
+            class="inline-flex items-center gap-1.5 text-[10px] font-mono text-red-400 hover:text-white border border-red-500/40 hover:border-red-500 px-3 py-2 rounded-xl transition-all">
+            <AppIcon name="trash2" :size="12" /> SUPPRIMER
+          </button>
         </div>
 
         <!-- Chat client <-> admin (ST-012) -->
@@ -359,22 +410,6 @@ function relanceUrl(c: any): string {
             :thread-id="'pre:' + c.userId"
             side="admin"
             :messages="adminChat.threadFor('pre:' + c.userId)?.messages || []"
-            placeholder="Répondre au client…"
-            @sent="onAdminChatSent"
-            @read="onAdminChatSent"
-          />
-        </div>
-
-        <!-- Chat général (ST-012) -->
-        <div v-if="generalChatOpen[c.userId]" class="px-4 pb-4 border-t border-zinc-900 pt-3">
-          <div class="flex items-center justify-between mb-2">
-            <p class="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Discussion générale — {{ c.customer?.name }}</p>
-          </div>
-          <ChatPanel
-            :key="'general:' + c.userId"
-            :thread-id="'general:' + c.userId"
-            side="admin"
-            :messages="adminChat.threadFor('general:' + c.userId)?.messages || []"
             placeholder="Répondre au client…"
             @sent="onAdminChatSent"
             @read="onAdminChatSent"

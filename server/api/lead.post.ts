@@ -1,4 +1,4 @@
-import { loadProducts, loadOrders, saveOrders, pushEvent } from '~~/server/utils/storage'
+import { loadProducts, mutateOrders, pushEvent } from '~~/server/utils/storage'
 import { rateLimit, clientIP } from '~~/server/utils/auth'
 
 export default defineEventHandler(async (event) => {
@@ -37,8 +37,9 @@ export default defineEventHandler(async (event) => {
     status: 'pending',
     createdAt: new Date().toISOString(),
   }
-  const orders = await loadOrders()
-  orders.unshift(order)
-  await saveOrders(orders)
+  await mutateOrders((orders) => {
+    orders.unshift(order)
+    return { next: orders, value: undefined }
+  })
   return { success: true, order }
 })

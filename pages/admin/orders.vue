@@ -109,6 +109,30 @@ async function remove(id: string) {
   }
 }
 
+// ---- Corbeille (commandes soft-deleted) ----
+const trashBusy = ref<string | null>(null)
+async function restoreTrash(id: string) {
+  trashBusy.value = id
+  try {
+    await store.restoreOrder(id)
+  } catch (e: any) {
+    error.value = e?.message || 'Erreur'
+  } finally {
+    trashBusy.value = null
+  }
+}
+async function purgeTrash(id: string) {
+  if (!confirm('Supprimer définitivement cette commande ? Cette action est irréversible (plus de restauration possible).')) return
+  trashBusy.value = id
+  try {
+    await store.deleteOrderPermanent(id)
+  } catch (e: any) {
+    error.value = e?.message || 'Erreur'
+  } finally {
+    trashBusy.value = null
+  }
+}
+
 function openDetail(o: any) {
   detailOrder.value = o
   showDetail.value = true
@@ -268,6 +292,42 @@ function cleanPhone(p: string) {
         <button :disabled="page <= 1" @click="page--" class="px-3 py-2 rounded-lg text-[11px] font-mono text-zinc-300 border border-zinc-700 hover:border-[#ff2a2a]/40 disabled:opacity-30">‹</button>
         <span class="text-[11px] font-mono text-zinc-400">{{ page }} / {{ totalPages }}</span>
         <button :disabled="page >= totalPages" @click="page++" class="px-3 py-2 rounded-lg text-[11px] font-mono text-zinc-300 border border-zinc-700 hover:border-[#ff2a2a]/40 disabled:opacity-30">›</button>
+      </div>
+    </div>
+
+    <!-- Trash (soft-deleted orders) -->
+    <div v-if="store.trashOrders.length" class="mt-6 bg-[#12121a] border border-zinc-800 rounded-2xl overflow-hidden">
+      <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-zinc-800">
+        <div class="flex items-center gap-2">
+          <AppIcon name="trash" :size="14" class="text-red-400" />
+          <h3 class="text-xs font-extrabold text-white font-mono uppercase tracking-wider">Corbeille des commandes</h3>
+          <span class="text-[9px] font-mono bg-red-500/20 text-red-400 rounded-full px-1.5 py-0.5">{{ store.trashOrders.length }}</span>
+        </div>
+        <span class="text-[9px] font-mono text-zinc-600">Restaurer ou supprimer définitivement</span>
+      </div>
+      <div class="divide-y divide-zinc-800/70">
+        <div v-for="o in store.trashOrders" :key="'t' + o.id" class="flex items-center gap-3 px-4 py-2.5 flex-wrap">
+          <img :src="o.productImage || `/api/img/${encodeURIComponent(o.productId)}.jpg`" :alt="o.productTitle" class="w-9 h-9 rounded-lg object-cover border border-zinc-800 shrink-0" @error="($event.target as any).style.display='none'" />
+          <div class="flex-1 min-w-0">
+            <p class="text-xs font-mono text-slate-300 truncate">{{ o.productTitle }}</p>
+            <p class="text-[9px] font-mono text-zinc-600 truncate">
+              {{ o.customerName }} · {{ o.customerPhone || 'tel ?' }}
+              <template v-if="o.deletedAt"> · supprimé le {{ new Date(o.deletedAt).toLocaleDateString('fr-FR') }}</template>
+            </p>
+          </div>
+          <div class="text-right shrink-0">
+            <p class="text-xs font-mono font-bold text-zinc-500 line-through">{{ formatPriceXof(o.priceXof * o.quantity) }}</p>
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <button @click="restoreTrash(o.id)" :disabled="trashBusy === o.id"
+              class="text-[10px] font-mono font-bold text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/10 px-2.5 py-1.5 rounded-lg transition-all disabled:opacity-40">
+              <span v-if="trashBusy === o.id" class="w-2.5 h-2.5 border border-emerald-500/40 border-t-emerald-400 rounded-full animate-spin inline-block align-middle" />
+              <template v-else>Restaurer</template>
+            </button>
+            <button @click="purgeTrash(o.id)" :disabled="trashBusy === o.id"
+              class="text-[10px] font-mono font-bold text-red-400 border border-red-500/30 hover:bg-red-500/10 px-2.5 py-1.5 rounded-lg transition-all disabled:opacity-40">Définitif</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -438,7 +498,7 @@ function cleanPhone(p: string) {
             <p class="text-[9px] font-mono text-zinc-500 truncate max-w-[240px]">{{ deleting }}</p>
           </div>
         </div>
-        <p class="text-[11px] text-zinc-400 font-mono mb-5">Cette action est irréversible : la commande sera supprimée définitivement.</p>
+        <p class="text-[11px] text-zinc-400 font-mono mb-5">La commande sera déplacée vers la corbeille admin (les statistiques sont mises à jour immédiatement). Vous pourrez la restaurer ou la supprimer définitivement plus tard.</p>
         <div class="flex gap-2">
           <button @click="deleting = null" class="flex-1 text-[10px] font-mono text-zinc-300 border border-zinc-700 px-3 py-2.5 rounded-xl hover:border-zinc-500 transition-all">Annuler</button>
           <button @click="remove(deleting)" :disabled="removing" class="flex-1 text-[10px] font-mono font-bold bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white px-3 py-2.5 rounded-xl transition-all">

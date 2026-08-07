@@ -1,4 +1,4 @@
-import { loadOrders, saveOrders, withLock } from '~~/server/utils/storage'
+import { mutateOrders } from '~~/server/utils/storage'
 import { requireAuth, rateLimit } from '~~/server/utils/auth'
 import { migratePreorderToOrder } from '~~/server/utils/chat'
 import { publishSiteUpdate } from '~~/server/utils/realtime'
@@ -76,41 +76,46 @@ export default defineEventHandler(async (event) => {
     status: ['pending', 'processing', 'completed', 'shipped', 'cancelled'].includes(body.status) ? body.status : 'pending',
     createdAt: String(body.createdAt || new Date().toISOString()),
   }
-  return withLock('orders', async () => {
-    const orders = await loadOrders()
+  let created = false
+  let savedOrder: any = order
+  await mutateOrders((orders) => {
     const idx = orders.findIndex((o) => o.id === id)
-    let created = false
-    if (idx >= 0) orders[idx] = order
-    else {
+    if (idx >= 0) {
+      orders[idx] = order
+      savedOrder = order
+    } else {
       // Dedupe: a logged-in user preordering the same product twice keeps one
-      // pending order instead of spamming the admin console.
+      // pending order instead of spamming the admin console. Trashed orders
+      // never count for dedupe.
       const dup = order.userId
-        ? orders.findIndex((o) => o.userId === order.userId && o.productId === order.productId && o.status === 'pending')
+        ? orders.findIndex((o) => !o.deleted && o.userId === order.userId && o.productId === order.productId && o.status === 'pending')
         : -1
-      if (dup >= 0) orders[dup] = { ...orders[dup], ...order }
-      else {
+      if (dup >= 0) {
+        orders[dup] = { ...orders[dup], ...order }
+        savedOrder = orders[dup]
+      } else {
         orders.unshift(order)
         created = true
       }
     }
-    await saveOrders(orders)
-
-    // Preserve the preorder conversation on the new confirmed order.
-    if (created && order.userId) {
-      await migratePreorderToOrder(order.id, order.userId, {
-        productTitle: order.productTitle,
-        customerName: order.customerName,
-      })
-    }
-
-    // Notify the admin (email) when a logged-in client confirms an order.
-    if (created && order.userId) {
-      notifyAdminNewOrder(order).catch((e) => console.error('[orders] admin email failed:', e))
-    }
-
-    // Site-wide: the admin console + client space refresh instantly.
-    publishSiteUpdate('orders')
-
-    return { success: true, order: idx >= 0 ? orders[idx] : order }
+    return { next: orders, value: undefined }
   })
+
+  // Preserve the preorder conversation on the new confirmed order.
+  if (created && order.userId) {
+    await migratePreorderToOrder(order.id, order.userId, {
+      productTitle: order.productTitle,
+      customerName: order.customerName,
+    })
+  }
+
+  // Notify the admin (email) when a logged-in client confirms an order.
+  if (created && order.userId) {
+    notifyAdminNewOrder(order).catch((e) => console.error('[orders] admin email failed:', e))
+  }
+
+  // Site-wide: the admin console + client space refresh instantly.
+  publishSiteUpdate('orders')
+
+  return { success: true, order: savedOrder }
 })

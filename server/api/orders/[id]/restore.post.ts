@@ -1,33 +1,29 @@
-import { mutateOrders, removeChatThreadForOrder } from '~~/server/utils/storage'
+import { mutateOrders } from '~~/server/utils/storage'
 import { requireAuth } from '~~/server/utils/auth'
 import { publishSiteUpdate } from '~~/server/utils/realtime'
 
-// Soft-delete an order: it disappears from the whole site (stats, accounting,
-// treasury, chat, client space) and lands in the admin trash, where it can be
-// restored or permanently deleted. Its chat thread (ord:<id>) is removed.
+// Restore a trashed order back to the active list (stats count it again).
 export default defineEventHandler(async (event) => {
   const session = await requireAuth(event)
   if (session.role !== 'admin') throw createError({ statusCode: 403, statusMessage: 'Accès administrateur requis.' })
   const id = getRouterParam(event, 'id')
 
-  let outcome: 'ok' | 'not-found' | 'already' = 'not-found'
+  let outcome: 'ok' | 'not-found' | 'not-trashed' = 'not-found'
   await mutateOrders((orders) => {
     const order = orders.find((o) => o.id === id)
     if (!order) return { next: null, value: undefined }
-    if (order.deleted) {
-      outcome = 'already'
+    if (!order.deleted) {
+      outcome = 'not-trashed'
       return { next: null, value: undefined }
     }
-    order.deleted = true
-    order.deletedAt = new Date().toISOString()
+    delete order.deleted
+    delete order.deletedAt
     outcome = 'ok'
     return { next: orders, value: undefined }
   })
 
   if (outcome === 'not-found') throw createError({ statusCode: 404, statusMessage: 'Commande introuvable.' })
-  if (outcome === 'already') throw createError({ statusCode: 400, statusMessage: 'Commande déjà dans la corbeille.' })
-
-  await removeChatThreadForOrder(id)
+  if (outcome === 'not-trashed') throw createError({ statusCode: 400, statusMessage: 'Cette commande n\'est pas dans la corbeille.' })
   publishSiteUpdate('orders')
-  return { success: true, trashed: true }
+  return { success: true, restored: true }
 })

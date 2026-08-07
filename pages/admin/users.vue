@@ -266,6 +266,15 @@ async function confirmDelete() {
               :class="a === data?.owner ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' : 'bg-[#ff2a2a]/10 border-[#ff2a2a]/25 text-[#ff2a2a]'"
             >
               {{ a === data?.owner ? '👑' : '🛡️' }} {{ a }}
+              <button
+                v-if="isOwner && a !== data?.owner"
+                @click="demote(a)"
+                :disabled="saving"
+                class="w-4 h-4 -mr-0.5 rounded-full flex items-center justify-center text-[11px] leading-none text-zinc-500 hover:text-red-400 hover:bg-red-500/20 transition-all disabled:opacity-40"
+                title="Retirer les droits admin (les mails ajoutés manuellement peuvent ainsi être supprimés)"
+              >
+                ✕
+              </button>
             </span>
           </div>
         </div>

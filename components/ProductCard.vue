@@ -4,12 +4,22 @@ import { promoPercent, promoPrice, promoCountdown, hasPromo } from '~/composable
 import { useAuthStore } from '~/stores/auth'
 import { useCurrency } from '~/composables/useCurrency'
 import { useCartStore } from '~/stores/cart'
+import { useInteractionsStore } from '~/stores/interactions'
+import { useCommentsStore } from '~/stores/comments'
 
 const props = defineProps<{ product: Product; index: number }>()
 const config = useRuntimeConfig()
 const auth = useAuthStore()
 const cart = useCartStore()
+const inter = useInteractionsStore()
+const comments = useCommentsStore()
 const { code, format } = useCurrency()
+
+// Glowing cards: products the CURRENT visitor liked or commented keep their
+// highlight after a reload (state is persisted in localStorage).
+const isLiked = computed(() => inter.getLike(props.product.id).liked)
+const isCommented = computed(() => comments.hasCommented(props.product.id))
+const isGlowing = computed(() => isLiked.value || isCommented.value)
 
 const pct = computed(() => promoPercent(props.product))
 const discountPrice = computed(() => promoPrice(props.product))
@@ -66,7 +76,12 @@ const truncatedTitle = computed(() => {
 </script>
 
 <template>
-  <div class="group bg-[#12121a] rounded-2xl overflow-hidden border border-zinc-800 hover:border-[#ff2a2a]/40 transition-all duration-300 cursor-pointer">
+  <div
+    class="group rounded-2xl overflow-hidden border transition-all duration-300 cursor-pointer"
+    :class="isGlowing
+      ? 'bg-[#1c0f18] border-[#ff2a2a]/50 shadow-[0_0_24px_rgba(255,42,42,0.18)]'
+      : 'bg-[#12121a] border-zinc-800 hover:border-[#ff2a2a]/40'"
+  >
     <NuxtLink :to="url" class="block" :aria-label="product.title">
       <div class="relative overflow-hidden" :style="{ height: imgHeight }">
         <video
@@ -114,6 +129,15 @@ const truncatedTitle = computed(() => {
         <span v-if="product.videoUrl" class="absolute top-3 right-3 bg-black/60 text-white text-[8px] uppercase font-bold tracking-widest px-2 py-1 rounded border border-white/20 flex items-center gap-1">
           <AppIcon name="video" :size="10" /> VIDEO
         </span>
+        <!-- Glow badges: liked / commented by the current visitor -->
+        <div v-if="isGlowing" class="absolute top-12 left-3 flex flex-col gap-1">
+          <span v-if="isLiked" class="inline-flex items-center gap-1 text-[9px] font-mono font-bold text-[#ff2a2a] bg-black/70 border border-[#ff2a2a]/50 backdrop-blur px-2 py-1 rounded-md">
+            ❤️ J'aime
+          </span>
+          <span v-if="isCommented" class="inline-flex items-center gap-1 text-[9px] font-mono font-bold text-sky-300 bg-black/70 border border-sky-400/50 backdrop-blur px-2 py-1 rounded-md">
+            💬 Commenté
+          </span>
+        </div>
       </div>
     </NuxtLink>
 

@@ -140,7 +140,7 @@ export function useTrack() {
     track({ type: liked ? 'like' : 'unlike', productId: p.id, productTitle: p.title })
   }
 
-  function share(p: { id: string; title?: string }, method: 'wa' | 'x' | 'fb' | 'copy') {
+  function share(p: { id: string; title?: string }, method: 'wa' | 'x' | 'fb' | 'copy' | 'tiktok' | 'gmail' | 'messenger') {
     track({ type: 'share', productId: p.id, productTitle: p.title, url: `${config.public.siteUrl}/p/${p.id}.html` })
     if (method === 'copy') copyLink(p.id)
   }

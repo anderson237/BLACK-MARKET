@@ -178,6 +178,15 @@ export default defineEventHandler(async (event) => {
     }
   })
 
+  const clickSeries = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date()
+    d.setDate(d.getDate() - (6 - i))
+    const key = d.toISOString().slice(0, 10)
+    const dayClicks = events.filter((e: any) => e.type === 'click' && new Date(e.ts || 0).toISOString().slice(0, 10) === key)
+    const label = d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })
+    return { label, clicks: dayClicks.length }
+  })
+
   const topProducts = products
     .map((p: any) => {
       const rev = revenueByProduct.get(p.id) || { revenueXof: 0, revenueEur: 0 }
@@ -218,6 +227,7 @@ export default defineEventHandler(async (event) => {
       interactions,
       salesByCategory: Object.entries(salesByCategory).map(([category, ordersCount]) => ({ category, orders: ordersCount, revenueXof: 0 })),
       revenueSeries,
+      clickSeries,
       topProducts,
       analytics: {
         totalUsers: accounts.length,

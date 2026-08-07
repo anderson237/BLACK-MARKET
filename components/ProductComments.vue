@@ -197,6 +197,7 @@ async function submit() {
       if (!res.ok) throw new Error(data?.statusMessage || data?.error || `Erreur ${res.status}`)
       comments.value.unshift(data.comment)
       commentsStore.bump(props.productId, 1)
+      commentsStore.markCommented(props.productId)
       text.value = ''
       track({ type: 'comment', productId: props.productId })
     } catch (e: any) {
