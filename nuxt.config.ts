@@ -10,6 +10,9 @@ export default defineNuxtConfig({
     plugins: [tailwindcss()],
   },
   runtimeConfig: {
+    // Server-only: shared secret used by the Netlify Scheduled Function to
+    // trigger /api/admin/reminders/run (set via env NUXT_TASK_SECRET).
+    taskSecret: "",
     public: {
       siteUrl: "https://deeproots-importexport.netlify.app",
       phoneNumber: "237683963007",

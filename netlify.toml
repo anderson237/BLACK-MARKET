@@ -1,5 +1,5 @@
 [build]
-  command = "npm run build"
+  command = "npm run build && node scripts/copy-scheduled-functions.mjs"
   publish = "dist"
 
 [functions]

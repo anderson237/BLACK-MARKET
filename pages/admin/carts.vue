@@ -14,6 +14,10 @@ const carts = ref<any[]>([])
 const search = ref('')
 const expanded = ref<Record<string, boolean>>({})
 
+// Reminder pass
+const reminderLoading = ref(false)
+const reminderResult = ref<any>(null)
+
 async function load() {
   loading.value = true
   error.value = ''
@@ -26,6 +30,28 @@ async function load() {
     error.value = e?.message || 'Impossible de charger les paniers.'
   } finally {
     loading.value = false
+  }
+}
+
+/** Run the automated reminder pass (dry-run: never sends without RESEND_API_KEY). */
+async function runReminder() {
+  reminderLoading.value = true
+  reminderResult.value = null
+  try {
+    const res = await fetch('/api/admin/reminders/run', {
+      method: 'POST',
+      headers: store.headers(),
+      body: JSON.stringify({ dryRun: true, abandonedHours: 24 }),
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(json?.statusMessage || json?.message || `Erreur ${res.status}`)
+    reminderResult.value = json
+    // Refresh the list (lastReminder info will appear once exposed by the API).
+    await load()
+  } catch (e: any) {
+    error.value = e?.message || 'Impossible de lancer le rappel.'
+  } finally {
+    reminderLoading.value = false
   }
 }
 
@@ -65,6 +91,38 @@ function timeAgo(iso: string): string {
   return new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 }
 
+/** CSV export of the current (filtered) baskets — Excel FR friendly. */
+function exportCsv() {
+  const rows = filtered.value.map((c) => {
+    const detail = (c.items || [])
+      .map((i: any) => `${String(i.title || '').replace(/"/g, '""')} x${i.quantity} (${formatPriceXof(i.priceXof)})`)
+      .join(' | ')
+    return {
+      'Client': String(c.customer?.name || ''),
+      'Email': String(c.customer?.email || ''),
+      'Téléphone': String(c.customer?.phone || ''),
+      'Pays': String(c.customer?.country || ''),
+      'Articles': String(c.itemsCount ?? 0),
+      'Total (F CFA)': String(c.totalXof ?? 0),
+      'Dernière activité': c.addedAt ? new Date(c.addedAt).toLocaleString('fr-FR') : '',
+      'Détail': detail,
+      'Lien WhatsApp': relanceUrl(c),
+    }
+  })
+  const cols = Object.keys(rows[0] || {})
+  const esc = (v: string) => `"${String(v ?? '').replace(/"/g, '""')}"`
+  const csv = '\uFEFF' + cols.join(';') + '\n' + rows.map((r) => cols.map((k) => esc(r[k as keyof typeof r])).join(';')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `paniers-non-confirmes-${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
 /** WhatsApp follow-up message targeting one basket. */
 function relanceUrl(c: any): string {
   const lines = (c.items || []).map((i: any) => `• ${String(i.title || '').toUpperCase()} — ${i.quantity} × ${formatPriceXof(i.priceXof)}`)
@@ -81,11 +139,17 @@ function relanceUrl(c: any): string {
         <h1 class="text-lg font-extrabold text-white font-mono uppercase tracking-widest">Paniers non confirmés</h1>
         <p class="text-[11px] text-zinc-500 font-mono mt-1">Précommandes ajoutées au panier sans confirmation — à relancer.</p>
       </div>
-      <button @click="load" :disabled="loading"
-        class="shrink-0 inline-flex items-center justify-center gap-2 bg-[#ff2a2a] hover:bg-red-600 disabled:opacity-40 text-white text-xs font-mono font-bold px-4 py-2 rounded-xl transition-all">
-        <span v-if="loading" class="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-        <template v-else>⟳ ACTUALISER</template>
-      </button>
+      <div class="flex items-center gap-2 shrink-0">
+        <button @click="exportCsv" :disabled="filtered.length === 0"
+          class="shrink-0 inline-flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-white text-xs font-mono font-bold px-4 py-2 rounded-xl transition-all">
+          ⬇ EXPORTER CSV
+        </button>
+        <button @click="load" :disabled="loading"
+          class="shrink-0 inline-flex items-center justify-center gap-2 bg-[#ff2a2a] hover:bg-red-600 disabled:opacity-40 text-white text-xs font-mono font-bold px-4 py-2 rounded-xl transition-all">
+          <span v-if="loading" class="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+          <template v-else>⟳ ACTUALISER</template>
+        </button>
+      </div>
     </div>
 
     <p v-if="error" class="mb-4 bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-xs text-red-400 font-mono">{{ error }}</p>
@@ -103,6 +167,45 @@ function relanceUrl(c: any): string {
       <div class="bg-[#0d0d14] rounded-2xl p-4 border border-zinc-800">
         <p class="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Valeur potentielle</p>
         <p class="text-2xl font-black font-mono text-[#ff2a2a]">{{ format(totalValue) }}</p>
+      </div>
+    </div>
+
+    <!-- Reminder pass -->
+    <div class="bg-[#0d0d14] rounded-2xl p-4 border border-zinc-800 mb-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <p class="text-[10px] font-mono text-zinc-400 uppercase tracking-widest">Rappel automatique des paniers abandonnés</p>
+          <p class="text-[10px] font-mono text-zinc-600 mt-1">
+            Tâche planifiée (toutes les heures). Mode <span class="text-emerald-400">dry-run</span> tant que <span class="text-zinc-300">RESEND_API_KEY</span> n'est pas configurée — aucun email réel envoyé.
+          </p>
+        </div>
+        <button @click="runReminder" :disabled="reminderLoading"
+          class="shrink-0 inline-flex items-center justify-center gap-2 bg-[#ff2a2a] hover:bg-red-600 disabled:opacity-40 text-white text-xs font-mono font-bold px-4 py-2 rounded-xl transition-all">
+          <span v-if="reminderLoading" class="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+          <template v-else>⟳ LANCER LE RAPPEL</template>
+        </button>
+      </div>
+      <div v-if="reminderResult" class="mt-3 border-t border-zinc-900 pt-3 grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
+        <div class="bg-black/40 border border-zinc-900 rounded-lg p-2">
+          <p class="text-lg font-black font-mono text-white">{{ reminderResult.candidates?.length ?? 0 }}</p>
+          <p class="text-[8px] font-mono text-zinc-500 uppercase">Paniers à relancer</p>
+        </div>
+        <div class="bg-black/40 border border-zinc-900 rounded-lg p-2">
+          <p class="text-lg font-black font-mono text-[#ff2a2a]">{{ reminderResult.dryRun ? '—' : reminderResult.sent }}</p>
+          <p class="text-[8px] font-mono text-zinc-500 uppercase">Emails envoyés</p>
+        </div>
+        <div class="bg-black/40 border border-zinc-900 rounded-lg p-2">
+          <p class="text-lg font-black font-mono text-white">{{ reminderResult.skippedNoContact }}</p>
+          <p class="text-[8px] font-mono text-zinc-500 uppercase">Sans contact</p>
+        </div>
+        <div class="bg-black/40 border border-zinc-900 rounded-lg p-2">
+          <p class="text-lg font-black font-mono text-white">{{ reminderResult.skippedCooldown }}</p>
+          <p class="text-[8px] font-mono text-zinc-500 uppercase">Cooldown</p>
+        </div>
+        <div class="bg-black/40 border border-zinc-900 rounded-lg p-2">
+          <p class="text-lg font-black font-mono" :class="reminderResult.dryRun ? 'text-amber-400' : 'text-emerald-400'">{{ reminderResult.dryRun ? 'DRY-RUN' : 'ACTIF' }}</p>
+          <p class="text-[8px] font-mono text-zinc-500 uppercase">Mode</p>
+        </div>
       </div>
     </div>
 

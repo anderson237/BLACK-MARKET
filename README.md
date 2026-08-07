@@ -1,8 +1,8 @@
-# BLACK MARKET — SINO-PREP Console
+# DEEP ROOTS LOGISTICS — Import/Export & Précommandes
 
-> Plateforme **no-code de sourcing & précommandes depuis la Chine (Taobao, 1688, WeChat)**
-> vers le marché francophone / africain. Console d'administration sécurisée + catalogue public
-> avec boutons de précommande WhatsApp, traductions IA Gemini et persistance Netlify Blobs.
+> Plateforme **import-export / précommande WhatsApp** : catalogue public de produits tendance,
+> console d'administration sécurisée, traduction & copywriting IA (Gemini) et persistance Netlify Blobs.
+> Stack **Nuxt 3 (SSR) + Nitro** déployée sur Netlify.
 
 - **Boutique publique** : `https://deeproots-importexport.netlify.app/`
 - **Console admin** : `https://deeproots-importexport.netlify.app/admin`
@@ -13,12 +13,12 @@
 
 | Couche | Technologie |
 |--------|-------------|
-| Frontend (console) | React 19 + Vite + Tailwind CSS v4 + Motion + lucide-react |
-| Boutique statique | HTML/JS vanilla auto-généré (`src/lib/template.ts`, `src/lib/productPage.ts`) |
-| Backend | Express + `@google/genai` (Gemini API) exposé via Netlify Functions (`serverless-http`) |
-| Persistance | Netlify Blobs (`bm-products`, `bm-images`) — fichier JSON `data/products.json` en local |
-| Images filigranées | `sharp` à la génération (`scripts/build-site.ts`) + canvas côté client |
-| Auth | Google OAuth (`GOOGLE_CLIENT_ID`) + clé `ADMIN_PASSWORD` (bearer token 12 h) |
+| Frontend + API | Nuxt 3 (SSR) + Nitro — `server/api/*` (h3 handlers), Pinia stores |
+| Styling | Tailwind CSS v4 (`@tailwindcss/vite`) |
+| IA | `@google/genai` (Gemini API) : traduction / copywriting / génération de fiches |
+| Persistance | Netlify Blobs (`bm-products`, `bm-images`, `bm-orders`, `bm-cart`, `bm-reminders`, …) — repli JSON local `data/` |
+| Auth | Comptes (email/phone/mot de passe ou Google OAuth) + sessions ; admin via `ADMIN_PASSWORD`/`ADMIN_EMAILS` |
+| Tâches planifiées | Netlify Scheduled Function `remind-carts` (rappel paniers abandonnés) → endpoint sécurisé `/api/admin/reminders/run` |
 
 ## Démarrage local
 
@@ -35,7 +35,7 @@ GEMINI_API_KEY=ta_cle_gemini
 ADMIN_PASSWORD=ton_mot_de_passe_admin_fort
 ```
 
-Lancez le serveur de développement (HMR Vite + API Express sur le même port) :
+Lancez le serveur de développement (SSR Nuxt + API sur le même port) :
 
 ```bash
 npm run dev
@@ -47,11 +47,12 @@ npm run dev
 
 | Commande | Description |
 |----------|-------------|
-| `npm run dev` | Serveur de dev avec HMR Vite (boutique + console + API) |
-| `npm run build` | Build production complet : régénère la boutique statique (`tsx scripts/build-site.ts`), bundle React (`vite build`), bundle serveur (`esbuild`) et copie `client-site/` → `dist/` |
-| `npm start` | Sert le build production (`dist/`) |
-| `npm run lint` | Vérification TypeScript (`tsc --noEmit`) |
-| `npx netlify deploy --prod --build` | Déploiement production Netlify |
+| `npm run dev` | Serveur de dev Nuxt (SSR + API) |
+| `npm run build` | Build production Nuxt (`dist/` + fonctions Nitro) |
+| `npm start` | Sert le build production (`nuxt preview`) |
+| `npm run lint` | Vérification TypeScript (`nuxi typecheck`) |
+| `node scripts/copy-scheduled-functions.mjs` | Copie `netlify/functions/*.mjs` vers `.netlify/functions-internal` (après build, avant deploy) |
+| `npx netlify deploy --prod --dir="dist" --functions=".netlify/functions-internal"` | Déploiement production Netlify |
 
 ## Variables d'environnement
 
@@ -67,54 +68,59 @@ Voir `.env.example` pour la liste exhaustive et les commentaires.
 | `GEMINI_FALLBACK_MODEL` | `gemini-2.5-flash-lite` | Modèle de repli |
 | `PORT` | `3000` | Port HTTP local |
 | `APP_URL` | — | URL publique (liens produits) |
+| `RESEND_API_KEY` | — | **Optionnel** — active l'envoi réel des emails de rappel paniers abandonnés |
+| `NUXT_TASK_SECRET` | — | Secret partagé entre la scheduled function et l'endpoint de rappel |
 
 ## Flux business (précommande WhatsApp + sourcing Chine)
 
 1. **Sourcing** : copiez une fiche brute fournisseur (Taobao / 1688 / WeChat) ou uploadez une photo d'usine.
-2. **Traitement IA** : l'onglet `[ 2 ] GÉNÉRATEUR DE FICHES IA` traduit, rédige le pitch et calcule les prix EUR/XOF.
+2. **Traitement IA** : l'onglet admin `Génération IA` traduit, rédige le pitch et calcule les prix F CFA.
 3. **Catalogue** : injectez le produit → persistance Netlify Blobs (survit aux rechargements/déploiements).
-4. **Ventes** : chaque fiche porte un bouton `PRÉCOMMANDER` qui ouvre `wa.me` avec un bon de précommande pré-rempli. Chaque clic est comptabilisé.
-5. **Pages produit** : chaque produit dispose d'une page `/p/<id>.html` statique (aperçu WhatsApp partagé, OG tags, image filigranée).
+4. **Ventes** : chaque fiche porte un bouton `PRÉCOMMANDER` qui ajoute l'article au **panier** du client
+   (compte connecté). Le client confirme depuis son dashboard → ouverture `wa.me` avec le bon pré-rempli.
+5. **Relance** : la vue admin `Paniers` liste les paniers non confirmés ; un bouton **RELANCER SUR WHATSAPP**
+   ouvre un message ciblé, et le rappel automatique (scheduled function) relance par email si `RESEND_API_KEY` est définie.
 
 ## Architecture du déploiement (Netlify)
 
 ```
 netlify.toml
-├── [build] command = "npm run build"  → publish = "dist"
-├── redirects /admin → admin.html (SPA console)
-├── redirects /api/* → /.netlify/functions/api/:splat
-├── redirects /catalog.json → fonction API
+├── [build] command = "npm run build && node scripts/copy-scheduled-functions.mjs" → publish = "dist"
+├── [functions] directory = ".netlify/functions-internal" (fichier serveur Nuxt + scheduled function copiée)
+├── redirects /* → /.netlify/functions/server (SSR Nuxt)
 ├── headers de sécurité (CSP, X-Frame-Options, HSTS, ...) sur toutes les routes
 └── règles de cache (assets immutables, img, pages produit, catalog no-store)
 ```
 
 ### Persistance & Netlify Blobs
 
-- En **production Netlify** : les données produits (`bm-products`) et images (`bm-images`) vivent dans
-  Netlify Blobs. La fonction `netlify/functions/api.ts` appelle `connectLambda(event)` en tête de chaque
-  invocation — **indispensable** car le format Functions v1 (`export const handler`) n'injecte pas
-  automatiquement la config Blobs (sinon `MissingBlobsEnvironmentError`).
-- En **local** : repli sur `data/products.json` et `data/uploads/` (fichiers, gitignorés).
+- En **production Netlify** : produits, images, commandes, paniers, rappels, événements… vivent dans
+  Netlify Blobs (`bm-*`). Lecture en **consistance forte** pour les données critiques (paniers, social).
+- En **local** : repli sur `data/*.json` (fichiers, gitignorés).
+
+### Rappel automatique des paniers abandonnés
+
+- **Déclencheur** : Netlify Scheduled Function `netlify/functions/remind-carts.mjs` (`@hourly`) qui POST
+  `/api/admin/reminders/run` avec le header `x-task-secret` (`NUXT_TASK_SECRET`).
+- **Logique** : `server/utils/reminders.ts` — scanne les paniers inactifs depuis ≥ 48 h, respecte un
+  cooldown de 72 h, journalise dans `bm-reminders`. **Dry-run par défaut** : aucun email tant que
+  `RESEND_API_KEY` n'est pas configurée (l'UI admin permet de lancer un pass manuellement).
 
 ## Sécurité implémentée (voir `SECURITY.md` pour le détail)
 
-- Authentification **côté serveur uniquement** (aucun fallback client). Bearer token 32 octets, TTL 12 h, logout invalide.
-- Comparaison du mot de passe en **temps constant** (`crypto.timingSafeEqual`).
-- **Rate limiting** par IP : login (6/min), Google (10/min), upload (30/min), produits (60/min), clics (120/min).
-- **Verrouillage anti-bruteforce** côté client (60 s après 3 échecs) + auto-déconnexion après 15 min d'inactivité.
+- Authentification **côté serveur uniquement** (aucun fallback client). Sessions persistées côté serveur.
+- Rate limiting par IP sur les endpoints sensibles (login, Google, upload, produits, clics).
 - **Headers de sécurité** sur chaque réponse (CSP, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`, HSTS).
-- **CORS stricte** : toute requête avec un `Origin` qui ne correspond pas à notre host → 403.
 - **Validation des uploads** : signature magique (JPEG/PNG/GIF/WebP/BMP) vérifiée côté serveur.
-- **Echappement HTML** systématique dans la boutique (XSS) + filigrane `BLACK MARKET` sur tous les visuels.
 - **Blobs** : pas de secret client exposé ; le runtime Netlify injecte `siteID`/`token`.
 
 ## Tests / validation
 
 ```bash
-npm run lint   # TypeScript strict
+npm run lint   # TypeScript strict (nuxi typecheck)
 npm run build  # build complet de bout en bout
 ```
 
 ---
 
-© 2026 BLACK MARKET SINO-PREP SYSTEM. Toutes les images et vidéos reçoivent un filigrane indélébile.
+© 2026 DEEP ROOTS LOGISTICS. Toutes les images et vidéos reçoivent un filigrane indélébile.

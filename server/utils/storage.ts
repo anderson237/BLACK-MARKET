@@ -86,7 +86,7 @@ export async function loadProducts(): Promise<any[]> {
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed)) return parsed.map(normalizeProduct)
     }
-    const { INITIAL_PRODUCTS } = await import('../../src/data')
+    const { INITIAL_PRODUCTS } = await import('../data/products-seed')
     const seed = JSON.parse(JSON.stringify(INITIAL_PRODUCTS)).map(normalizeProduct)
     await blobSet('bm-products', 'products.json', JSON.stringify(seed, null, 2))
     return seed
@@ -174,6 +174,60 @@ export async function saveCart(userId: string, items: CartItem[]): Promise<void>
     return blobSet('bm-cart', 'carts.json', JSON.stringify(carts, null, 2))
   }
   return writeJSON(CART_FILE, carts)
+}
+
+// ---- abandoned-cart reminders ----
+export interface CartReminder {
+  userId: string
+  reminderAt: string
+  status: 'sent' | 'dry-run' | 'no-contact'
+  via: 'email' | 'whatsapp' | 'none'
+  target: string
+  totalXof: number
+}
+
+const REMINDER_FILE = path.join(DATA_DIR, 'reminders.json')
+
+async function loadRemindersFile(): Promise<CartReminder[]> {
+  if (isNetlifyRuntime()) {
+    const raw = await blobGet('bm-reminders', 'reminders.json', 'text', 'strong')
+    if (raw != null) {
+      try {
+        const p = JSON.parse(raw)
+        if (Array.isArray(p)) return p
+      } catch {
+        /* corrupted -> seed */
+      }
+    }
+    return []
+  }
+  const p = await readJSON(REMINDER_FILE)
+  return Array.isArray(p) ? p : []
+}
+
+/** History of automatic reminders sent for abandoned carts. */
+export async function loadReminders(): Promise<CartReminder[]> {
+  return loadRemindersFile()
+}
+
+export async function saveReminder(r: CartReminder): Promise<void> {
+  const list = await loadRemindersFile()
+  list.push(r)
+  // keep last 200
+  const trimmed = list.slice(-200)
+  if (isNetlifyRuntime()) {
+    return blobSet('bm-reminders', 'reminders.json', JSON.stringify(trimmed, null, 2))
+  }
+  return writeJSON(REMINDER_FILE, trimmed)
+}
+
+/** Last reminder time for a user ('' if never reminded). */
+export async function lastReminderAt(userId: string): Promise<string> {
+  const list = await loadRemindersFile()
+  for (let i = list.length - 1; i >= 0; i--) {
+    if (list[i].userId === userId) return list[i].reminderAt
+  }
+  return ''
 }
 
 // ---- expenses (accounting) ----

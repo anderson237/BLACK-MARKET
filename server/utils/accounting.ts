@@ -1,4 +1,4 @@
-import { RMB_TO_XOF_RATE, XOF_PER_EUR } from '../../src/lib/constants'
+import { RMB_TO_XOF_RATE, XOF_PER_EUR } from './constants'
 
 // ---------------------------------------------------------------------------
 // Accounting helpers shared by /api/accounting, the expense CRUD and the CSV

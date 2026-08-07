@@ -16,7 +16,7 @@ import {
   normalizeKpiSettings,
   periodMonths,
 } from '~~/server/utils/accounting'
-import { RMB_TO_XOF_RATE } from '../../src/lib/constants'
+import { RMB_TO_XOF_RATE } from '../utils/constants'
 import { EXPENSE_CATEGORY_LABEL } from '../../data/expenseCategories'
 
 const ALLOWED_ROLES = ['admin', 'editor', 'publisher']
