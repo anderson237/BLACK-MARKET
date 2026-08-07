@@ -355,7 +355,7 @@ function unlikeProduct(productId: string) {
 }
 
 // ---- activity tabs: categories + "voir plus" (9 first) ----
-type CatKey = 'cart' | 'views' | 'likes' | 'shares' | 'comments' | 'orders' | 'others'
+type CatKey = 'cart' | 'views' | 'likes' | 'shares' | 'comments' | 'orders' | 'others' | 'chat'
 const PAGE = 9
 const CATEGORIES: { key: CatKey; label: string; icon: string }[] = [
   { key: 'cart', label: 'Précommandes', icon: 'cart' },
@@ -365,9 +365,10 @@ const CATEGORIES: { key: CatKey; label: string; icon: string }[] = [
   { key: 'comments', label: 'Commentaires', icon: 'comment' },
   { key: 'orders', label: 'Commandes', icon: 'box' },
   { key: 'others', label: 'Autres réactions', icon: 'sparkles' },
+  { key: 'chat', label: 'Chat', icon: 'message' },
 ]
 const activeCat = ref<CatKey>('cart')
-const shown = reactive<Record<CatKey, number>>({ cart: PAGE, views: PAGE, likes: PAGE, shares: PAGE, comments: PAGE, orders: PAGE, others: PAGE })
+const shown = reactive<Record<CatKey, number>>({ cart: PAGE, views: PAGE, likes: PAGE, shares: PAGE, comments: PAGE, orders: PAGE, others: PAGE, chat: PAGE })
 
 function catIcon(key: CatKey): string {
   return CATEGORIES.find((c) => c.key === key)?.icon || 'sparkles'
@@ -375,6 +376,7 @@ function catIcon(key: CatKey): string {
 
 function catItems(key: CatKey): any[] {
   if (key === 'cart') return cart.items
+  if (key === 'chat') return []
   const d = data.value
   if (!d || !d.activity) return []
   if (key === 'comments') return d.comments
@@ -398,20 +400,22 @@ function showLess(key: CatKey) {
 }
 
 const catList = computed(() =>
-  CATEGORIES.map((c) => ({ ...c, count: catItems(c.key).length })),
+  CATEGORIES.map((c) => ({ ...c, count: c.key === 'chat' ? (generalThread.value ? 1 : 0) : catItems(c.key).length })),
 )
 
-// ---- Chat (ST-012) : thread précommande + threads commandes + badges ----
-const preThread = computed(() => chat.threads.find((t) => t.kind === 'preorder') || null)
+// ---- Chat (ST-012) : threads précommande (panier + par article), général, commandes ----
+const preThread = computed(() => chat.threads.find((t) => t.kind === 'preorder' && !t.productId) || null)
 const orderThreads = computed(() => chat.threads.filter((t) => t.kind === 'order'))
 const chatUnread = computed(() => chat.unread)
-const preChatUnread = computed(() => preThread.value?.unread || 0)
+const generalThread = computed(() => chat.threads.find((t) => t.kind === 'general') || null)
+const generalChatUnread = computed(() => generalThread.value?.unread || 0)
+const preChatUnread = computed(() => chat.threads.reduce((s, t) => s + (t.kind === 'preorder' ? t.unread || 0 : 0), 0))
 const ordersChatUnread = computed(() => chat.threads.reduce((s, t) => s + (t.kind === 'order' ? t.unread || 0 : 0), 0))
 
 // Which thread is open in the chat drawer (client side).
 const openThreadId = ref<string | null>(null)
-const openThreadKind = ref<'preorder' | 'order'>('preorder')
-function openChat(kind: 'preorder' | 'order', threadId: string | null) {
+const openThreadKind = ref<'preorder' | 'order' | 'general'>('preorder')
+function openChat(kind: 'preorder' | 'order' | 'general', threadId: string | null) {
   if (kind === 'preorder' && !threadId) {
     // Preorder chat can be opened even before the first message: the thread
     // is created server-side on first send.
@@ -427,6 +431,21 @@ function closeChat() {
 }
 function onChatSent() {
   chat.refresh()
+}
+
+// A delivered order thread is locked (read-only) server-side and in the UI.
+const openLocked = computed(() => chat.threads.find((t) => t.id === openThreadId.value)?.locked || false)
+
+// Chat par article : accordéon "style commentaires" dans l'onglet Précommandes.
+const expandedItemChat = ref<string | null>(null)
+function itemThread(productId: string) {
+  return chat.threads.find((t) => t.kind === 'preorder' && t.productId === productId) || null
+}
+function itemThreadUnread(productId: string) {
+  return itemThread(productId)?.unread || 0
+}
+function toggleItemChat(productId: string) {
+  expandedItemChat.value = expandedItemChat.value === productId ? null : productId
 }
 
 const totalActivity = computed(() => {
@@ -838,6 +857,7 @@ async function confirmAllPreorders() {
                 <span>{{ c.label }}</span>
                 <span v-if="c.key === 'cart' && preChatUnread" class="px-1.5 rounded-full bg-[#ff2a2a] text-white text-[9px] leading-4 min-w-[18px] text-center">{{ preChatUnread }}</span>
                 <span v-else-if="c.key === 'orders' && ordersChatUnread" class="px-1.5 rounded-full bg-[#ff2a2a] text-white text-[9px] leading-4 min-w-[18px] text-center">{{ ordersChatUnread }}</span>
+                <span v-else-if="c.key === 'chat' && generalChatUnread" class="px-1.5 rounded-full bg-[#ff2a2a] text-white text-[9px] leading-4 min-w-[18px] text-center">{{ generalChatUnread }}</span>
                 <span v-else-if="c.count" class="px-1.5 rounded bg-white/10">{{ c.count }}</span>
               </button>
             </div>
@@ -847,7 +867,7 @@ async function confirmAllPreorders() {
               <div class="flex items-center justify-between mb-2">
                 <p class="text-[10px] font-mono text-zinc-400 uppercase tracking-widest">
                   <AppIcon name="message" :size="12" class="inline mr-1 text-[#ff2a2a]" />
-                  Discussion {{ openThreadKind === 'preorder' ? '— précommandes' : '— commande' }}
+                  Discussion {{ openThreadKind === 'preorder' ? '— précommandes' : openThreadKind === 'general' ? '— générale' : '— commande' }}
                 </p>
                 <button @click="closeChat" class="text-[10px] font-mono text-zinc-500 hover:text-white border border-zinc-800 px-2.5 py-1 rounded-lg transition-all">
                   <AppIcon name="close" :size="11" class="inline" /> Fermer
@@ -857,7 +877,8 @@ async function confirmAllPreorders() {
                 :key="openThreadId"
                 :thread-id="openThreadId"
                 side="client"
-                :messages="(openThreadKind === 'preorder' ? preThread?.messages : (chat.threads.find(t => t.id === openThreadId)?.messages)) || []"
+                :locked="openLocked"
+                :messages="(openThreadKind === 'preorder' ? preThread?.messages : (openThreadKind === 'general' ? generalThread?.messages : (chat.threads.find(t => t.id === openThreadId)?.messages))) || []"
                 @sent="onChatSent"
                 @read="onChatSent"
               />
@@ -876,27 +897,53 @@ async function confirmAllPreorders() {
                     DISCUTER DE MES PRÉCOMMANDES
                     <span v-if="preChatUnread" class="px-1.5 rounded-full bg-[#ff2a2a] text-white text-[9px] leading-4 min-w-[18px] text-center">{{ preChatUnread }}</span>
                   </button>
-                  <div v-for="item in cart.items" :key="item.productId" class="flex items-center gap-3 bg-black/30 border border-zinc-900 rounded-xl p-3">
-                    <NuxtLink :to="productUrl(item.productId)">
-                      <img v-if="item.imageUrl" :src="item.imageUrl" alt="" class="w-11 h-11 rounded-lg object-cover border border-zinc-800 shrink-0" />
-                      <div v-else class="w-11 h-11 rounded-lg bg-[#16161d] border border-zinc-800 flex items-center justify-center text-[#ff2a2a]">
-                        <AppIcon name="cart" :size="14" />
+                  <div v-for="item in cart.items" :key="item.productId" class="bg-black/30 border border-zinc-900 rounded-xl overflow-hidden">
+                    <div class="flex items-center gap-3 p-3">
+                      <NuxtLink :to="productUrl(item.productId)">
+                        <img v-if="item.imageUrl" :src="item.imageUrl" alt="" class="w-11 h-11 rounded-lg object-cover border border-zinc-800 shrink-0" />
+                        <div v-else class="w-11 h-11 rounded-lg bg-[#16161d] border border-zinc-800 flex items-center justify-center text-[#ff2a2a]">
+                          <AppIcon name="cart" :size="14" />
+                        </div>
+                      </NuxtLink>
+                      <div class="flex-1 min-w-0">
+                        <p class="text-xs font-bold text-slate-200 truncate">{{ item.title }}</p>
+                        <p class="text-[10px] text-zinc-500 font-mono mt-0.5">x{{ item.quantity }} · {{ format(item.priceXof) }}</p>
                       </div>
-                    </NuxtLink>
-                    <div class="flex-1 min-w-0">
-                      <p class="text-xs font-bold text-slate-200 truncate">{{ item.title }}</p>
-                      <p class="text-[10px] text-zinc-500 font-mono mt-0.5">x{{ item.quantity }} · {{ format(item.priceXof) }}</p>
+                      <div class="flex flex-col gap-1.5 shrink-0">
+                        <button @click="toggleItemChat(item.productId)"
+                          class="inline-flex items-center justify-center gap-1.5 text-[10px] font-mono font-bold px-3 py-2 rounded-xl border transition-all cursor-pointer"
+                          :class="expandedItemChat === item.productId ? 'bg-[#ff2a2a]/15 border-[#ff2a2a]/60 text-[#ff2a2a]' : 'border-zinc-700 text-zinc-300 hover:border-[#ff2a2a]/60 hover:text-white'">
+                          <AppIcon name="message" :size="12" />
+                          <span>{{ expandedItemChat === item.productId ? 'Fermer' : 'Message' }}</span>
+                          <span v-if="itemThreadUnread(item.productId)" class="px-1.5 rounded-full bg-[#ff2a2a] text-white text-[9px] leading-4 min-w-[16px] text-center">{{ itemThreadUnread(item.productId) }}</span>
+                        </button>
+                        <button @click="confirmPreorder(item)" :disabled="confirmingId === item.productId"
+                          class="inline-flex items-center justify-center gap-1.5 bg-[#ff2a2a] hover:bg-red-600 disabled:opacity-40 text-white text-[10px] font-mono font-bold px-3 py-2 rounded-xl transition-all cursor-pointer">
+                          <span v-if="confirmingId === item.productId" class="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                          <template v-else><AppIcon name="whatsapp" :size="12" /> CONFIRMER</template>
+                        </button>
+                        <button @click="cart.remove(item.productId)"
+                          class="inline-flex items-center justify-center gap-1 text-[10px] font-mono text-zinc-500 hover:text-red-400 border border-zinc-800 px-3 py-1.5 rounded-xl transition-all cursor-pointer">
+                          <AppIcon name="trash" :size="11" /> Retirer
+                        </button>
+                      </div>
                     </div>
-                    <div class="flex flex-col gap-1.5 shrink-0">
-                      <button @click="confirmPreorder(item)" :disabled="confirmingId === item.productId"
-                        class="inline-flex items-center justify-center gap-1.5 bg-[#ff2a2a] hover:bg-red-600 disabled:opacity-40 text-white text-[10px] font-mono font-bold px-3 py-2 rounded-xl transition-all cursor-pointer">
-                        <span v-if="confirmingId === item.productId" class="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                        <template v-else><AppIcon name="whatsapp" :size="12" /> CONFIRMER</template>
-                      </button>
-                      <button @click="cart.remove(item.productId)"
-                        class="inline-flex items-center justify-center gap-1 text-[10px] font-mono text-zinc-500 hover:text-red-400 border border-zinc-800 px-3 py-1.5 rounded-xl transition-all cursor-pointer">
-                        <AppIcon name="trash" :size="11" /> Retirer
-                      </button>
+                    <!-- Chat par article : accordéon "style commentaires" -->
+                    <div v-if="expandedItemChat === item.productId" class="border-t border-zinc-800 bg-[#12121a]/60">
+                      <div class="flex items-center justify-between px-3 py-2 border-b border-zinc-800">
+                        <p class="text-[9px] font-mono text-zinc-500 uppercase tracking-widest truncate">Discussion — {{ item.title }}</p>
+                      </div>
+                      <ChatPanel
+                        :key="'pre:' + (auth.user?.id || '') + ':' + item.productId"
+                        :thread-id="'pre:' + (auth.user?.id || '') + ':' + item.productId"
+                        side="client"
+                        :messages="itemThread(item.productId)?.messages || []"
+                        :locked="itemThread(item.productId)?.locked || false"
+                        height="200px"
+                        placeholder="Question sur cet article…"
+                        @sent="onChatSent"
+                        @read="onChatSent"
+                      />
                     </div>
                   </div>
                   <div class="flex flex-col gap-2 pt-2 border-t border-zinc-900">
@@ -976,6 +1023,25 @@ async function confirmAllPreorders() {
                 </div>
               </template>
 
+              <!-- Chat général -->
+              <template v-else-if="activeCat === 'chat'">
+                <div class="bg-black/30 border border-zinc-900 rounded-xl p-3">
+                  <div class="flex items-center justify-between mb-2">
+                    <p class="text-[10px] font-mono text-zinc-400 uppercase tracking-widest">
+                      <AppIcon name="message" :size="12" class="inline mr-1 text-[#ff2a2a]" /> DISCUSSION GÉNÉRALE
+                    </p>
+                  </div>
+                  <p class="text-[10px] font-mono text-zinc-600 mb-3">Une seule conversation globale avec DEEP ROOTS — questions, disponibilités, tous sujets.</p>
+                  <ChatPanel
+                    :thread-id="'general:' + (auth.user?.id || '')"
+                    side="client"
+                    :messages="generalThread?.messages || []"
+                    @sent="onChatSent"
+                    @read="onChatSent"
+                  />
+                </div>
+              </template>
+
               <!-- Orders -->
               <template v-else>
                 <div v-if="visibleItems('orders').length === 0" class="text-center py-8 text-zinc-600 font-mono text-[11px]">
@@ -991,7 +1057,10 @@ async function confirmAllPreorders() {
                     <p class="text-[10px] text-zinc-500 font-mono mt-0.5">x{{ o.quantity }} · {{ o.priceXof ? format(o.priceXof) : '' }} · {{ timeAgo(o.createdAt) }}</p>
                   </div>
                   <div class="flex flex-col items-end gap-1.5 shrink-0">
-                    <span class="text-[9px] font-mono uppercase tracking-widest px-2 py-1 rounded border" :class="o.status === 'completed' ? 'text-emerald-400 border-emerald-500/30' : o.status === 'cancelled' ? 'text-red-400 border-red-500/30' : 'text-amber-400 border-amber-500/30'">{{ o.status }}</span>
+                    <span class="inline-flex items-center gap-1 text-[9px] font-mono uppercase tracking-widest px-2 py-1 rounded border" :class="o.status === 'completed' ? 'text-emerald-400 border-emerald-500/30' : o.status === 'cancelled' ? 'text-red-400 border-red-500/30' : 'text-amber-400 border-amber-500/30'">
+                      <AppIcon v-if="o.status === 'completed'" name="lock" :size="10" />
+                      {{ o.status }}
+                    </span>
                     <button @click="openChat('order', `ord:${o.id}`)"
                       class="inline-flex items-center gap-1.5 text-[10px] font-mono text-[#ff2a2a] hover:text-white border border-[#ff2a2a]/40 hover:border-[#ff2a2a]/80 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer">
                       <AppIcon name="message" :size="12" /> Discuter

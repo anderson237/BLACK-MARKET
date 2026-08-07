@@ -341,12 +341,16 @@ function cleanPhone(p: string) {
           <div class="border-t border-zinc-800 pt-4">
             <div class="text-[9px] font-mono text-zinc-500 uppercase tracking-wider mb-2 flex items-center gap-2">
               <AppIcon name="message" :size="12" class="text-[#ff2a2a]" /> Discussion avec le client
+              <span v-if="detailOrder.status === 'completed'" class="inline-flex items-center gap-1 text-[9px] font-mono text-zinc-500 border border-zinc-700 px-1.5 py-0.5 rounded">
+                <AppIcon name="lock" :size="9" /> COMMANDE LIVRÉE — LECTURE SEULE
+              </span>
               <span v-if="chatUnreadFor(detailOrder.id)" class="px-1.5 rounded-full bg-[#ff2a2a] text-white text-[9px] leading-4 min-w-[18px] text-center">{{ chatUnreadFor(detailOrder.id) }}</span>
             </div>
             <ChatPanel
               :key="'ord:' + detailOrder.id"
               :thread-id="'ord:' + detailOrder.id"
               side="admin"
+              :locked="detailOrder.status === 'completed'"
               :messages="adminChat.threadFor('ord:' + detailOrder.id)?.messages || []"
               placeholder="Répondre au client…"
               @sent="onAdminChatSent"

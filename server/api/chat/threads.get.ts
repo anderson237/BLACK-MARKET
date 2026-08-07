@@ -16,16 +16,21 @@ export default defineEventHandler(async (event) => {
   return {
     success: true,
     unread: threads.reduce((s, t) => s + clientUnreadCount(t, t.clientReadTs || 0), 0),
-    threads: threads.map((t) => ({
-      id: t.id,
-      kind: t.kind,
-      orderId: t.orderId,
-      productTitle: t.productTitle,
-      createdAt: t.createdAt,
-      updatedAt: t.updatedAt,
-      unread: clientUnreadCount(t, t.clientReadTs || 0),
-      order: t.orderId ? byOrderId.get(t.orderId) || null : null,
-      messages: t.messages || [],
-    })),
+    threads: threads.map((t) => {
+      const order = t.orderId ? byOrderId.get(t.orderId) || null : null
+      return {
+        id: t.id,
+        kind: t.kind,
+        orderId: t.orderId,
+        productId: t.productId,
+        productTitle: t.productTitle,
+        createdAt: t.createdAt,
+        updatedAt: t.updatedAt,
+        unread: clientUnreadCount(t, t.clientReadTs || 0),
+        locked: order ? order.status === 'completed' : false,
+        order,
+        messages: t.messages || [],
+      }
+    }),
   }
 })

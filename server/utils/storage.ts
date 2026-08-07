@@ -1045,10 +1045,11 @@ export interface ChatMessage {
 }
 
 export interface ChatThread {
-  id: string                 // 'pre:<userId>' OU 'ord:<orderId>'
-  kind: 'preorder' | 'order'
+  id: string                 // 'pre:<userId>' OU 'pre:<userId>:<productId>' OU 'general:<userId>' OU 'ord:<orderId>'
+  kind: 'preorder' | 'order' | 'general'
   userId: string             // compte client
   orderId?: string           // pour kind='order'
+  productId?: string         // pour kind='preorder' par article
   productTitle?: string      // libellé affichable
   customerName?: string      // pour l'affichage admin
   messages: ChatMessage[]

@@ -62,17 +62,39 @@ onMounted(() => {
   adminChat.load()
 })
 
-// Chat helpers (ST-012) — preorder thread unread per basket + toggle panel.
-const preChatUnreadFor = (userId: string) => {
-  const t = adminChat.threadFor(`pre:${userId}`)
-  return t ? t.unread || 0 : 0
-}
+// Chat helpers (ST-012) — preorder threads (basket + per article) unread per
+// basket + toggle panels (basket, per article, general).
+const preChatUnreadFor = (userId: string) =>
+  adminChat.threads.reduce((s, t) => s + (t.kind === 'preorder' && t.userId === userId ? t.unread || 0 : 0), 0)
 function toggleChat(userId: string) {
   chatOpen.value[userId] = !chatOpen.value[userId]
   if (chatOpen.value[userId]) adminChat.load(true)
 }
 function onAdminChatSent() {
   adminChat.refresh()
+}
+const generalChatOpen = ref<Record<string, boolean>>({})
+const itemChatOpen = ref<Record<string, boolean>>({})
+const itemChatKey = (userId: string, productId: string) => `${userId}::${productId}`
+function itemThreadFor(userId: string, productId: string) {
+  return adminChat.threadFor(`pre:${userId}:${productId}`)
+}
+function itemThreadUnreadFor(userId: string, productId: string) {
+  const t = itemThreadFor(userId, productId)
+  return t ? t.unread || 0 : 0
+}
+function toggleItemChat(userId: string, productId: string) {
+  const k = itemChatKey(userId, productId)
+  itemChatOpen.value[k] = !itemChatOpen.value[k]
+  if (itemChatOpen.value[k]) adminChat.load(true)
+}
+function generalChatUnreadFor(userId: string) {
+  const t = adminChat.threadFor(`general:${userId}`)
+  return t ? t.unread || 0 : 0
+}
+function toggleGeneralChat(userId: string) {
+  generalChatOpen.value[userId] = !generalChatOpen.value[userId]
+  if (generalChatOpen.value[userId]) adminChat.load(true)
 }
 
 const filtered = computed(() => {
@@ -272,14 +294,39 @@ function relanceUrl(c: any): string {
 
         <!-- Items (collapsible) -->
         <div v-if="expanded[c.userId]" class="px-4 pb-3 space-y-1.5 border-t border-zinc-900 pt-3">
-          <div v-for="item in c.items" :key="item.productId" class="flex items-center gap-3 bg-black/30 border border-zinc-900 rounded-lg p-2">
-            <img v-if="item.imageUrl" :src="item.imageUrl" alt="" class="w-9 h-9 rounded-md object-cover border border-zinc-800 shrink-0" />
-            <div v-else class="w-9 h-9 rounded-md bg-[#16161d] border border-zinc-800 flex items-center justify-center text-[#ff2a2a] shrink-0"><AppIcon name="cart" :size="12" /></div>
-            <div class="flex-1 min-w-0">
-              <p class="text-[11px] font-bold text-slate-200 truncate">{{ item.title }}</p>
-              <p class="text-[9px] font-mono text-zinc-500">x{{ item.quantity }} · {{ formatPriceXof(item.priceXof) }} · {{ timeAgo(item.addedAt) }}</p>
+          <div v-for="item in c.items" :key="item.productId" class="bg-black/30 border border-zinc-900 rounded-lg overflow-hidden">
+            <div class="flex items-center gap-3 p-2">
+              <img v-if="item.imageUrl" :src="item.imageUrl" alt="" class="w-9 h-9 rounded-md object-cover border border-zinc-800 shrink-0" />
+              <div v-else class="w-9 h-9 rounded-md bg-[#16161d] border border-zinc-800 flex items-center justify-center text-[#ff2a2a] shrink-0"><AppIcon name="cart" :size="12" /></div>
+              <div class="flex-1 min-w-0">
+                <p class="text-[11px] font-bold text-slate-200 truncate">{{ item.title }}</p>
+                <p class="text-[9px] font-mono text-zinc-500">x{{ item.quantity }} · {{ formatPriceXof(item.priceXof) }} · {{ timeAgo(item.addedAt) }}</p>
+              </div>
+              <div class="flex flex-col items-end gap-1.5 shrink-0">
+                <button @click="toggleItemChat(c.userId, item.productId)"
+                  class="inline-flex items-center gap-1 text-[9px] font-mono font-bold px-2 py-1.5 rounded-lg border transition-all cursor-pointer"
+                  :class="itemChatOpen[itemChatKey(c.userId, item.productId)] ? 'bg-[#ff2a2a]/15 border-[#ff2a2a]/60 text-[#ff2a2a]' : 'border-zinc-700 text-zinc-300 hover:border-[#ff2a2a]/60 hover:text-white'">
+                  <AppIcon name="message" :size="11" />
+                  <span>{{ itemChatOpen[itemChatKey(c.userId, item.productId)] ? 'Fermer' : 'Message' }}</span>
+                  <span v-if="itemThreadUnreadFor(c.userId, item.productId)" class="px-1 rounded-full bg-[#ff2a2a] text-white text-[9px] leading-4 min-w-[15px] text-center">{{ itemThreadUnreadFor(c.userId, item.productId) }}</span>
+                </button>
+                <NuxtLink :to="`/p/${item.productId}.html`" target="_blank" class="text-[9px] font-mono text-[#ff2a2a] hover:underline shrink-0">VOIR →</NuxtLink>
+              </div>
             </div>
-            <NuxtLink :to="`/p/${item.productId}.html`" target="_blank" class="text-[9px] font-mono text-[#ff2a2a] hover:underline shrink-0">VOIR →</NuxtLink>
+            <!-- Chat par article (accordéon) -->
+            <div v-if="itemChatOpen[itemChatKey(c.userId, item.productId)]" class="border-t border-zinc-800 bg-[#0d0d14]">
+              <ChatPanel
+                :key="'pre:' + c.userId + ':' + item.productId"
+                :thread-id="'pre:' + c.userId + ':' + item.productId"
+                side="admin"
+                :messages="itemThreadFor(c.userId, item.productId)?.messages || []"
+                :locked="itemThreadFor(c.userId, item.productId)?.locked || false"
+                height="180px"
+                placeholder="Répondre au client…"
+                @sent="onAdminChatSent"
+                @read="onAdminChatSent"
+              />
+            </div>
           </div>
         </div>
 
@@ -294,6 +341,11 @@ function relanceUrl(c: any): string {
             <AppIcon name="message" :size="12" /> {{ chatOpen[c.userId] ? 'FERMER LE CHAT' : 'DISCUTER' }}
             <span v-if="preChatUnreadFor(c.userId)" class="px-1 rounded-full bg-[#ff2a2a] text-white text-[9px] leading-4 min-w-[16px] text-center">{{ preChatUnreadFor(c.userId) }}</span>
           </button>
+          <button @click="toggleGeneralChat(c.userId)"
+            class="inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-300 hover:text-white border border-zinc-700 hover:border-zinc-500 px-3 py-2 rounded-xl transition-all">
+            <AppIcon name="message" :size="12" /> {{ generalChatOpen[c.userId] ? 'FERMER GÉNÉRAL' : 'CHAT GÉNÉRAL' }}
+            <span v-if="generalChatUnreadFor(c.userId)" class="px-1 rounded-full bg-[#ff2a2a] text-white text-[9px] leading-4 min-w-[16px] text-center">{{ generalChatUnreadFor(c.userId) }}</span>
+          </button>
           <a :href="relanceUrl(c)" target="_blank" rel="noopener"
             class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-mono font-bold px-3 py-2 rounded-xl transition-all">
             <AppIcon name="whatsapp" :size="12" /> RELANCER SUR WHATSAPP
@@ -307,6 +359,22 @@ function relanceUrl(c: any): string {
             :thread-id="'pre:' + c.userId"
             side="admin"
             :messages="adminChat.threadFor('pre:' + c.userId)?.messages || []"
+            placeholder="Répondre au client…"
+            @sent="onAdminChatSent"
+            @read="onAdminChatSent"
+          />
+        </div>
+
+        <!-- Chat général (ST-012) -->
+        <div v-if="generalChatOpen[c.userId]" class="px-4 pb-4 border-t border-zinc-900 pt-3">
+          <div class="flex items-center justify-between mb-2">
+            <p class="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Discussion générale — {{ c.customer?.name }}</p>
+          </div>
+          <ChatPanel
+            :key="'general:' + c.userId"
+            :thread-id="'general:' + c.userId"
+            side="admin"
+            :messages="adminChat.threadFor('general:' + c.userId)?.messages || []"
             placeholder="Répondre au client…"
             @sent="onAdminChatSent"
             @read="onAdminChatSent"

@@ -9,9 +9,11 @@ const props = withDefaults(defineProps<{
   messages: any[]
   height?: string
   placeholder?: string
+  locked?: boolean
 }>(), {
   height: '220px',
   placeholder: 'Écrivez votre message…',
+  locked: false,
 })
 
 const emit = defineEmits<{ (e: 'sent'): void; (e: 'read'): void }>()
@@ -46,7 +48,7 @@ watch(() => props.messages?.length, (n) => {
 
 async function send() {
   const body = text.value.trim()
-  if (!body || sending.value) return
+  if (!body || sending.value || props.locked) return
   sending.value = true
   error.value = ''
   try {
@@ -110,7 +112,7 @@ function fmt(ts: number): string {
       </div>
     </div>
 
-    <form @submit.prevent="send" class="flex items-center gap-2 border-t border-zinc-800 bg-black/30 px-2 py-2">
+    <form v-if="!locked" @submit.prevent="send" class="flex items-center gap-2 border-t border-zinc-800 bg-black/30 px-2 py-2">
       <input
         v-model="text"
         :placeholder="placeholder"
@@ -127,6 +129,12 @@ function fmt(ts: number): string {
         <AppIcon v-else name="send" :size="15" />
       </button>
     </form>
+    <div v-else class="border-t border-zinc-800 bg-black/30 px-3 py-2.5 text-center">
+      <p class="text-[10px] font-mono text-zinc-500">
+        <AppIcon name="lock" :size="11" class="inline mr-1" />
+        COMMANDE LIVRÉE — DISCUSSION FERMÉE (lecture seule)
+      </p>
+    </div>
     <p v-if="error" class="text-[10px] font-mono text-[#ff2a2a] px-3 pb-2">{{ error }}</p>
   </div>
 </template>

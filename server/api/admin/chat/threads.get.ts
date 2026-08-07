@@ -22,6 +22,7 @@ export default defineEventHandler(async (event) => {
         id: t.id,
         kind: t.kind,
         orderId: t.orderId,
+        productId: t.productId,
         userId: t.userId,
         productTitle: t.productTitle,
         customerName: t.customerName,
@@ -29,6 +30,7 @@ export default defineEventHandler(async (event) => {
           ? { name: acc.pseudo || acc.name || acc.email || 'Client', email: acc.email, phone: acc.phone, picture: acc.picture }
           : null,
         order: order ? { id: order.id, productTitle: order.productTitle, status: order.status, quantity: order.quantity } : null,
+        locked: order ? order.status === 'completed' : false,
         unread: adminUnreadCount(t, t.adminReadTs || 0),
         messages: t.messages || [],
         createdAt: t.createdAt,

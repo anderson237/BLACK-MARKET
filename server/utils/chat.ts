@@ -3,12 +3,21 @@ import { publishChatUpdate } from '~~/server/utils/realtime'
 
 export interface ChatUnread {
   threadId: string
-  kind: 'preorder' | 'order'
+  kind: 'preorder' | 'order' | 'general'
   count: number
 }
 
 export function preThreadId(userId: string): string {
   return `pre:${userId}`
+}
+
+/** Thread of one preorder ARTICLE (cart item): `pre:<userId>:<productId>`. */
+export function preItemThreadId(userId: string, productId: string): string {
+  return `pre:${userId}:${productId}`
+}
+
+export function generalThreadId(userId: string): string {
+  return `general:${userId}`
 }
 
 export function ordThreadId(orderId: string): string {
@@ -44,7 +53,7 @@ export async function getThread(id: string): Promise<ChatThread | null> {
 
 /** Upsert a thread (creates it if missing) and append a message atomically. */
 export async function addMessage(
-  thread: { id: string; kind: 'preorder' | 'order'; userId: string; orderId?: string; productTitle?: string; customerName?: string },
+  thread: { id: string; kind: 'preorder' | 'order' | 'general'; userId: string; orderId?: string; productId?: string; productTitle?: string; customerName?: string },
   from: 'client' | 'admin',
   text: string,
 ): Promise<ChatThread> {
@@ -58,6 +67,7 @@ export async function addMessage(
         kind: thread.kind,
         userId: thread.userId,
         orderId: thread.orderId,
+        productId: thread.productId,
         productTitle: thread.productTitle,
         customerName: thread.customerName,
         messages: [],
@@ -110,16 +120,19 @@ export async function markAdminRead(threadId: string, ts?: number): Promise<void
 }
 
 /**
- * When a preorder becomes a confirmed order, carry every message over so the
- * conversation is preserved. Returns the new order thread.
+ * When a preorder becomes a confirmed order, carry every conversation over so
+ * nothing is lost: the legacy basket thread (`pre:<userId>`) AND every per-item
+ * thread (`pre:<userId>:<productId>`) are merged into the order thread
+ * (dedupe by message id). Returns the new order thread.
  */
 export async function migratePreorderToOrder(orderId: string, userId: string, meta: { productTitle?: string; customerName?: string }): Promise<ChatThread | null> {
-  const preId = preThreadId(userId)
   const ordId = ordThreadId(orderId)
+  const prefix = `pre:${userId}:`
   return withLock('chat', async () => {
     const threads = await loadChat()
-    const pre = threads.find((x) => x.id === preId)
-    if (!pre || !pre.messages?.length) return null
+    const preThreads = threads.filter((x) => x.id === preThreadId(userId) || x.id.startsWith(prefix))
+    if (!preThreads.length) return null
+
     let ord = threads.find((x) => x.id === ordId)
     const now = Date.now()
     if (!ord) {
@@ -128,24 +141,35 @@ export async function migratePreorderToOrder(orderId: string, userId: string, me
         kind: 'order',
         userId,
         orderId,
-        productTitle: meta.productTitle || pre.productTitle,
-        customerName: meta.customerName || pre.customerName,
+        productTitle: meta.productTitle || preThreads[0]?.productTitle,
+        customerName: meta.customerName || preThreads[0]?.customerName,
         messages: [],
-        clientReadTs: pre.clientReadTs || 0,
-        adminReadTs: pre.adminReadTs || 0,
+        clientReadTs: 0,
+        adminReadTs: 0,
         createdAt: now,
         updatedAt: now,
       }
       threads.push(ord)
     }
-    // Copy messages only if the order thread has none yet (dedupe on re-confirm).
     if (!ord.messages?.length) {
-      ord.messages = (pre.messages || []).map((m) => ({ ...m }))
+      const seen = new Set<string>()
+      const merged: ChatMessage[] = []
+      for (const pre of preThreads) {
+        for (const m of pre.messages || []) {
+          if (seen.has(m.id)) continue
+          seen.add(m.id)
+          merged.push({ ...m })
+        }
+      }
+      merged.sort((a, b) => a.ts - b.ts)
+      ord.messages = merged
+      ord.clientReadTs = Math.max(...preThreads.map((p) => p.clientReadTs || 0), ord.clientReadTs || 0)
+      ord.adminReadTs = Math.max(...preThreads.map((p) => p.adminReadTs || 0), ord.adminReadTs || 0)
     }
     ord.updatedAt = now
     await saveChat(threads)
     // Real-time: both sides should refresh to see the conversation carried over.
-    publishChatUpdate(pre, 'migrated')
+    for (const pre of preThreads) publishChatUpdate(pre, 'migrated')
     publishChatUpdate(ord, 'migrated')
     return ord
   })
