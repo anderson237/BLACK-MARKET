@@ -74,6 +74,7 @@ const navItems = [
   { label: 'Dashboard', icon: 'dashboard', to: '/admin' },
   { label: 'Catalogue', icon: 'box', to: '/admin/catalog' },
   { label: 'Commandes', icon: 'cart', to: '/admin/orders' },
+  { label: 'Paniers', icon: 'cart', to: '/admin/carts' },
   { label: 'Comptabilité', icon: 'chart', to: '/admin/comptabilite' },
   { label: 'Analyse', icon: 'chart', to: '/admin/analyse' },
   { label: 'Audience', icon: 'globe', to: '/admin/audience' },

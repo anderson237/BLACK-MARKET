@@ -138,7 +138,9 @@ const CART_FILE = path.join(DATA_DIR, 'carts.json')
 
 async function loadCartsFile(): Promise<Record<string, CartItem[]>> {
   if (isNetlifyRuntime()) {
-    const raw = await blobGet('bm-cart', 'carts.json', 'text')
+    // Strong consistency: the cart is read right after it was written (client
+    // adds then confirms; admin lists baskets) — eventual reads can miss it.
+    const raw = await blobGet('bm-cart', 'carts.json', 'text', 'strong')
     if (raw != null) {
       try {
         const p = JSON.parse(raw)
@@ -151,6 +153,11 @@ async function loadCartsFile(): Promise<Record<string, CartItem[]>> {
   }
   const p = await readJSON(CART_FILE)
   return p && typeof p === 'object' ? p : {}
+}
+
+/** All baskets keyed by userId (admin "abandoned carts" view). */
+export async function loadAllCarts(): Promise<Record<string, CartItem[]>> {
+  return loadCartsFile()
 }
 
 export async function loadCart(userId: string): Promise<CartItem[]> {
