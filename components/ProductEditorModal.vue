@@ -417,7 +417,7 @@ async function handleVideoFile(e: Event) {
   <div class="fixed inset-0 z-50 flex items-stretch justify-center p-0 sm:p-4">
     <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" @click="emit('close')" />
 
-    <div class="relative w-full max-w-2xl bg-[#12121a] border border-zinc-800 flex flex-col overflow-hidden sm:rounded-3xl">
+    <div class="relative w-full max-w-4xl bg-[#12121a] border border-zinc-800 flex flex-col overflow-hidden sm:rounded-3xl">
       <!-- Header -->
       <div class="flex items-center justify-between px-5 py-4 border-b border-zinc-800 bg-[#0d0d14] shrink-0">
         <h2 class="text-sm font-extrabold text-white font-mono uppercase tracking-widest">
@@ -471,9 +471,9 @@ async function handleVideoFile(e: Event) {
 <!-- Prix & marge -->
         <div class="space-y-2">
           <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Prix & marge</label>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div class="space-y-2">
-              <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Prix d'achat fournisseur (F CFA)</label>
+              <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Achat (F CFA)</label>
               <input v-model.number="draft.purchaseRmb" type="number" min="0" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="2000" />
             </div>
             <div class="space-y-2">
