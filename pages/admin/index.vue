@@ -367,6 +367,25 @@ const USER_TOP_CONFIG = computed(() => {
       <div v-if="!stats" v-for="n in 4" :key="n" class="skeleton h-32 rounded-2xl" />
     </div>
 
+    <!-- Trash alert: soft-deleted orders waiting for restore / permanent purge -->
+    <div v-if="stats && store.trashOrders.length" class="bg-[#12121a] border border-red-500/30 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+      <div class="w-11 h-11 shrink-0 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-400">
+        <AppIcon name="trash" :size="20" />
+      </div>
+      <div class="flex-1 min-w-0">
+        <p class="text-xs font-extrabold text-white font-mono uppercase tracking-wider">
+          {{ store.trashOrders.length }} commande(s) dans la corbeille
+        </p>
+        <p class="text-[10px] font-mono text-zinc-500 mt-0.5">Supprimées mais pas encore effacées. Restaurez-les ou supprimez-les définitivement.</p>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <NuxtLink to="/admin/orders#corbeille" class="text-[10px] font-mono font-bold text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/10 px-3.5 py-2 rounded-xl transition-all inline-flex items-center gap-1.5">
+          <AppIcon name="restore" :size="12" /> Restaurer
+        </NuxtLink>
+        <NuxtLink to="/admin/orders#corbeille" class="text-[10px] font-mono font-bold text-red-400 border border-red-500/30 hover:bg-red-500/10 px-3.5 py-2 rounded-xl transition-all">Gérer</NuxtLink>
+      </div>
+    </div>
+
     <!-- Revenue Area Chart + Sale by category -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <div class="lg:col-span-2 bg-[#0d0d14] rounded-2xl p-5 border border-zinc-800">

@@ -114,6 +114,7 @@ const navItems = [
   { label: 'Dashboard', icon: 'dashboard', to: '/admin' },
   { label: 'Catalogue', icon: 'box', to: '/admin/catalog' },
   { label: 'Commandes', icon: 'cart', to: '/admin/orders' },
+  { label: 'Corbeille', icon: 'trash', to: '/admin/orders#corbeille', trash: true },
   { label: 'Paniers', icon: 'cart', to: '/admin/carts' },
   { label: 'Comptabilité', icon: 'chart', to: '/admin/comptabilite' },
   { label: 'Analyse', icon: 'chart', to: '/admin/analyse' },
@@ -215,6 +216,7 @@ function closeDrawer() {
         >
           <AppIcon :name="item.icon" :size="15" />{{ item.label }}
           <span v-if="item.to === '/admin/orders' && adminChat.unread" class="ml-auto px-1.5 rounded-full bg-[#ff2a2a] text-white text-[9px] font-mono font-bold leading-4 min-w-[18px] text-center">{{ adminChat.unread }}</span>
+          <span v-else-if="item.trash && store.trashOrders.length" class="ml-auto px-1.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 text-[9px] font-mono font-bold leading-4 min-w-[18px] text-center">{{ store.trashOrders.length }}</span>
         </NuxtLink>
       </nav>
     </aside>
@@ -233,6 +235,7 @@ function closeDrawer() {
             :class="isActive(item.to) ? 'bg-[#ff2a2a]/15 text-[#ff2a2a] border border-[#ff2a2a]/30' : 'text-zinc-300 hover:text-white hover:bg-zinc-800/60 border border-transparent'">
             <AppIcon :name="item.icon" :size="15" />{{ item.label }}
             <span v-if="item.to === '/admin/orders' && adminChat.unread" class="ml-auto px-1.5 rounded-full bg-[#ff2a2a] text-white text-[9px] font-mono font-bold leading-4 min-w-[18px] text-center">{{ adminChat.unread }}</span>
+            <span v-else-if="item.trash && store.trashOrders.length" class="ml-auto px-1.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 text-[9px] font-mono font-bold leading-4 min-w-[18px] text-center">{{ store.trashOrders.length }}</span>
           </NuxtLink>
         </nav>
         <div class="p-4 border-t border-zinc-800">

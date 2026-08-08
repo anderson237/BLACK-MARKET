@@ -65,6 +65,13 @@ const detailOrder = ref<any>(null)
 onMounted(() => {
   store.loadOrders()
   adminChat.load()
+  // Deep-link: /admin/orders#corbeille (sidebar & dashboard trash links) scrolls
+  // straight to the trash section.
+  if (window.location.hash === '#corbeille') {
+    setTimeout(() => {
+      document.getElementById('corbeille')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 150)
+  }
 })
 
 // Chat helpers (ST-012) — thread unread per order + reply from the detail modal.
@@ -296,7 +303,7 @@ function cleanPhone(p: string) {
     </div>
 
     <!-- Trash (soft-deleted orders) -->
-    <div v-if="store.trashOrders.length" class="mt-6 bg-[#12121a] border border-zinc-800 rounded-2xl overflow-hidden">
+    <div id="corbeille" v-if="store.trashOrders.length" class="mt-6 bg-[#12121a] border border-zinc-800 rounded-2xl overflow-hidden scroll-mt-24">
       <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-zinc-800">
         <div class="flex items-center gap-2">
           <AppIcon name="trash" :size="14" class="text-red-400" />

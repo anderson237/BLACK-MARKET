@@ -280,6 +280,11 @@ export const useAdminStore = defineStore('admin', () => {
     orders.value = orders.value.filter((o) => o.id !== id)
     if (trashed && order) {
       trashOrders.value.unshift({ ...order, deleted: true, deletedAt: new Date().toISOString() })
+    } else if (trashed) {
+      // The local list was stale/not loaded (e.g. trash action from the
+      // dashboard before /api/orders was fetched) — re-sync both lists from
+      // the server so the trash stays visible.
+      await loadOrders().catch(() => {})
     }
     // Keep the dashboard KPI (Commandes / Revenu) in sync right away, not only
     // on the 12s timer or the intra-instance SSE push.
