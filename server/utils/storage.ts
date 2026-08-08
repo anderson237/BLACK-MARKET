@@ -721,8 +721,16 @@ export async function pushEvent(ev: MarketEvent): Promise<void> {
     await mutateSocial((social) => {
       const pid = ev.productId || 'global'
       const uid = ev.userId || ''
-      const cur = social.likes[pid] || 0
-      social.likes[pid] = Math.max(0, cur + (ev.type === 'like' ? 1 : -1))
+      // Idempotent per user: a "like" from someone who already liked must not
+      // bump the counter twice (this happens on client re-sync after a dropped
+      // POST, or a double-tap). Same for unlike. Anonymous events (no uid) keep
+      // the raw +/- 1 behaviour.
+      const already = uid ? (social.likedBy[pid] || []).includes(uid) : false
+      if (ev.type === 'like') {
+        if (!already) social.likes[pid] = Math.max(0, (social.likes[pid] || 0) + 1)
+      } else {
+        if (already) social.likes[pid] = Math.max(0, (social.likes[pid] || 0) - 1)
+      }
       // Keep the per-product and per-user like index in sync so every screen
       // (product likes, "plus aimés", client space) derives from the SAME data.
       if (uid) {

@@ -1,6 +1,7 @@
 import crypto from 'node:crypto'
 import { addComment } from '~~/server/utils/storage'
 import { requireAuth, rateLimit } from '~~/server/utils/auth'
+import { publishSiteUpdate } from '~~/server/utils/realtime'
 
 export default defineEventHandler(async (event) => {
   const session = await requireAuth(event)
@@ -20,5 +21,6 @@ export default defineEventHandler(async (event) => {
     text,
     createdAt: new Date().toISOString(),
   })
+  publishSiteUpdate('catalog')
   return { success: true, comment }
 })

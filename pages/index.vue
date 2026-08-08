@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { useCatalogStore } from '~/stores/catalog'
+import { useInteractionsStore } from '~/stores/interactions'
+import { useCommentsStore } from '~/stores/comments'
 
 definePageMeta({ layout: 'default' })
 
@@ -53,7 +55,18 @@ const onIntersect = (entries: IntersectionObserverEntry[]) => {
 // push can be missed when the mutation lands on a different Lambda instance.
 function onSiteEvent(e: Event) {
   const detail = (e as CustomEvent).detail
-  if (detail?.kind === 'catalog') store.refresh()
+  if (detail?.kind === 'catalog') {
+    store.refresh()
+    // Like/unlike/comment pushes also arrive as kind 'catalog': refresh the
+    // live interaction counters (heart count, comment count, glow state)
+    // without waiting for the poll, exactly like the chat updates in real time.
+    const inter = useInteractionsStore()
+    const comments = useCommentsStore()
+    for (const p of store.items) {
+      inter.refreshCount(p.id).catch(() => {})
+      comments.refresh(p.id).catch(() => {})
+    }
+  }
 }
 
 let catalogPoll: ReturnType<typeof setInterval> | null = null

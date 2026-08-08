@@ -1,5 +1,6 @@
 import { pushEvent, findAccount } from '~~/server/utils/storage'
 import { rateLimit, clientIP, verifyToken, extractToken } from '~~/server/utils/auth'
+import { publishSiteUpdate } from '~~/server/utils/realtime'
 
 export default defineEventHandler(async (event) => {
   rateLimit(300, 60_000)(event)
@@ -41,5 +42,12 @@ export default defineEventHandler(async (event) => {
     city: body?.city ? String(body.city).slice(0, 120) : undefined,
     region: body?.region ? String(body.region).slice(0, 120) : undefined,
   })
+  // Real-time: a like/unlike must reach every open page instantly, exactly like
+  // chat messages (publishSiteUpdate -> SSE 'site' -> client bm:site event ->
+  // product cards refresh their counters). Without this push the counter only
+  // moves on the liking device or after the 30s/60s fallback poll.
+  if (type === 'like' || type === 'unlike' || type === 'comment') {
+    publishSiteUpdate('catalog')
+  }
   return { success: true }
 })

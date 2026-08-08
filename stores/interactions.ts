@@ -81,11 +81,25 @@ export const useInteractionsStore = defineStore('interactions', () => {
           // if the like POST was dropped (blob contention, refresh right after
           // the click…) the server would answer liked:false and switching the
           // button off on every reload would break the expected persistence.
-          const liked = data?.liked === true || likedSet.value.has(id)
+          const localLiked = likedSet.value.has(id)
+          const liked = data?.liked === true || localLiked
           likes.value[id] = { liked, count }
           if (liked) likedSet.value.add(id)
           else likedSet.value.delete(id)
           persist()
+          // Repair a dropped like: the visitor DID like (local memory) but the
+          // server doesn't know yet (the /api/events POST never landed, e.g.
+          // reload right after the click). Re-send it — the server is now
+          // idempotent per user so this can never double-count. Only when a
+          // session exists, otherwise the server can't attribute the like.
+          if (localLiked && data?.liked !== true && auth.token) {
+            await fetch('/api/events', {
+              method: 'POST',
+              headers: { ...headers, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ type: 'like', productId: id, url: window.location.pathname }),
+              keepalive: true,
+            }).catch(() => {})
+          }
         }
       }
     } catch {
