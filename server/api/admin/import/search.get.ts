@@ -65,14 +65,19 @@ function applyClientSort(items: any[], sort: string): any[] {
 }
 
 // Admin-side filters applied on the fetched items (prices in FCFA — the
-// converted priceXof; sales / rating are the platform signals). Filters run
-// BEFORE the limit truncation so "give me 10 with filters" returns 10 filtered
-// products when available, and the max available otherwise.
+// converted priceXof; priceSource in the platform source currency ¥/$/€;
+// sales / rating are the platform signals; bestSellersOnly keeps items flagged
+// is_best_seller by the platform — currently Amazon). Filters run BEFORE the
+// limit truncation so "give me 10 with filters" returns 10 filtered products
+// when available, and the max available otherwise.
 interface SearchFilters {
   priceMin: number
   priceMax: number
+  priceSourceMin: number
+  priceSourceMax: number
   salesMin: number
   ratingMin: number
+  bestSellersOnly: boolean
   limit: number
 }
 
@@ -80,8 +85,11 @@ function applyFilters(items: any[], o: SearchFilters): any[] {
   let list = items
   if (o.priceMin) list = list.filter((i) => (i?.priceXof || 0) >= o.priceMin)
   if (o.priceMax) list = list.filter((i) => (i?.priceXof || 0) <= o.priceMax)
+  if (o.priceSourceMin) list = list.filter((i) => (i?.price || 0) >= o.priceSourceMin)
+  if (o.priceSourceMax) list = list.filter((i) => (i?.price || 0) <= o.priceSourceMax)
   if (o.salesMin) list = list.filter((i) => (i?.sales || 0) >= o.salesMin)
   if (o.ratingMin) list = list.filter((i) => (i?.rating || 0) >= o.ratingMin)
+  if (o.bestSellersOnly) list = list.filter((i) => i?.isBestSeller === true)
   return o.limit ? list.slice(0, o.limit) : list
 }
 
@@ -105,10 +113,13 @@ export default defineEventHandler(async (event) => {
   const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(100, Math.floor(limitRaw)) : 0
   const priceMin = Number(q?.priceMin) > 0 ? Number(q?.priceMin) : 0
   const priceMax = Number(q?.priceMax) > 0 ? Number(q?.priceMax) : 0
+  const priceSourceMin = Number(q?.priceSourceMin) > 0 ? Number(q?.priceSourceMin) : 0
+  const priceSourceMax = Number(q?.priceSourceMax) > 0 ? Number(q?.priceSourceMax) : 0
   const salesMin = Number(q?.salesMin) > 0 ? Number(q?.salesMin) : 0
   const ratingMin = Number(q?.ratingMin) > 0 ? Number(q?.ratingMin) : 0
-  const hasFilters = !!(priceMin || priceMax || salesMin || ratingMin)
-  const filters: SearchFilters = { priceMin, priceMax, salesMin, ratingMin, limit }
+  const bestSellersOnly = String(q?.bestSellersOnly || '') === '1'
+  const hasFilters = !!(priceMin || priceMax || priceSourceMin || priceSourceMax || salesMin || ratingMin || bestSellersOnly)
+  const filters: SearchFilters = { priceMin, priceMax, priceSourceMin, priceSourceMax, salesMin, ratingMin, bestSellersOnly, limit }
   const fetchLimit = limit ? (hasFilters ? Math.min(100, limit * 3) : limit) : 0
   const need = limit ? (hasFilters ? Math.min(100, limit * 3) : limit) : 0
 

@@ -29,6 +29,23 @@ export interface Product {
   stockStatus?: 'in_stock' | 'preorder'
   stockQuantity?: number
   moq?: number
+  /** Fournisseur (import ST-017) — affiché en « Fiche vendeur » sur la fiche
+   * produit publique quand au moins un champ est renseigné (optionnel). */
+  sourcePriceTiers?: { quantity: string; value: string }[]
+  sourceStock?: number
+  supplierContact?: {
+    platform?: string
+    sourceId?: string
+    sellerName?: string
+    country?: string
+    wechat?: string
+    email?: string
+    whatsapp?: string
+    phone?: string
+    website?: string
+    note?: string
+    updatedAt?: string
+  }
   deleted?: boolean
   deletedAt?: string
   createdAt: string

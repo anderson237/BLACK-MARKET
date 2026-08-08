@@ -128,6 +128,21 @@ const media = computed<{ type: 'image' | 'video'; src: string }[]>(() => {
 
 const current = ref(0)
 
+// ---- Fiche vendeur (optionnelle) : contacts fournisseur du produit importé.
+// Affichée uniquement si au moins un champ est renseigné.
+const supplierInfo = computed(() => {
+  const c = (product.value as Product | null)?.supplierContact
+  if (!c || typeof c !== 'object') return null
+  const keys = ['sellerName', 'country', 'wechat', 'email', 'whatsapp', 'phone', 'website', 'note'] as const
+  const has = keys.some((k) => String((c as any)[k] || '').trim())
+  return has ? (c as any) : null
+})
+
+function waLink(phone: string): string {
+  const digits = String(phone).replace(/[^0-9]/g, '')
+  return digits ? `https://wa.me/${digits}` : ''
+}
+
 // ---- Promo : réduction, prix barré et compte à rebours ----
 const pct = computed(() => promoPercent(product.value || {}))
 const discountPrice = computed(() => promoPrice(product.value || {}))
@@ -266,6 +281,21 @@ const techHtml = computed(() => sanitizeHtml(product.value?.originalDescription 
           <span v-if="Number(product.stockQuantity) > 0" class="inline-flex items-center gap-1.5 text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-3 py-1.5">
             <AppIcon name="box" :size="13" /> {{ product.stockQuantity }} unité(s) en stock
           </span>
+        </div>
+
+        <!-- Fiche vendeur (optionnelle) : contacts fournisseur renseignés à l'import -->
+        <div v-if="supplierInfo" class="border border-zinc-800 rounded-xl p-4 bg-black/30 space-y-2">
+          <p class="text-[9px] text-[#ff2a2a] font-mono uppercase font-bold tracking-wider">FICHE VENDEUR</p>
+          <p v-if="supplierInfo.sellerName" class="text-sm font-bold text-slate-100">{{ supplierInfo.sellerName }}</p>
+          <div class="grid grid-cols-1 gap-1.5 text-xs text-zinc-300 [&_a]:text-sky-400 [&_a:hover]:underline">
+            <p v-if="supplierInfo.country">📍 {{ supplierInfo.country }}</p>
+            <a v-if="supplierInfo.phone" :href="`tel:${supplierInfo.phone}`">📞 {{ supplierInfo.phone }}</a>
+            <a v-if="supplierInfo.whatsapp" :href="waLink(supplierInfo.whatsapp)" target="_blank" rel="noopener">💬 WhatsApp : {{ supplierInfo.whatsapp }}</a>
+            <p v-if="supplierInfo.wechat">💬 WeChat : {{ supplierInfo.wechat }}</p>
+            <a v-if="supplierInfo.email" :href="`mailto:${supplierInfo.email}`">✉️ {{ supplierInfo.email }}</a>
+            <a v-if="supplierInfo.website" :href="supplierInfo.website" target="_blank" rel="noopener">🌐 {{ supplierInfo.website }}</a>
+            <p v-if="supplierInfo.note" class="text-zinc-400 whitespace-pre-line">{{ supplierInfo.note }}</p>
+          </div>
         </div>
 
         <div class="space-y-2">

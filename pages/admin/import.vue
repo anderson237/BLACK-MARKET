@@ -83,9 +83,20 @@ const cached = ref(false) // true when the results came from the history cache
 const limit = ref<any>(10)
 const priceMin = ref<any>(null)
 const priceMax = ref<any>(null)
+const priceSourceMin = ref<any>(null)
+const priceSourceMax = ref<any>(null)
 const salesMin = ref<any>(null)
 const ratingMin = ref<any>(null)
+const bestSellersOnly = ref(false)
 const LIMIT_PRESETS = [10, 20, 30, 50]
+
+// Source currency symbol for the platform currently selected (the "prix
+// source" filters apply on the raw platform price ¥ / $ / €).
+const sourceCur = computed(() => {
+  const p = platform.value
+  if (p === 'amazon' || p === 'tiktok-shop') return region.value === 'FR' ? '€' : '$'
+  return '¥'
+})
 
 const curPlatform = computed(() => PLATFORMS.find((p) => p.id === platform.value) || PLATFORMS[0])
 const platformSorts = computed(() => SORTS[platform.value] || [])
@@ -132,7 +143,7 @@ const transportConfig = ref<any>(null)
 const transportTab = ref(false)
 
 // Supplier contact (manual capture in the draft modal, server-stored)
-const supplierContact = ref<any>({ wechat: '', email: '', whatsapp: '', phone: '', website: '', note: '' })
+const supplierContact = ref<any>({ sellerName: '', country: '', wechat: '', email: '', whatsapp: '', phone: '', website: '', note: '' })
 const supplierSaved = ref(false)
 
 function sellerUrl(item: any): string {
@@ -234,8 +245,11 @@ async function doSearch(reset = true, fresh = false) {
         limit: Math.max(1, Math.min(100, Number(limit.value) || 10)),
         priceMin: Number(priceMin.value) > 0 ? priceMin.value : 0,
         priceMax: Number(priceMax.value) > 0 ? priceMax.value : 0,
+        priceSourceMin: Number(priceSourceMin.value) > 0 ? priceSourceMin.value : 0,
+        priceSourceMax: Number(priceSourceMax.value) > 0 ? priceSourceMax.value : 0,
         salesMin: Number(salesMin.value) > 0 ? salesMin.value : 0,
         ratingMin: Number(ratingMin.value) > 0 ? ratingMin.value : 0,
+        bestSellersOnly: bestSellersOnly.value ? 1 : 0,
       },
     })
     results.value = (res as any).items || []
@@ -281,7 +295,7 @@ async function openDraft(item: any) {
     publishPriceXof.value = d.priceXof || 0
     publishFeatures.value = Array.isArray(d.features) ? d.features.map((f: any) => f.value || f) : []
     publishCategory.value = ''
-    supplierContact.value = d.supplierContact || { wechat: '', email: '', whatsapp: '', phone: '', website: '', note: '' }
+    supplierContact.value = d.supplierContact || { sellerName: '', country: '', wechat: '', email: '', whatsapp: '', phone: '', website: '', note: '' }
     supplierSaved.value = false
   } catch (e: any) {
     publishError.value = e?.data?.statusMessage || e?.message || 'Erreur d\u2019import du produit'
@@ -585,6 +599,14 @@ onMounted(() => {
             <input v-model.number="priceMax" type="number" min="0" placeholder="—" class="w-24 bg-black/40 border border-zinc-800 rounded px-1.5 py-1 text-[11px] font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-[#ff2a2a]/60" />
           </label>
           <label class="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400">
+            Prix src min ({{ sourceCur }})
+            <input v-model.number="priceSourceMin" type="number" min="0" placeholder="—" class="w-20 bg-black/40 border border-zinc-800 rounded px-1.5 py-1 text-[11px] font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-[#ff2a2a]/60" />
+          </label>
+          <label class="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400">
+            Prix src max ({{ sourceCur }})
+            <input v-model.number="priceSourceMax" type="number" min="0" placeholder="—" class="w-20 bg-black/40 border border-zinc-800 rounded px-1.5 py-1 text-[11px] font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-[#ff2a2a]/60" />
+          </label>
+          <label class="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400">
             Ventes min
             <input v-model.number="salesMin" type="number" min="0" placeholder="—" class="w-20 bg-black/40 border border-zinc-800 rounded px-1.5 py-1 text-[11px] font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-[#ff2a2a]/60" />
           </label>
@@ -593,8 +615,13 @@ onMounted(() => {
             <input v-model.number="ratingMin" type="number" min="0" max="5" step="0.1" placeholder="—" class="w-16 bg-black/40 border border-zinc-800 rounded px-1.5 py-1 text-[11px] font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-[#ff2a2a]/60" />
           </label>
           <button
-            v-if="priceMin || priceMax || salesMin || ratingMin"
-            @click="priceMin = null; priceMax = null; salesMin = null; ratingMin = null"
+            @click="bestSellersOnly = !bestSellersOnly"
+            :class="bestSellersOnly ? 'bg-amber-500/20 text-amber-400 border-amber-500/50' : 'text-zinc-400 border-zinc-800 hover:text-white'"
+            class="px-2.5 py-1 rounded-md border text-[10px] font-mono font-bold transition-all"
+          >🔥 BEST uniquement</button>
+          <button
+            v-if="priceMin || priceMax || priceSourceMin || priceSourceMax || salesMin || ratingMin || bestSellersOnly"
+            @click="priceMin = null; priceMax = null; priceSourceMin = null; priceSourceMax = null; salesMin = null; ratingMin = null; bestSellersOnly = false"
             class="px-2 py-1 rounded-md border border-zinc-800 text-[10px] font-mono text-zinc-400 hover:text-white transition-all"
           >✕ Effacer les filtres</button>
           <span v-if="results.length" class="text-[10px] font-mono text-zinc-500 ml-auto">{{ results.length }} résultat(s)</span>
@@ -774,6 +801,14 @@ onMounted(() => {
               <button @click="saveSupplierContact" class="text-[10px] font-mono text-emerald-400 hover:text-emerald-300">💾 Enregistrer</button>
             </div>
             <div class="grid grid-cols-2 gap-2">
+              <label class="flex flex-col gap-0.5 text-[9px] font-mono text-zinc-500">
+                Fournisseur
+                <input v-model.trim="supplierContact.sellerName" placeholder="Nom du fournisseur" class="bg-black/40 border border-zinc-800 rounded px-2 py-1 text-[11px] text-white focus:outline-none focus:border-[#ff2a2a]/60" />
+              </label>
+              <label class="flex flex-col gap-0.5 text-[9px] font-mono text-zinc-500">
+                Pays
+                <input v-model.trim="supplierContact.country" placeholder="Chine, Turquie…" class="bg-black/40 border border-zinc-800 rounded px-2 py-1 text-[11px] text-white focus:outline-none focus:border-[#ff2a2a]/60" />
+              </label>
               <label class="flex flex-col gap-0.5 text-[9px] font-mono text-zinc-500">
                 WeChat
                 <input v-model.trim="supplierContact.wechat" placeholder="ID WeChat" class="bg-black/40 border border-zinc-800 rounded px-2 py-1 text-[11px] text-white focus:outline-none focus:border-[#ff2a2a]/60" />

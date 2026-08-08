@@ -1339,6 +1339,8 @@ export async function deleteImportSearch(key: string): Promise<ImportSearchEntry
 export interface SupplierContact {
   platform: string
   sourceId: string
+  sellerName?: string     // supplier / seller name
+  country?: string        // supplier country
   wechat?: string
   email?: string
   whatsapp?: string
