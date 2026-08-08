@@ -33,7 +33,8 @@
 ## Historique des deploys
 
 | Date | Deploy URL | Contenu |
-| 2026-08-08 | *(deploy en cours)* | ST-017 : tris universels prix ↑/↓ + 🔥 Produits du moment (ventes) + ⭐ Top note pour TikTok Shop / Douyin / 1688 (tri client-side, l'API n'expose pas de tri), libellés SORTS harmonisés Taobao/Amazon (valeurs API inchangées) (build Nuxt) |
+| 2026-08-08 | *(deploy en cours)* | ST-017 : **nombre de résultats configurable (10/20/30/50/custom, 1-100)** — pagination multi-pages côté serveur (10 pages max, pageToken TikTok, dédup par sourceId, max dispo si solde/limite API insuffisant) + **filtres prix min/max FCFA, ventes min, note min** appliqués avant la troncature (cache réutilisable, `extra` retiré des résultats → cache allégé) (build Nuxt) |
+| 2026-08-08 | 6a77769f1830de2889e19acd | ST-017 : tris universels prix ↑/↓ + 🔥 Produits du moment (ventes) + ⭐ Top note pour TikTok Shop / Douyin / 1688 (tri client-side, l'API n'expose pas de tri), libellés SORTS harmonisés Taobao/Amazon (valeurs API inchangées) (build Nuxt) |
 | 2026-08-08 | 6a7772e6dc70690ae2e772f2 | ST-017 : MOQ + barème 1688, stock Taobao, contacts fournisseurs (blob bm-supplier-contacts, option 3), bouton fiche vendeur, suppression individuelle historique, réordonnancement accessoires (build Nuxt) |
 | 2026-08-08 | 6a776dcdb2499cde21e8bf73 | ST-017 : fix images CDN anti-hotlink (referrerpolicy no-referrer) + fix inputs transport débordants (w-full min-w-0) (build Nuxt) |
 | 2026-08-08 | 6a776a86ced1266aa4f8cd67 | ST-017 : impl multi-plateforme (cycle 2) — justone.ts 6 plateformes (Xianyu/1688/Taobao/TikTok/Amazon/Douyin), région US/FR + fallback TikTok FR→US, taux EUR 655,957 fixe + USD 700 configurable, tris + métriques trending UI (build Nuxt) |

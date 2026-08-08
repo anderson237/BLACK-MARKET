@@ -202,7 +202,6 @@ function flattenXianyuSearch(json: any): JoSearchItem[] {
       area: String(ex?.area || ''),
       sellerNick: String(ex?.userNick || ex?.userNickName || ''),
       sourceUrl: targetUrl,
-      extra: { ex },
     })
   }
   return out
@@ -277,7 +276,6 @@ function flatten1688Search(json: any): JoSearchItem[] {
       sales: Number(d?.saleCount) || undefined,
       moq: tiers.length ? parseMoq(tiers[0].quantity) : undefined,
       priceTiers: tiers.length ? tiers : undefined,
-      extra: { d },
     })
   }
   return out
@@ -353,7 +351,6 @@ function flattenTaobaoSearch(json: any): JoSearchItem[] {
       shopName: String(d?.shopName || ''),
       shopId: String(d?.shopId || ''),
       stock: Number(d?.frontStock) > 0 ? Number(d.frontStock) : undefined,
-      extra: { d },
     })
   }
   return out
@@ -426,7 +423,6 @@ function flattenTikTokSearch(json: any): JoSearchItem[] {
       ratingCount: Number(p?.rate_info?.review_count) || undefined,
       shopName: String(p?.seller_info?.shop_name || ''),
       sellerNick: String(p?.seller_info?.shop_name || ''),
-      extra: { p },
     })
   }
   return out
@@ -509,7 +505,6 @@ function flattenAmazonSearch(json: any): JoSearchItem[] {
       isBestSeller: Boolean(p?.is_best_seller),
       isAmazonChoice: Boolean(p?.is_amazon_choice),
       sellerNick: String(p?.product_num_offers ? `${p.product_num_offers} offre(s)` : ''),
-      extra: { p },
     })
   }
   return out
@@ -571,7 +566,6 @@ function flattenDouyinSearch(json: any): JoSearchItem[] {
       rating: Number(pi?.good_ratio?.origin) || undefined, // % of good ratio
       shopName: String(bm?.shop_info?.shop_name || ''),
       sellerNick: String(bm?.shop_info?.shop_name || ''),
-      extra: { p, saleAxis: pi?.sale_axis || [] },
     })
   }
   return out
@@ -609,53 +603,117 @@ function flattenDouyinDetail(json: any): JoDetail | null {
 // Public API — search & detail across all platforms.
 // ---------------------------------------------------------------------------
 
+// Max API pages fetched when the admin asks for a higher result count (limit).
+// Each page costs one paid API call, so we cap the loop (10 pages ≈ up to
+// 100 results on Taobao/TikTok, 480 on Amazon). Iteration stops earlier when
+// the platform returns fewer items, has_more=false, or the balance runs out.
+const MAX_SEARCH_PAGES = 10
+
+// One API call for one page. TikTok paginates via pageToken (returned in
+// load_more_params) — we surface it so the caller can continue the loop.
+interface JoSearchPage {
+  items: JoSearchItem[]
+  pageToken?: string
+  hasMore?: boolean
+}
+
+async function joSearchPage(
+  platform: JoPlatform,
+  keyword: string,
+  page: number,
+  sort: string,
+  region: string,
+  pageToken?: string,
+): Promise<JoSearchPage> {
+  let json: any
+  switch (platform) {
+    case 'xianyu':
+      json = await joGet<any>('/api/xianyu/search-item-list/v1', { keyword, page: String(page), sort: sort || 'active' })
+      return { items: flattenXianyuSearch(json) }
+    case '1688': {
+      json = await joGet<any>('/api/1688/search-item-list/v1', { keyword, page: String(page) })
+      return { items: flatten1688Search(json) }
+    }
+    case 'taobao': {
+      json = await joGet<any>('/api/taobao/search-item-list/v1', { keyword, page: String(page), sort: sort || '_sale' })
+      return { items: flattenTaobaoSearch(json) }
+    }
+    case 'tiktok-shop': {
+      // Region US default (FR possible). On a repeated 301/302 the joGet retry
+      // loop already kicked in; if the caller passed FR and still failed we
+      // fall back to US below (done in the route via the fallback param).
+      const params: Record<string, string> = { keyword, region, offset: String((page - 1) * 20) }
+      if (pageToken) params.pageToken = pageToken
+      json = await joGet<any>('/api/tiktok-shop/search-products/v1', params)
+      const data = json?.data?.data || json?.data || {}
+      return {
+        items: flattenTikTokSearch(json),
+        pageToken: String(data?.load_more_params?.page_token || '') || undefined,
+        hasMore: Boolean(data?.has_more),
+      }
+    }
+    case 'amazon': {
+      json = await joGet<any>('/api/amazon/search-products/v1', {
+        keyword,
+        country: region,
+        sortBy: sort || 'RELEVANCE',
+        page: String(page),
+      })
+      return { items: flattenAmazonSearch(json) }
+    }
+    case 'douyin-ec': {
+      json = await joGet<any>('/api/douyin-ec/search-item-list/v1', { keyword, page: String(page) })
+      return { items: flattenDouyinSearch(json) }
+    }
+    default:
+      throw createError({ statusCode: 400, statusMessage: `Plateforme inconnue: ${platform}` })
+  }
+}
+
 export async function joSearch(
   platform: JoPlatform,
   keyword: string,
   page = 1,
   sort: string = '',
   region: string = 'US',
+  limit?: number,
 ): Promise<JoSearchItem[]> {
-  switch (platform) {
-    case 'xianyu': {
-      const json = await joGet<any>('/api/xianyu/search-item-list/v1', { keyword, page: String(page), sort: sort || 'active' })
-      return flattenXianyuSearch(json)
+  const seen = new Set<string>()
+  const all: JoSearchItem[] = []
+  const startPage = Math.max(1, page)
+  let curPage = startPage
+  let pageToken: string | undefined
+  let hasMore = true
+
+  for (let iter = 0; iter < MAX_SEARCH_PAGES && hasMore; iter++) {
+    let res: JoSearchPage
+    try {
+      res = await joSearchPage(platform, keyword, curPage, sort, region, pageToken)
+    } catch (err) {
+      // A later page failed (601 balance / 303 quota / transient): return what
+      // we already have instead of failing the whole search — the result count
+      // is then "max available" for the current balance.
+      if (all.length > 0) break
+      throw err
     }
-    case '1688': {
-      const json = await joGet<any>('/api/1688/search-item-list/v1', { keyword, page: String(page) })
-      return flatten1688Search(json)
+    for (const it of res.items) {
+      if (!seen.has(it.sourceId)) {
+        seen.add(it.sourceId)
+        all.push(it)
+      }
     }
-    case 'taobao': {
-      const json = await joGet<any>('/api/taobao/search-item-list/v1', { keyword, page: String(page), sort: sort || '_sale' })
-      return flattenTaobaoSearch(json)
+    if (limit && all.length >= limit) break
+    if (res.items.length === 0) break
+    if (res.hasMore === false) break
+    if (platform === 'tiktok-shop') {
+      if (!res.pageToken) break // TikTok only paginates through pageToken
+      pageToken = res.pageToken
     }
-    case 'tiktok-shop': {
-      // Region US default (FR possible). On a repeated 301/302 the joGet retry
-      // loop already kicked in; if the caller passed FR and still failed we
-      // fall back to US below (done in the route via the fallback param).
-      const json = await joGet<any>('/api/tiktok-shop/search-products/v1', {
-        keyword,
-        region,
-        offset: String((page - 1) * 20),
-      })
-      return flattenTikTokSearch(json)
-    }
-    case 'amazon': {
-      const json = await joGet<any>('/api/amazon/search-products/v1', {
-        keyword,
-        country: region,
-        sortBy: sort || 'RELEVANCE',
-        page: String(page),
-      })
-      return flattenAmazonSearch(json)
-    }
-    case 'douyin-ec': {
-      const json = await joGet<any>('/api/douyin-ec/search-item-list/v1', { keyword, page: String(page) })
-      return flattenDouyinSearch(json)
-    }
-    default:
-      throw createError({ statusCode: 400, statusMessage: `Plateforme inconnue: ${platform}` })
+    curPage++
+    // Keep looping unless the platform explicitly said there is no more.
+    hasMore = true
   }
+  return limit ? all.slice(0, limit) : all
 }
 
 export async function joDetail(platform: JoPlatform, sourceId: string, region: string = 'US'): Promise<JoDetail> {

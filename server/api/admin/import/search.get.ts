@@ -64,6 +64,27 @@ function applyClientSort(items: any[], sort: string): any[] {
   }
 }
 
+// Admin-side filters applied on the fetched items (prices in FCFA — the
+// converted priceXof; sales / rating are the platform signals). Filters run
+// BEFORE the limit truncation so "give me 10 with filters" returns 10 filtered
+// products when available, and the max available otherwise.
+interface SearchFilters {
+  priceMin: number
+  priceMax: number
+  salesMin: number
+  ratingMin: number
+  limit: number
+}
+
+function applyFilters(items: any[], o: SearchFilters): any[] {
+  let list = items
+  if (o.priceMin) list = list.filter((i) => (i?.priceXof || 0) >= o.priceMin)
+  if (o.priceMax) list = list.filter((i) => (i?.priceXof || 0) <= o.priceMax)
+  if (o.salesMin) list = list.filter((i) => (i?.sales || 0) >= o.salesMin)
+  if (o.ratingMin) list = list.filter((i) => (i?.rating || 0) >= o.ratingMin)
+  return o.limit ? list.slice(0, o.limit) : list
+}
+
 export default defineEventHandler(async (event) => {
   const session = await requireAuth(event)
   if (session.role !== 'admin') throw createError({ statusCode: 403, statusMessage: 'Accès administrateur requis.' })
@@ -77,20 +98,36 @@ export default defineEventHandler(async (event) => {
   const region = String(q?.region || '').toUpperCase() === 'FR' ? 'FR' : 'US'
   const fresh = String(q?.fresh || '') === '1'
 
+  // Result count + filters (admin-controllable). limit=0 means "no cap" (the
+  // platform default per page). When filters are active we fetch up to 3× the
+  // requested count so the post-filter result can still reach `limit`.
+  const limitRaw = Number(q?.limit)
+  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(100, Math.floor(limitRaw)) : 0
+  const priceMin = Number(q?.priceMin) > 0 ? Number(q?.priceMin) : 0
+  const priceMax = Number(q?.priceMax) > 0 ? Number(q?.priceMax) : 0
+  const salesMin = Number(q?.salesMin) > 0 ? Number(q?.salesMin) : 0
+  const ratingMin = Number(q?.ratingMin) > 0 ? Number(q?.ratingMin) : 0
+  const hasFilters = !!(priceMin || priceMax || salesMin || ratingMin)
+  const filters: SearchFilters = { priceMin, priceMax, salesMin, ratingMin, limit }
+  const fetchLimit = limit ? (hasFilters ? Math.min(100, limit * 3) : limit) : 0
+  const need = limit ? (hasFilters ? Math.min(100, limit * 3) : limit) : 0
+
   const key = importHistoryKey(platform, keyword, sort, page, region)
 
   // 1) Cache hit (and the admin didn't force a fresh fetch) -> return stored
-  //    results without spending an API call.
+  //    results without spending an API call. The cache key does NOT include the
+  //    filters/limit so a previous larger search (≥ need items) is reused and
+  //    filtered locally; otherwise we fall through to a fresh API search.
   if (!fresh) {
     const cached = await getImportSearch(key)
-    if (cached) {
+    if (cached && cached.items.length >= need) {
       // Re-attach local market prices (table may have evolved since cache).
       const withLocal: any[] = []
       for (const item of cached.items) {
         const lp = await findLocalPrice(String(item.titleFr || item.title || ''), keyword)
         withLocal.push({ ...item, localPriceXof: lp ? lp.priceXof : undefined, localPriceLabel: lp ? lp.label : undefined })
       }
-      return { success: true, platform, keyword, page, region, cached: true, fromCache: true, items: withLocal }
+      return { success: true, platform, keyword, page, region, cached: true, fromCache: true, items: applyFilters(withLocal, filters) }
     }
   }
 
@@ -98,11 +135,11 @@ export default defineEventHandler(async (event) => {
   //    the FR collection keeps failing (301 COLLECT FAILED observed).
   let items
   try {
-    items = await joSearch(platform, keyword, page, sort, region)
+    items = await joSearch(platform, keyword, page, sort, region, fetchLimit)
   } catch (err: any) {
     if (platform === 'tiktok-shop' && region === 'FR') {
       console.warn('[import] TikTok FR failed, falling back to US:', err?.statusMessage || err?.message)
-      items = await joSearch(platform, keyword, page, sort, 'US')
+      items = await joSearch(platform, keyword, page, sort, 'US', fetchLimit)
     } else {
       throw err
     }
@@ -170,7 +207,12 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // 3) Persist for the history (cache).
+  // Apply the admin filters (prices FCFA / sales / rating) then the requested
+  // result count. The cache stores the FULL unfiltered page(s) so a later
+  // search with other filters can reuse it.
+  const filtered = applyFilters(out, filters)
+
+  // 3) Persist for the history (cache) — full page, before filters.
   await upsertImportSearch({
     key,
     platform,
@@ -182,5 +224,5 @@ export default defineEventHandler(async (event) => {
     updatedAt: new Date().toISOString(),
   })
 
-  return { success: true, platform, keyword, page, region, cached: false, items: out }
+  return { success: true, platform, keyword, page, region, cached: false, items: filtered }
 })

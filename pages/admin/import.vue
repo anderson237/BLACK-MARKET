@@ -78,6 +78,15 @@ const page = ref(1)
 const sort = ref('')
 const cached = ref(false) // true when the results came from the history cache
 
+// Result count + filters (applied server-side after the fetch).
+// Typed `any` because v-model.number yields '' when the field is cleared.
+const limit = ref<any>(10)
+const priceMin = ref<any>(null)
+const priceMax = ref<any>(null)
+const salesMin = ref<any>(null)
+const ratingMin = ref<any>(null)
+const LIMIT_PRESETS = [10, 20, 30, 50]
+
 const curPlatform = computed(() => PLATFORMS.find((p) => p.id === platform.value) || PLATFORMS[0])
 const platformSorts = computed(() => SORTS[platform.value] || [])
 const showsRegion = computed(() => REGION_PLATFORMS.has(platform.value))
@@ -215,7 +224,19 @@ async function doSearch(reset = true, fresh = false) {
     const res = await $fetch('/api/admin/import/search', {
       method: 'GET',
       headers: authHeaders(),
-      params: { platform: platform.value, keyword: k, page: page.value, sort: sort.value, region: region.value, fresh: fresh ? 1 : 0 },
+      params: {
+        platform: platform.value,
+        keyword: k,
+        page: page.value,
+        sort: sort.value,
+        region: region.value,
+        fresh: fresh ? 1 : 0,
+        limit: Math.max(1, Math.min(100, Number(limit.value) || 10)),
+        priceMin: Number(priceMin.value) > 0 ? priceMin.value : 0,
+        priceMax: Number(priceMax.value) > 0 ? priceMax.value : 0,
+        salesMin: Number(salesMin.value) > 0 ? salesMin.value : 0,
+        ratingMin: Number(ratingMin.value) > 0 ? ratingMin.value : 0,
+      },
     })
     results.value = (res as any).items || []
     cached.value = Boolean((res as any).cached)
@@ -517,6 +538,24 @@ onMounted(() => {
             <option value="" v-if="!platformSorts.some((s) => s.value === '')">Tri…</option>
             <option v-for="s in platformSorts" :key="s.value" :value="s.value">{{ s.label }}</option>
           </select>
+          <div class="flex items-center gap-1.5 bg-black/30 border border-zinc-800 rounded-lg px-2.5">
+            <span class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Résultats</span>
+            <button
+              v-for="n in LIMIT_PRESETS"
+              :key="n"
+              @click="limit = n"
+              class="px-1.5 py-2 text-[11px] font-mono font-bold"
+              :class="limit === n ? 'text-[#ff2a2a]' : 'text-zinc-500 hover:text-white'"
+            >{{ n }}</button>
+            <input
+              v-model.number="limit"
+              type="number"
+              min="1"
+              max="100"
+              title="Nombre de résultats (1-100)"
+              class="w-14 bg-black/40 border border-zinc-800 rounded px-1.5 py-1 text-[11px] font-mono text-white focus:outline-none focus:border-[#ff2a2a]/60"
+            />
+          </div>
           <button
             @click="doSearch(true)"
             :disabled="searching"
@@ -534,6 +573,31 @@ onMounted(() => {
             <span v-if="searching" class="w-3.5 h-3.5 border-2 border-emerald-500/40 border-t-emerald-400 rounded-full animate-spin" />
             Nouveautés depuis l'API
           </button>
+        </div>
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <span class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Filtres</span>
+          <label class="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400">
+            Prix min (FCFA)
+            <input v-model.number="priceMin" type="number" min="0" placeholder="—" class="w-24 bg-black/40 border border-zinc-800 rounded px-1.5 py-1 text-[11px] font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-[#ff2a2a]/60" />
+          </label>
+          <label class="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400">
+            Prix max (FCFA)
+            <input v-model.number="priceMax" type="number" min="0" placeholder="—" class="w-24 bg-black/40 border border-zinc-800 rounded px-1.5 py-1 text-[11px] font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-[#ff2a2a]/60" />
+          </label>
+          <label class="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400">
+            Ventes min
+            <input v-model.number="salesMin" type="number" min="0" placeholder="—" class="w-20 bg-black/40 border border-zinc-800 rounded px-1.5 py-1 text-[11px] font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-[#ff2a2a]/60" />
+          </label>
+          <label class="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400">
+            Note min (0-5)
+            <input v-model.number="ratingMin" type="number" min="0" max="5" step="0.1" placeholder="—" class="w-16 bg-black/40 border border-zinc-800 rounded px-1.5 py-1 text-[11px] font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-[#ff2a2a]/60" />
+          </label>
+          <button
+            v-if="priceMin || priceMax || salesMin || ratingMin"
+            @click="priceMin = null; priceMax = null; salesMin = null; ratingMin = null"
+            class="px-2 py-1 rounded-md border border-zinc-800 text-[10px] font-mono text-zinc-400 hover:text-white transition-all"
+          >✕ Effacer les filtres</button>
+          <span v-if="results.length" class="text-[10px] font-mono text-zinc-500 ml-auto">{{ results.length }} résultat(s)</span>
         </div>
         <p v-if="cached" class="text-[10px] font-mono text-emerald-500">💾 Résultats chargés depuis l'historique — aucun appel API facturé. Cliquez « Nouveautés depuis l'API » pour rafraîchir.</p>
         <p v-if="searchError" class="text-[11px] font-mono text-red-400">{{ searchError }}</p>
