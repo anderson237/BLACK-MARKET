@@ -5,23 +5,38 @@ import { loadProducts, saveProducts } from '~~/server/utils/storage'
 import { sanitizeProduct } from '~~/server/utils/product'
 import { publishSiteUpdate } from '~~/server/utils/realtime'
 import { getAI, geminiModel, geminiFallbackModel, generateContentWithRetry } from '~~/server/utils/ai'
-import { cnyToXof } from '~~/server/utils/justone'
+import { priceToXof, type JoPlatform } from '~~/server/utils/justone'
 
 // Admin import pipeline (ST-017) — publish step.
 // Body: {
-//   platform, sourceId, title, description, chineseDescription, priceCny?,
+//   platform, sourceId, title, description, chineseDescription, price?, currency?,
 //   imageUrl, gallery[], features[] (strings), category?
 // }
 // Optional AI enrichment (translate + sales pitch + price) runs when
 // `aiEnrich: true` and GEMINI_API_KEY is configured. Otherwise the payload
 // is published as-is (admin already typed the FR copy).
+const VALID_PLATFORMS = new Set<JoPlatform>(['xianyu', '1688', 'taobao', 'tiktok-shop', 'amazon', 'douyin-ec'])
+
+function platformLabel(p: string): string {
+  switch (p) {
+    case 'xianyu': return 'Xianyu (Goofish)'
+    case '1688': return '1688 (gros)'
+    case 'taobao': return 'Taobao / Tmall'
+    case 'tiktok-shop': return 'TikTok Shop'
+    case 'amazon': return 'Amazon'
+    case 'douyin-ec': return 'Douyin E-commerce'
+    default: return p
+  }
+}
+
 export default defineEventHandler(async (event) => {
   const session = await requireAuth(event)
   if (session.role !== 'admin') throw createError({ statusCode: 403, statusMessage: 'Accès administrateur requis.' })
   const body = await readBody(event)
 
   const sourceId = String(body?.sourceId || '').trim()
-  const platform = body?.platform === '1688' ? '1688' : 'xianyu'
+  const rawPlatform = String(body?.platform || 'xianyu')
+  const platform: JoPlatform = VALID_PLATFORMS.has(rawPlatform as JoPlatform) ? (rawPlatform as JoPlatform) : 'xianyu'
   let title = String(body?.title || '').trim()
   let description = String(body?.description || '').trim()
   const chineseDescription = String(body?.chineseDescription || '').trim()
@@ -34,7 +49,9 @@ export default defineEventHandler(async (event) => {
     ? (body.features as unknown[]).map((f) => String(f).trim()).filter(Boolean).slice(0, 12)
     : []
   const category = String(body?.category || '').trim()
-  const priceCny = Number(body?.priceCny) || 0
+  const price = Number(body?.price) || 0
+  const currencyRaw = String(body?.currency || 'CNY').toUpperCase()
+  const currency = currencyRaw === 'EUR' ? 'EUR' : currencyRaw === 'USD' ? 'USD' : 'CNY'
   const aiEnrich = body?.aiEnrich === true
 
   if (!sourceId || !title) throw createError({ statusCode: 400, statusMessage: 'Identifiant source et titre requis.' })
@@ -49,15 +66,15 @@ export default defineEventHandler(async (event) => {
     const ai = getAI()
     if (!ai) throw createError({ statusCode: 503, statusMessage: "Le service d'IA n'est pas configuré (GEMINI_API_KEY manquante)." })
     const prompt = `
-Produit importé de ${platform === 'xianyu' ? 'Xianyu (Goofish)' : '1688'} — titre chinois : "${chineseTitle || title}".
-Description chinoise : "${chineseDescription || description}".
-Prix d'achat en RMB : ${priceCny || 'inconnu'} yuan.
+Produit importé de ${platformLabel(platform)} — titre source : "${chineseTitle || title}".
+Description source : "${chineseDescription || description}".
+Prix d'achat : ${price || 'inconnu'} ${currency}.
 Fais le travail suivant :
 1. Traduis le titre en français (titre commercial accrocheur, marché francophone/africain).
 2. Traduis/adapte la description en français de manière claire et fidèle.
 3. Rédige un argumentaire de vente premium en français (bénéfices clients, crédible).
 4. Extrais 3 à 5 caractéristiques techniques clés.
-5. Suggère un prix de vente EUR et XOF. Convertis le prix d'achat (1 RMB ≈ 95 XOF ≈ 0.14 EUR) et applique une marge d'importation réaliste (frais d'envoi 5-10 € / 3000-6000 XOF inclus).
+5. Suggère un prix de vente EUR et XOF. Convertis le prix d'achat (1 RMB ≈ 95 XOF, 1 EUR = 655.957 XOF, 1 USD ≈ 700 XOF) et applique une marge d'importation réaliste (frais d'envoi 5-10 € / 3000-6000 XOF inclus).
 Réponds strictement en JSON au schéma demandé.
 `
     const response = await generateContentWithRetry(
@@ -67,7 +84,7 @@ Réponds strictement en JSON au schéma demandé.
         contents: [{ text: prompt }],
         config: {
           systemInstruction:
-            "Tu es un assistant de commerce international expert en sourcing Chine (Taobao, 1688, Xianyu) et en copywriting e-commerce de précommande.",
+            "Tu es un assistant de commerce international expert en sourcing (Taobao, 1688, Xianyu, TikTok Shop, Amazon, Douyin) et en copywriting e-commerce de précommande.",
           temperature: 0.7,
           responseMimeType: 'application/json',
           responseSchema: {
@@ -101,9 +118,9 @@ Réponds strictement en JSON au schéma demandé.
     finalId = `${baseId}_${crypto.randomBytes(3).toString('hex')}`
   }
 
-  // Margin: if the admin kept the machine-computed price (cnyToXof applies the
-  // fixed 1 CNY = 95 XOF rate), the final display price keeps that value.
-  const computedXof = cnyToXof(priceCny)
+  // Margin: if the admin kept the machine-computed price (priceToXof applies
+  // the source-currency conversion), the final display price keeps that value.
+  const computedXof = priceToXof({ price, currency })
   const aiXof = Number(enriched?.priceXof) || 0
 
   const product = sanitizeProduct({
@@ -120,7 +137,7 @@ Réponds strictement en JSON au schéma demandé.
     features: Array.isArray(enriched?.features) && enriched.features.length ? enriched.features : features,
     priceEur: Math.round(Number(enriched?.priceEur) || (computedXof / 655.957) * 100) / 100,
     priceXof: Math.round(aiXof || computedXof),
-    sourceRmb: priceCny || undefined,
+    sourceRmb: price || undefined,
     createdAt: new Date().toISOString(),
   })
 

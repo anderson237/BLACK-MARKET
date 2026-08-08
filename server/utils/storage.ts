@@ -1254,11 +1254,12 @@ export async function mutatePayments<T>(
 // stored entry. The list is capped to avoid unbounded blob growth.
 // ---------------------------------------------------------------------------
 export interface ImportSearchEntry {
-  key: string // platform|keyword|sort|page
-  platform: 'xianyu' | '1688'
+  key: string // platform|region|keyword|sort|page
+  platform: string // 'xianyu' | '1688' | 'taobao' | 'tiktok-shop' | 'amazon' | 'douyin-ec'
   keyword: string
   sort: string
   page: number
+  region?: string // US | FR (tiktok-shop / amazon)
   items: any[] // flattened + translated search results (no raw API payload)
   updatedAt: string
 }
@@ -1287,8 +1288,8 @@ export async function loadImportHistory(): Promise<ImportSearchEntry[]> {
   return loadImportHistoryFile()
 }
 
-export function importHistoryKey(platform: string, keyword: string, sort: string, page: number): string {
-  return `${platform}|${String(keyword).toLowerCase().trim()}|${sort}|${page}`
+export function importHistoryKey(platform: string, keyword: string, sort: string, page: number, region?: string): string {
+  return `${platform}|${region || ''}|${String(keyword).toLowerCase().trim()}|${sort}|${page}`
 }
 
 /** Fetch one cached search entry by key (null when absent). */

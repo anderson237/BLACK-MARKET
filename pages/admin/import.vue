@@ -1,23 +1,76 @@
 <script setup lang="ts">
-// Admin import Xianyu / 1688 (ST-017)
+// Admin import multi-plateforme (ST-017)
 // 1. Search by keyword -> results list (cached in history, "Nouveautés API" refreshes)
 // 2. Click a result -> draft (full detail + gallery downloaded locally)
 // 3. Edit title/desc/price -> publish to catalog (optional Gemini enrichment)
-// 4. Prices: yuan (source) / CFA (conversion) / marché local (table, optional)
+// 4. Prices: source (¥/€/$) / CFA (conversion) / marché local (table, optional)
 // 5. Transport estimate (air ~10 000 CFA/kg, sea ~320 000 CFA/m³, emballage inclus)
+// 6. Trending signals: Amazon best-seller, Douyin ventes 30 j, Taobao ventes…
 definePageMeta({ layout: 'admin' })
 
 const config = useRuntimeConfig()
 const justoneEnabled = computed(() => Boolean(config.public.justoneEnabled))
 
-const platform = ref<'xianyu' | '1688'>('xianyu')
+const PLATFORMS = [
+  { id: 'xianyu', label: 'Xianyu (occase)', short: 'XY', color: 'text-[#ff2a2a]' },
+  { id: '1688', label: '1688 (gros)', short: '1688', color: 'text-sky-400' },
+  { id: 'taobao', label: 'Taobao / Tmall', short: 'TB', color: 'text-orange-400' },
+  { id: 'tiktok-shop', label: 'TikTok Shop', short: 'TT', color: 'text-fuchsia-400' },
+  { id: 'amazon', label: 'Amazon', short: 'AMZ', color: 'text-amber-400' },
+  { id: 'douyin-ec', label: 'Douyin', short: 'DY', color: 'text-emerald-400' },
+] as const
+type PlatformId = (typeof PLATFORMS)[number]['id']
+
+const REGION_PLATFORMS = new Set<PlatformId>(['tiktok-shop', 'amazon'])
+
+const SORTS: Record<string, { value: string; label: string }[]> = {
+  xianyu: [
+    { value: 'active', label: 'Tri : actifs' },
+    { value: 'recent', label: 'Tri : récents' },
+    { value: 'credit', label: 'Tri : crédit' },
+    { value: 'price_asc', label: 'Prix ↑' },
+    { value: 'price_desc', label: 'Prix ↓' },
+    { value: 'newest', label: 'Nouveautés' },
+  ],
+  taobao: [
+    { value: '_sale', label: 'Ventes' },
+    { value: '_bid', label: 'Prix décroissant' },
+    { value: 'bid', label: 'Prix croissant' },
+    { value: '_coefp', label: 'Général' },
+  ],
+  amazon: [
+    { value: 'RELEVANCE', label: 'Pertinence' },
+    { value: 'BEST_SELLERS', label: 'Meilleures ventes' },
+    { value: 'REVIEWS', label: 'Avis' },
+    { value: 'NEWEST', label: 'Nouveautés' },
+    { value: 'LOWEST_PRICE', label: 'Prix croissant' },
+    { value: 'HIGHEST_PRICE', label: 'Prix décroissant' },
+  ],
+}
+
+const platform = ref<PlatformId>('xianyu')
+const region = ref<'US' | 'FR'>('US')
 const keyword = ref('')
 const searching = ref(false)
 const searchError = ref('')
 const results = ref<any[]>([])
 const page = ref(1)
-const sort = ref('active')
+const sort = ref('')
 const cached = ref(false) // true when the results came from the history cache
+
+const curPlatform = computed(() => PLATFORMS.find((p) => p.id === platform.value) || PLATFORMS[0])
+const platformSorts = computed(() => SORTS[platform.value] || [])
+const showsRegion = computed(() => REGION_PLATFORMS.has(platform.value))
+
+function currencySymbol(cur?: string): string {
+  if (cur === 'EUR') return '€'
+  if (cur === 'USD') return '$'
+  return '¥'
+}
+
+function fmtPrice(item: any): string {
+  return `${currencySymbol(item.currency)}${item.price ?? item.priceCny ?? 0}`
+}
 
 // History (cached searches)
 const history = ref<any[]>([])
@@ -81,8 +134,9 @@ async function clearHistory() {
 function loadFromHistory(entry: any) {
   platform.value = entry.platform
   keyword.value = entry.keyword
-  sort.value = entry.sort
+  sort.value = entry.sort || ''
   page.value = entry.page
+  region.value = entry.region || 'US'
   results.value = entry.items || []
   cached.value = true
   searchError.value = ''
@@ -100,7 +154,7 @@ async function doSearch(reset = true, fresh = false) {
     const res = await $fetch('/api/admin/import/search', {
       method: 'GET',
       headers: authHeaders(),
-      params: { platform: platform.value, keyword: k, page: page.value, sort: sort.value, fresh: fresh ? 1 : 0 },
+      params: { platform: platform.value, keyword: k, page: page.value, sort: sort.value, region: region.value, fresh: fresh ? 1 : 0 },
     })
     results.value = (res as any).items || []
     cached.value = Boolean((res as any).cached)
@@ -136,7 +190,7 @@ async function openDraft(item: any) {
     const res = await $fetch('/api/admin/import/draft', {
       method: 'POST',
       headers: authHeaders(),
-      body: { platform: item.platform, sourceId: item.sourceId, titleFr: item.titleFr || '', keyword: keyword.value },
+      body: { platform: item.platform, sourceId: item.sourceId, titleFr: item.titleFr || '', keyword: keyword.value, region: region.value },
     })
     const d = (res as any).draft
     draft.value = d
@@ -180,7 +234,8 @@ async function doPublish() {
         description: publishDesc.value,
         chineseTitle: draft.value.chineseTitle,
         chineseDescription: draft.value.chineseDescription,
-        priceCny: draft.value.priceCny,
+        price: draft.value.price,
+        currency: draft.value.currency || 'CNY',
         imageUrl: draft.value.imageUrl,
         gallery: draft.value.gallery || [],
         features: publishFeatures.value.filter(Boolean),
@@ -272,7 +327,7 @@ async function saveTransportConfig() {
 }
 
 const meta = computed(() => ({
-  label: platform.value === 'xianyu' ? 'Xianyu (Goofish)' : '1688 (gros)',
+  label: curPlatform.value.label,
 }))
 
 function fmtXof(n: number): string {
@@ -315,8 +370,8 @@ onMounted(() => {
     <!-- Header -->
     <div class="flex items-center justify-between gap-3">
       <div>
-        <h1 class="text-lg font-extrabold font-mono uppercase tracking-widest text-white">Import Chine</h1>
-        <p class="text-[11px] font-mono text-zinc-500 mt-0.5">Xianyu (Goofish) + 1688 — recherche, aperçu, publication (ST-017)</p>
+        <h1 class="text-lg font-extrabold font-mono uppercase tracking-widest text-white">Import Multi-Plateforme</h1>
+        <p class="text-[11px] font-mono text-zinc-500 mt-0.5">Xianyu · 1688 · Taobao · TikTok Shop · Amazon · Douyin — recherche, aperçu, publication (ST-017)</p>
       </div>
       <div class="flex items-center gap-2">
         <span v-if="justoneEnabled" class="text-[10px] font-mono text-emerald-400 border border-emerald-500/30 px-2.5 py-1.5 rounded-lg">API connectée</span>
@@ -346,8 +401,9 @@ onMounted(() => {
             @click="loadFromHistory(h)"
             class="px-2.5 py-1.5 rounded-lg border border-zinc-800 text-[10px] font-mono text-zinc-300 hover:text-white hover:border-[#ff2a2a]/40 transition-all text-left"
           >
-            <span class="text-[#ff2a2a]">{{ h.platform === 'xianyu' ? 'XY' : '1688' }}</span> {{ h.keyword }}
+            <span class="text-[#ff2a2a]">{{ PLATFORMS.find((p) => p.id === h.platform)?.short || h.platform }}</span> {{ h.keyword }}
             <span class="text-zinc-600">p{{ h.page }}</span>
+            <span v-if="h.region" class="text-zinc-600">[{{ h.region }}]</span>
             <span class="text-zinc-600 ml-1">({{ (h.items || []).length }})</span>
           </button>
         </div>
@@ -357,31 +413,37 @@ onMounted(() => {
       <div class="border border-zinc-800 rounded-xl p-4 bg-[#0d0d14] space-y-3">
         <div class="flex flex-wrap gap-2">
           <button
-            @click="platform = 'xianyu'; results = []; page = 1"
+            v-for="p in PLATFORMS"
+            :key="p.id"
+            @click="platform = p.id; results = []; page = 1; sort = ''"
             class="px-3 py-2 rounded-lg text-[11px] font-mono font-bold uppercase tracking-wider border transition-all"
-            :class="platform === 'xianyu' ? 'bg-[#ff2a2a]/15 text-[#ff2a2a] border-[#ff2a2a]/40' : 'text-zinc-400 border-zinc-800 hover:text-white'"
-          >Xianyu (occase)</button>
-          <button
-            @click="platform = '1688'; results = []; page = 0"
-            class="px-3 py-2 rounded-lg text-[11px] font-mono font-bold uppercase tracking-wider border transition-all"
-            :class="platform === '1688' ? 'bg-[#ff2a2a]/15 text-[#ff2a2a] border-[#ff2a2a]/40' : 'text-zinc-400 border-zinc-800 hover:text-white'"
-          >1688 (gros)</button>
+            :class="platform === p.id ? 'bg-[#ff2a2a]/15 text-[#ff2a2a] border-[#ff2a2a]/40' : 'text-zinc-400 border-zinc-800 hover:text-white'"
+          >{{ p.label }}</button>
         </div>
         <div class="flex flex-wrap gap-2">
+          <div v-if="showsRegion" class="flex items-center gap-1.5 bg-black/30 border border-zinc-800 rounded-lg px-2.5">
+            <span class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Région</span>
+            <button
+              @click="region = 'US'"
+              class="px-2 py-2 text-[11px] font-mono font-bold"
+              :class="region === 'US' ? 'text-[#ff2a2a]' : 'text-zinc-500 hover:text-white'"
+            >US</button>
+            <button
+              @click="region = 'FR'"
+              class="px-2 py-2 text-[11px] font-mono font-bold"
+              :class="region === 'FR' ? 'text-[#ff2a2a]' : 'text-zinc-500 hover:text-white'"
+            >FR</button>
+          </div>
           <input
             v-model="keyword"
             @keyup.enter="doSearch(true)"
             placeholder="Mot-clé (ex: iphone, montre, sac…)"
             class="flex-1 min-w-[200px] bg-black/40 border border-zinc-800 rounded-lg px-3 py-2.5 text-[13px] text-white placeholder-zinc-600 focus:outline-none focus:border-[#ff2a2a]/60"
           />
-          <select v-if="platform === 'xianyu'" v-model="sort"
+          <select v-if="platformSorts.length" v-model="sort"
             class="bg-black/40 border border-zinc-800 rounded-lg px-2.5 py-2.5 text-[11px] font-mono text-slate-200 focus:outline-none focus:border-[#ff2a2a]/60 cursor-pointer">
-            <option value="active">Tri : actifs</option>
-            <option value="recent">Tri : récents</option>
-            <option value="credit">Tri : crédit</option>
-            <option value="price_asc">Prix ↑</option>
-            <option value="price_desc">Prix ↓</option>
-            <option value="newest">Nouveautés</option>
+            <option value="" v-if="!platformSorts.some((s) => s.value === '')">Tri…</option>
+            <option v-for="s in platformSorts" :key="s.value" :value="s.value">{{ s.label }}</option>
           </select>
           <button
             @click="doSearch(true)"
@@ -417,19 +479,26 @@ onMounted(() => {
               loading="lazy" />
             <div v-else class="absolute inset-0 grid place-items-center text-zinc-700 text-[10px] font-mono">no img</div>
             <span class="absolute top-2 left-2 text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-black/60 text-white backdrop-blur">
-              {{ item.platform === 'xianyu' ? 'XY' : '1688' }}
+              {{ PLATFORMS.find((p) => p.id === item.platform)?.short || item.platform }}
             </span>
-            <span v-if="item.priceCny" class="absolute bottom-2 right-2 text-[11px] font-mono font-bold text-[#ff2a2a] bg-black/60 backdrop-blur px-2 py-0.5 rounded-lg">
-              ¥{{ item.priceCny }}
+            <span v-if="item.isBestSeller" class="absolute top-2 right-2 text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/80 text-black font-bold">BEST</span>
+            <span v-if="item.price" class="absolute bottom-2 right-2 text-[11px] font-mono font-bold text-[#ff2a2a] bg-black/60 backdrop-blur px-2 py-0.5 rounded-lg">
+              {{ fmtPrice(item) }}
             </span>
           </div>
           <div class="p-3 flex flex-col gap-1.5 flex-1">
             <p class="text-[12px] text-zinc-200 line-clamp-2 min-h-[32px]">{{ item.titleFr || item.title }}</p>
             <div class="space-y-0.5">
-              <p class="text-[11px] font-mono text-zinc-400">¥{{ item.priceCny }} <span class="text-emerald-400">≈ {{ fmtXof(item.priceXof) }} FCFA</span></p>
+              <p class="text-[11px] font-mono text-zinc-400">{{ fmtPrice(item) }} <span class="text-emerald-400">≈ {{ fmtXof(item.priceXof) }} FCFA</span></p>
               <p v-if="item.localPriceXof" class="text-[11px] font-mono text-amber-400">🏷️ Marché local : {{ fmtXof(item.localPriceXof) }} FCFA</p>
+              <div v-if="item.sales || item.rating || item.isAmazonChoice" class="flex flex-wrap gap-1.5 pt-0.5">
+                <span v-if="item.sales" class="text-[10px] font-mono text-sky-400">🛒 {{ item.sales }} ventes</span>
+                <span v-if="item.rating" class="text-[10px] font-mono text-zinc-400">⭐ {{ Number(item.rating).toFixed(1) }}</span>
+                <span v-if="item.ratingCount" class="text-[10px] font-mono text-zinc-500">({{ item.ratingCount }})</span>
+                <span v-if="item.isAmazonChoice" class="text-[10px] font-mono text-emerald-400">🏆 Choix Amazon</span>
+              </div>
             </div>
-            <p v-if="item.area" class="text-[10px] font-mono text-zinc-500">📍 {{ item.area }}</p>
+            <p v-if="item.area || item.shopName" class="text-[10px] font-mono text-zinc-500">📍 {{ item.shopName || item.area }}</p>
             <button
               @click="draftMode = item; openDraft(item)"
               :disabled="drafting && draftMode === item"
@@ -496,9 +565,11 @@ onMounted(() => {
               </div>
               <div class="grid grid-cols-2 gap-2">
                 <div>
-                  <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Prix source (¥)</p>
-                  <input type="number" :value="draft.priceCny" disabled class="w-full bg-black/20 border border-zinc-800 rounded-lg px-3 py-2 text-[12px] text-zinc-400" />
-                  <p class="text-[9px] font-mono text-zinc-600 mt-1">1 ¥ = 95 FCFA</p>
+                  <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Prix source ({{ currencySymbol(draft.currency) }})</p>
+                  <input type="number" :value="draft.price" disabled class="w-full bg-black/20 border border-zinc-800 rounded-lg px-3 py-2 text-[12px] text-zinc-400" />
+                  <p class="text-[9px] font-mono text-zinc-600 mt-1">
+                    {{ draft.currency === 'EUR' ? '1 € = 655,957 FCFA' : draft.currency === 'USD' ? '1 $ ≈ 700 FCFA' : '1 ¥ = 95 FCFA' }}
+                  </p>
                 </div>
                 <div>
                   <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Prix vente (XOF)</p>
@@ -537,6 +608,11 @@ onMounted(() => {
               <span v-if="draft.seller.zhimaVerified" class="text-emerald-300">✅ Vérifié Zhima</span>
             </div>
             <p v-if="draft.metrics?.wantCnt" class="text-[11px] font-mono text-zinc-400">💛 {{ draft.metrics.wantCnt }} personnes le veulent</p>
+            <div v-if="draft.sales || draft.rating" class="flex flex-wrap gap-2 text-[10px] font-mono">
+              <span v-if="draft.sales" class="text-sky-400">🛒 {{ draft.sales }} ventes</span>
+              <span v-if="draft.rating" class="text-zinc-400">⭐ {{ Number(draft.rating).toFixed(1) }} <span v-if="draft.ratingCount">({{ draft.ratingCount }} avis)</span></span>
+            </div>
+            <p v-if="draft.url" class="text-[10px] font-mono text-zinc-500 break-all">🔗 <a :href="draft.url" target="_blank" rel="noopener" class="text-sky-400 hover:underline">{{ draft.url }}</a></p>
             <p v-if="draft.features?.length" class="text-[11px] font-mono text-zinc-400 mt-1">
               Caractéristiques : <span v-for="(f, i) in draft.features" :key="i" class="mr-2">{{ f.name }} : {{ f.value }}</span>
             </p>

@@ -32,6 +32,13 @@ export default defineNuxtConfig({
       phoneNumber: "237683963007",
       currency: "XOF",
       rmbToXofRate: 95,
+      // EUR is pegged to the CFA franc at a fixed official rate (655.957 XOF
+      // per EUR) — used by the import pipeline when the source platform quotes
+      // in EUR (Amazon FR…). USD is NOT pegged: the conversion is a
+      // configurable approximation (default 700 XOF per USD, editable via env
+      // NUXT_PUBLIC_USD_TO_XOF_RATE).
+      eurToXofRate: 655.957,
+      usdToXofRate: Number(process.env.NUXT_PUBLIC_USD_TO_XOF_RATE) || 700,
       xofToEurRate: 655.957,
       googleClientId: process.env.GOOGLE_CLIENT_ID || "",
       ga4Id: process.env.GA4_ID || "",
