@@ -33,6 +33,7 @@
 ## Historique des deploys
 
 | Date | Deploy URL | Contenu |
+| 2026-08-08 | 6a778b4d43195056ebc77567 | Vitrine : **barre de recherche produit** au-dessus des onglets catégorie (recherche sur titre/chinois/description/catégorie, combinée avec le filtre catégorie actif, bouton effacer, message vide adapté) (build Nuxt) |
 | 2026-08-08 | 6a7789332187baadc65f4dbe | Admin : **infos fournisseur visibles et éditables dans le catalogue admin** — fix critique (le contact fournisseur était silencieusement perdu à chaque édition d'un produit importé : `supplierContact` absent du modal) ; section « 📇 Contact fournisseur » éditable dans l'éditeur produit, badge « 📇 Fournisseur » sur les cards + « Fiche fournisseur » dans le modal détail (build Nuxt) |
 | 2026-08-08 | 6a7786a7b8374abde18e079e | Vitrine : **badge « ❤️ J'aime » retiré des cards produit** (recouvrait la photo/vidéo en haut de carte) — le badge « 💬 Commenté » et le glow de bordure restent (build Nuxt) |
 | 2026-08-08 | 6a7782992187ba912b5f4db0 | ST-017 : **fix filtres catégorie vitrine** (resetAndSlice/loadMore/refresh filtrent par catégorie — ne faisaient rien avant) + **catégories auto à l'import** : détection par mots-clés FR/EN/CN (`detectCategory`), draft → `suggestedCategory`, UI pré-remplie + input libre avec datalist (transport + produits existants + seed) ; toute nouvelle catégorie devient un filtre vitrine automatiquement (build Nuxt) |
