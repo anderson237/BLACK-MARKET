@@ -40,6 +40,30 @@ function rankAccessoryItems(items: any[], keyword: string): any[] {
   return [...mains, ...accessories]
 }
 
+// Platforms whose JustOne API exposes NO sort parameter (TikTok Shop, Douyin,
+// 1688). For those the `sort` query is applied client-side on the fetched items
+// instead of being forwarded to the API (joSearch ignores it there). Supports
+// price asc/desc, best sellers ("produits du moment") and top rating — the
+// foundations of a winning-product scan.
+const CLIENT_SORT_PLATFORMS = new Set<JoPlatform>(['tiktok-shop', 'douyin-ec', '1688'])
+
+function applyClientSort(items: any[], sort: string): any[] {
+  if (!sort) return items
+  const list = [...items]
+  switch (sort) {
+    case 'price_asc':
+      return list.sort((a, b) => (a?.price || 0) - (b?.price || 0))
+    case 'price_desc':
+      return list.sort((a, b) => (b?.price || 0) - (a?.price || 0))
+    case 'sales_desc':
+      return list.sort((a, b) => (b?.sales || 0) - (a?.sales || 0))
+    case 'rating_desc':
+      return list.sort((a, b) => (b?.rating || 0) - (a?.rating || 0))
+    default:
+      return items
+  }
+}
+
 export default defineEventHandler(async (event) => {
   const session = await requireAuth(event)
   if (session.role !== 'admin') throw createError({ statusCode: 403, statusMessage: 'Accès administrateur requis.' })
@@ -84,8 +108,14 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  // Reorder accessory listings after the real products (1688/taobao/xianyu).
-  items = rankAccessoryItems(items, keyword)
+  // Client-side sort for platforms whose API has no sort parameter
+  // (TikTok/Douyin/1688). An explicit client sort wins; otherwise reorder the
+  // accessory listings after the real products (1688/taobao/xianyu).
+  if (CLIENT_SORT_PLATFORMS.has(platform) && sort) {
+    items = applyClientSort(items, sort)
+  } else {
+    items = rankAccessoryItems(items, keyword)
+  }
 
   // Batch-translate the page titles to French in a single Gemini call
   // (fallback: keep the raw title when the AI is not configured or the
