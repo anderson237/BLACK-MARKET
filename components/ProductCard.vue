@@ -129,11 +129,9 @@ const truncatedTitle = computed(() => {
         <span v-if="product.videoUrl" class="absolute top-3 right-3 bg-black/60 text-white text-[8px] uppercase font-bold tracking-widest px-2 py-1 rounded border border-white/20 flex items-center gap-1">
           <AppIcon name="video" :size="10" /> VIDEO
         </span>
-        <!-- Glow badges: liked / commented by the current visitor -->
+        <!-- Glow badge: commented by the current visitor (the "J'aime" badge
+             was removed to keep photos/videos fully visible). -->
         <div v-if="isGlowing" class="absolute top-12 left-3 flex flex-col gap-1">
-          <span v-if="isLiked" class="inline-flex items-center gap-1 text-[9px] font-mono font-bold text-[#ff2a2a] bg-black/70 border border-[#ff2a2a]/50 backdrop-blur px-2 py-1 rounded-md">
-            ❤️ J'aime
-          </span>
           <span v-if="isCommented" class="inline-flex items-center gap-1 text-[9px] font-mono font-bold text-sky-300 bg-black/70 border border-sky-400/50 backdrop-blur px-2 py-1 rounded-md">
             💬 Commenté
           </span>
