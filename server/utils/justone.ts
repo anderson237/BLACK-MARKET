@@ -111,6 +111,10 @@ export interface JoSearchItem {
   ratingCount?: number    // number of reviews
   isBestSeller?: boolean
   isAmazonChoice?: boolean
+  moq?: number                // minimum order quantity (1688 tiered pricing)
+  priceTiers?: { quantity: string; value: string }[] // tiered price ladder (1688)
+  stock?: number              // remaining stock when the platform exposes it (Taobao frontStock)
+  shopId?: string             // Taobao shop id (to build the seller profile URL)
   shopName?: string
   extra?: any             // remaining raw payload for the detail enrichment step
 }
@@ -142,7 +146,32 @@ export interface JoDetail {
   sales?: number
   rating?: number
   ratingCount?: number
+  moq?: number                // minimum order quantity (1688 tiered pricing)
+  priceTiers?: { quantity: string; value: string }[] // tiered price ladder (1688)
+  stock?: number              // remaining stock when the platform exposes it
   extra?: any
+}
+
+// ---------------------------------------------------------------------------
+// MOQ helpers — 1688 exposes a tiered price ladder (shopAddition.quantityPrices):
+// [{ quantity: "1~29个", value: "6.44" }, { quantity: "30~4999个", value: "5.94" }].
+// The MOQ is the lower bound of the first tier ("1~29个" -> 1, "≥5000个" -> 5000).
+// ---------------------------------------------------------------------------
+
+function parseMoq(q: string): number | undefined {
+  const m = String(q || '').match(/[0-9]+(?:\.[0-9]+)?/)
+  return m ? Number(m[0]) : undefined
+}
+
+function tiersFrom(qp: any): { quantity: string; value: string }[] {
+  if (!Array.isArray(qp)) return []
+  const out: { quantity: string; value: string }[] = []
+  for (const t of qp) {
+    const quantity = String(t?.quantity ?? t?.beginAmount ?? t?.startQuantity ?? '')
+    const value = String(t?.price ?? t?.value ?? t?.amount ?? '')
+    if (quantity || value) out.push({ quantity, value })
+  }
+  return out
 }
 
 // ---------------------------------------------------------------------------
@@ -234,6 +263,7 @@ function flatten1688Search(json: any): JoSearchItem[] {
     const d = card?.data
     if (!d?.offerId) continue
     const price = Number(String(d?.priceInfo?.price ?? d?.displayPrice ?? '').replace(/[^0-9.]/g, ''))
+    const tiers = tiersFrom(d?.shopAddition?.quantityPrices)
     out.push({
       platform: '1688',
       sourceId: String(d.offerId),
@@ -245,6 +275,8 @@ function flatten1688Search(json: any): JoSearchItem[] {
       sellerNick: String(d?.memberId || ''),
       sourceUrl: String(d?.linkUrl || d?.winPortUrl || ''),
       sales: Number(d?.saleCount) || undefined,
+      moq: tiers.length ? parseMoq(tiers[0].quantity) : undefined,
+      priceTiers: tiers.length ? tiers : undefined,
       extra: { d },
     })
   }
@@ -274,6 +306,9 @@ function flatten1688Detail(json: any): JoDetail | null {
       if (url) images.push(url)
     }
   }
+  // MOQ / tiered price — 1688 detail can expose a ladder too (defensive scan).
+  const tiers = tiersFrom(offer.quantityPriceList || offer.quantityPrices || offer.saleInfo?.quantityPriceList)
+  const moq = Number(offer.moq) || (tiers.length ? parseMoq(tiers[0].quantity) : undefined) || undefined
   return {
     platform: '1688',
     sourceId,
@@ -283,6 +318,8 @@ function flatten1688Detail(json: any): JoDetail | null {
     price: Number(String(offer.priceInfo?.price ?? offer.price ?? offer.saleInfo?.price ?? '').replace(/[^0-9.]/g, '')) || 0,
     currency: 'CNY',
     features: [],
+    moq: moq ? Number(moq) : undefined,
+    priceTiers: tiers.length ? tiers : undefined,
     extra: { offer },
   }
 }
@@ -314,6 +351,8 @@ function flattenTaobaoSearch(json: any): JoSearchItem[] {
       sourceUrl: `https://item.taobao.com/item.htm?id=${d.itemId}`,
       sales: Number.isFinite(salesNum) ? salesNum : undefined,
       shopName: String(d?.shopName || ''),
+      shopId: String(d?.shopId || ''),
+      stock: Number(d?.frontStock) > 0 ? Number(d.frontStock) : undefined,
       extra: { d },
     })
   }

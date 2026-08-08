@@ -1,6 +1,6 @@
 import { requireAuth } from '~~/server/utils/auth'
 import { joDetail, importRemoteImage, priceToXof, type JoPlatform } from '~~/server/utils/justone'
-import { findLocalPrice, estimateTransport } from '~~/server/utils/storage'
+import { findLocalPrice, estimateTransport, getSupplierContact } from '~~/server/utils/storage'
 
 // Admin import pipeline (ST-017): draft a single product from any supported
 // platform.
@@ -38,6 +38,11 @@ export default defineEventHandler(async (event) => {
   if (!sourceId) throw createError({ statusCode: 400, statusMessage: 'Identifiant source manquant.' })
   const titleFr = String(body?.titleFr || '').trim()
   const region = String(body?.region || '').toUpperCase() === 'FR' ? 'FR' : 'US'
+  // MOQ / tiered ladder captured at search time (1688) — the detail call may be
+  // blocked (balance) or lack the field, so the search value is authoritative.
+  const searchMoq = Number(body?.moq)
+  const searchTiers = Array.isArray(body?.priceTiers) && body.priceTiers.length ? body.priceTiers : undefined
+  const searchStock = Number(body?.stock)
 
   let detail
   try {
@@ -63,6 +68,9 @@ export default defineEventHandler(async (event) => {
   // Transport estimate (emballage inclus) — category defaults to "Autre" until
   // the admin picks one; the front asks /api/admin/import/transport for rates.
   const transport = await estimateTransport(String(body?.category || ''))
+
+  // Previously captured supplier contact (server-side) — pre-fill the draft.
+  const sc = await getSupplierContact(platform, sourceId)
 
   return {
     success: true,
@@ -94,6 +102,12 @@ export default defineEventHandler(async (event) => {
       sales: detail.sales,
       rating: detail.rating,
       ratingCount: detail.ratingCount,
+      moq: Number.isFinite(searchMoq) && searchMoq > 0 ? searchMoq : detail.moq || undefined,
+      priceTiers: searchTiers || detail.priceTiers || undefined,
+      stock: Number.isFinite(searchStock) && searchStock > 0 ? searchStock : detail.stock || undefined,
+      supplierContact: sc
+        ? { wechat: sc.wechat, email: sc.email, whatsapp: sc.whatsapp, phone: sc.phone, website: sc.website, note: sc.note }
+        : undefined,
       date: new Date().toISOString(),
     },
   }

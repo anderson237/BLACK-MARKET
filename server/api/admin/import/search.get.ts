@@ -19,6 +19,27 @@ import {
 // "Nouveautés API".
 const VALID_PLATFORMS = new Set<JoPlatform>(['xianyu', '1688', 'taobao', 'tiktok-shop', 'amazon', 'douyin-ec'])
 
+// Accessory markers (coque / film / écran / câble…). On 1688/Taobao/Xianyu the
+// default sort is "relevance" which floods product keywords with high-volume
+// accessories ("适用于iphone13" phone cases). We reorder — never remove — those
+// listings after real products. Skipped when the keyword itself is an accessory
+// term (e.g. "coque iphone13"), otherwise every result would be pushed down.
+const ACCESSORY_MARKERS =
+  /适用于|适用|兼容|compatible|coque|壳|膜|钢化|防摔|防窥|耳机|数据线|充电|贴膜|保护套|保护壳|手机壳|保护膜|屏保|screen\s?protector|\bcase\b|\bcover\b|\bstand\b|\bholder\b|\bbumper\b|\bprotector\b/i
+
+function rankAccessoryItems(items: any[], keyword: string): any[] {
+  const kw = String(keyword || '').toLowerCase()
+  if (ACCESSORY_MARKERS.test(kw)) return items
+  const mains: any[] = []
+  const accessories: any[] = []
+  for (const it of items) {
+    const title = String(it?.title || it?.titleFr || '')
+    if (ACCESSORY_MARKERS.test(title)) accessories.push(it)
+    else mains.push(it)
+  }
+  return [...mains, ...accessories]
+}
+
 export default defineEventHandler(async (event) => {
   const session = await requireAuth(event)
   if (session.role !== 'admin') throw createError({ statusCode: 403, statusMessage: 'Accès administrateur requis.' })
@@ -62,6 +83,9 @@ export default defineEventHandler(async (event) => {
       throw err
     }
   }
+
+  // Reorder accessory listings after the real products (1688/taobao/xianyu).
+  items = rankAccessoryItems(items, keyword)
 
   // Batch-translate the page titles to French in a single Gemini call
   // (fallback: keep the raw title when the AI is not configured or the

@@ -53,6 +53,21 @@ export default defineEventHandler(async (event) => {
   const currencyRaw = String(body?.currency || 'CNY').toUpperCase()
   const currency = currencyRaw === 'EUR' ? 'EUR' : currencyRaw === 'USD' ? 'USD' : 'CNY'
   const aiEnrich = body?.aiEnrich === true
+  const moq = Number(body?.moq)
+  const priceTiers = Array.isArray(body?.priceTiers) ? body.priceTiers.slice(0, 6) : undefined
+  const stock = Number(body?.stock)
+  const scRaw = body?.supplierContact || {}
+  const supplierContact =
+    scRaw && typeof scRaw === 'object' && (scRaw.wechat || scRaw.email || scRaw.whatsapp || scRaw.phone || scRaw.website || scRaw.note)
+      ? {
+          wechat: String(scRaw.wechat || '').trim() || undefined,
+          email: String(scRaw.email || '').trim() || undefined,
+          whatsapp: String(scRaw.whatsapp || '').trim() || undefined,
+          phone: String(scRaw.phone || '').trim() || undefined,
+          website: String(scRaw.website || '').trim() || undefined,
+          note: String(scRaw.note || '').trim() || undefined,
+        }
+      : undefined
 
   if (!sourceId || !title) throw createError({ statusCode: 400, statusMessage: 'Identifiant source et titre requis.' })
   if (!imageUrl && gallery.length === 0) {
@@ -138,6 +153,10 @@ Réponds strictement en JSON au schéma demandé.
     priceEur: Math.round(Number(enriched?.priceEur) || (computedXof / 655.957) * 100) / 100,
     priceXof: Math.round(aiXof || computedXof),
     sourceRmb: price || undefined,
+    moq: Number.isFinite(moq) && moq > 0 ? moq : undefined,
+    sourcePriceTiers: priceTiers?.length ? priceTiers : undefined,
+    sourceStock: Number.isFinite(stock) && stock > 0 ? stock : undefined,
+    supplierContact,
     createdAt: new Date().toISOString(),
   })
 

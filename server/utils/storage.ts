@@ -1322,6 +1322,67 @@ export async function clearImportHistory(): Promise<void> {
   await writeJSON(IMPORT_HISTORY_FILE, [])
 }
 
+/** Delete a single cached search entry (by key) — admin individual removal. */
+export async function deleteImportSearch(key: string): Promise<ImportSearchEntry[]> {
+  return mutateGeneric('bm-import-history', 'history.json', IMPORT_HISTORY_FILE, (list: ImportSearchEntry[]) => {
+    return list.filter((e) => e.key !== key)
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Supplier contacts (ST-017) — blob bm-supplier-contacts / contacts.json
+//
+// Admin-captured supplier contact (WeChat / WhatsApp / email / phone / site)
+// per imported product (platform + sourceId). Stored server-side so the same
+// product re-imported later comes back with the contact pre-filled.
+// ---------------------------------------------------------------------------
+export interface SupplierContact {
+  platform: string
+  sourceId: string
+  wechat?: string
+  email?: string
+  whatsapp?: string
+  phone?: string
+  website?: string
+  note?: string
+  updatedAt: string
+}
+
+const SUPPLIER_CONTACTS_FILE = path.join(DATA_DIR, 'supplier-contacts.json')
+const SUPPLIER_CONTACTS_MAX = 500
+
+async function loadSupplierContactsFile(): Promise<SupplierContact[]> {
+  if (isNetlifyRuntime()) {
+    const raw = await blobGet('bm-supplier-contacts', 'contacts.json', 'text', 'strong')
+    if (raw != null) {
+      try {
+        const p = JSON.parse(raw)
+        if (Array.isArray(p)) return p
+      } catch {
+        /* corrupted -> start fresh */
+      }
+    }
+    return []
+  }
+  const p = await readJSON(SUPPLIER_CONTACTS_FILE)
+  return Array.isArray(p) ? p : []
+}
+
+export async function getSupplierContact(platform: string, sourceId: string): Promise<SupplierContact | null> {
+  const list = await loadSupplierContactsFile()
+  return list.find((c) => c.platform === platform && c.sourceId === sourceId) || null
+}
+
+export async function upsertSupplierContact(c: SupplierContact): Promise<SupplierContact[]> {
+  return mutateGeneric('bm-supplier-contacts', 'contacts.json', SUPPLIER_CONTACTS_FILE, (list: SupplierContact[]) => {
+    const idx = list.findIndex((e) => e.platform === c.platform && e.sourceId === c.sourceId)
+    const next = [...list]
+    if (idx >= 0) next.splice(idx, 1)
+    next.unshift({ ...c, updatedAt: new Date().toISOString() })
+    return next.slice(0, SUPPLIER_CONTACTS_MAX)
+  })
+}
+
 // ---------------------------------------------------------------------------
 // Local market price table (ST-017) — blob bm-local-prices / prices.json
 //

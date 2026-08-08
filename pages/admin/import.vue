@@ -102,6 +102,39 @@ const localPriceSaving = ref(false)
 const transportConfig = ref<any>(null)
 const transportTab = ref(false)
 
+// Supplier contact (manual capture in the draft modal, server-stored)
+const supplierContact = ref<any>({ wechat: '', email: '', whatsapp: '', phone: '', website: '', note: '' })
+const supplierSaved = ref(false)
+
+function sellerUrl(item: any): string {
+  if (!item) return ''
+  switch (item.platform) {
+    case 'taobao':
+      return item.shopId ? `https://shop${item.shopId}.taobao.com/` : item.sourceUrl || ''
+    case '1688':
+      return item.sourceId ? `https://detail.1688.com/offer/${item.sourceId}.html` : ''
+    case 'xianyu':
+      return item.sourceId ? `https://www.goofish.com/item?id=${item.sourceId}` : ''
+    default:
+      return item.sourceUrl || ''
+  }
+}
+
+async function saveSupplierContact() {
+  if (!draft.value) return
+  try {
+    await $fetch('/api/admin/import/contact', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: { platform: draft.value.platform, sourceId: draft.value.sourceId, contact: supplierContact.value || {} },
+    })
+    supplierSaved.value = true
+    setTimeout(() => (supplierSaved.value = false), 3000)
+  } catch (e: any) {
+    publishError.value = e?.data?.statusMessage || e?.message || 'Erreur d\u2019enregistrement du contact'
+  }
+}
+
 function authHeaders(): Record<string, string> {
   const auth = useAuthStore()
   const headers: Record<string, string> = { Accept: 'application/json' }
@@ -125,9 +158,17 @@ async function clearHistory() {
   try {
     await $fetch('/api/admin/import/history', { method: 'DELETE', headers: authHeaders() })
     history.value = []
-    successMsg.value = 'Historique vidé'
-  } catch (e: any) {
-    searchError.value = e?.data?.statusMessage || e?.message || 'Erreur'
+  } catch {
+    /* non-blocking */
+  }
+}
+
+async function deleteHistoryEntry(h: any) {
+  try {
+    await $fetch('/api/admin/import/history', { method: 'DELETE', headers: authHeaders(), body: { key: h.key } })
+    history.value = history.value.filter((e) => e.key !== h.key)
+  } catch {
+    /* non-blocking */
   }
 }
 
@@ -190,7 +231,7 @@ async function openDraft(item: any) {
     const res = await $fetch('/api/admin/import/draft', {
       method: 'POST',
       headers: authHeaders(),
-      body: { platform: item.platform, sourceId: item.sourceId, titleFr: item.titleFr || '', keyword: keyword.value, region: region.value },
+      body: { platform: item.platform, sourceId: item.sourceId, titleFr: item.titleFr || '', keyword: keyword.value, region: region.value, moq: item.moq, priceTiers: item.priceTiers, stock: item.stock },
     })
     const d = (res as any).draft
     draft.value = d
@@ -199,6 +240,8 @@ async function openDraft(item: any) {
     publishPriceXof.value = d.priceXof || 0
     publishFeatures.value = Array.isArray(d.features) ? d.features.map((f: any) => f.value || f) : []
     publishCategory.value = ''
+    supplierContact.value = d.supplierContact || { wechat: '', email: '', whatsapp: '', phone: '', website: '', note: '' }
+    supplierSaved.value = false
   } catch (e: any) {
     publishError.value = e?.data?.statusMessage || e?.message || 'Erreur d\u2019import du produit'
   } finally {
@@ -241,6 +284,10 @@ async function doPublish() {
         features: publishFeatures.value.filter(Boolean),
         category: publishCategory.value,
         aiEnrich: aiEnrich.value,
+        moq: draft.value.moq,
+        priceTiers: draft.value.priceTiers,
+        stock: draft.value.stock,
+        supplierContact: supplierContact.value,
       },
     })
     successMsg.value = `Produit publié ✓ (${(res as any).id})`
@@ -395,17 +442,22 @@ onMounted(() => {
           <button @click="clearHistory" class="text-[10px] font-mono text-red-400 hover:text-red-300">Vider l'historique</button>
         </div>
         <div class="flex flex-wrap gap-2">
-          <button
-            v-for="h in history"
-            :key="h.key"
-            @click="loadFromHistory(h)"
-            class="px-2.5 py-1.5 rounded-lg border border-zinc-800 text-[10px] font-mono text-zinc-300 hover:text-white hover:border-[#ff2a2a]/40 transition-all text-left"
-          >
-            <span class="text-[#ff2a2a]">{{ PLATFORMS.find((p) => p.id === h.platform)?.short || h.platform }}</span> {{ h.keyword }}
-            <span class="text-zinc-600">p{{ h.page }}</span>
-            <span v-if="h.region" class="text-zinc-600">[{{ h.region }}]</span>
-            <span class="text-zinc-600 ml-1">({{ (h.items || []).length }})</span>
-          </button>
+          <div v-for="h in history" :key="h.key" class="flex items-center gap-1">
+            <button
+              @click="loadFromHistory(h)"
+              class="px-2.5 py-1.5 rounded-lg border border-zinc-800 text-[10px] font-mono text-zinc-300 hover:text-white hover:border-[#ff2a2a]/40 transition-all text-left"
+            >
+              <span class="text-[#ff2a2a]">{{ PLATFORMS.find((p) => p.id === h.platform)?.short || h.platform }}</span> {{ h.keyword }}
+              <span class="text-zinc-600">p{{ h.page }}</span>
+              <span v-if="h.region" class="text-zinc-600">[{{ h.region }}]</span>
+              <span class="text-zinc-600 ml-1">({{ (h.items || []).length }})</span>
+            </button>
+            <button
+              @click="deleteHistoryEntry(h)"
+              :title="'Supprimer cette recherche'"
+              class="w-6 h-6 shrink-0 rounded-md border border-zinc-800 text-[10px] font-mono text-zinc-500 hover:text-red-400 hover:border-red-500/40 transition-all"
+            >✕</button>
+          </div>
         </div>
       </div>
 
@@ -490,6 +542,11 @@ onMounted(() => {
             <p class="text-[12px] text-zinc-200 line-clamp-2 min-h-[32px]">{{ item.titleFr || item.title }}</p>
             <div class="space-y-0.5">
               <p class="text-[11px] font-mono text-zinc-400">{{ fmtPrice(item) }} <span class="text-emerald-400">≈ {{ fmtXof(item.priceXof) }} FCFA</span></p>
+              <p v-if="item.moq" class="text-[11px] font-mono text-sky-400">📦 MOQ : {{ item.moq }} pièce(s)</p>
+              <p v-if="item.stock" class="text-[11px] font-mono text-emerald-400">✔ Stock : {{ item.stock }}</p>
+              <p v-if="item.priceTiers?.length" class="text-[10px] font-mono text-zinc-600">
+                <span v-for="(t, ti) in item.priceTiers" :key="ti" class="mr-1.5">{{ t.quantity }} → {{ t.value }} ¥</span>
+              </p>
               <p v-if="item.localPriceXof" class="text-[11px] font-mono text-amber-400">🏷️ Marché local : {{ fmtXof(item.localPriceXof) }} FCFA</p>
               <div v-if="item.sales || item.rating || item.isAmazonChoice" class="flex flex-wrap gap-1.5 pt-0.5">
                 <span v-if="item.sales" class="text-[10px] font-mono text-sky-400">🛒 {{ item.sales }} ventes</span>
@@ -499,6 +556,7 @@ onMounted(() => {
               </div>
             </div>
             <p v-if="item.area || item.shopName" class="text-[10px] font-mono text-zinc-500">📍 {{ item.shopName || item.area }}</p>
+            <a v-if="sellerUrl(item)" :href="sellerUrl(item)" target="_blank" rel="noopener" class="text-[10px] font-mono text-zinc-500 hover:text-sky-400">🏪 Fiche vendeur →</a>
             <button
               @click="draftMode = item; openDraft(item)"
               :disabled="drafting && draftMode === item"
@@ -572,6 +630,11 @@ onMounted(() => {
                   <p class="text-[9px] font-mono text-zinc-600 mt-1">
                     {{ draft.currency === 'EUR' ? '1 € = 655,957 FCFA' : draft.currency === 'USD' ? '1 $ ≈ 700 FCFA' : '1 ¥ = 95 FCFA' }}
                   </p>
+                  <p v-if="draft.moq" class="text-[9px] font-mono text-sky-400 mt-1">📦 MOQ : {{ draft.moq }} pièce(s)</p>
+                  <p v-if="draft.priceTiers?.length" class="text-[9px] font-mono text-zinc-500 mt-1">
+                    Barème : <span v-for="(t, ti) in draft.priceTiers" :key="ti" class="mr-1.5">{{ t.quantity }} → {{ t.value }} ¥</span>
+                  </p>
+                  <p v-if="draft.stock" class="text-[9px] font-mono text-emerald-400 mt-1">✔ Stock restant : {{ draft.stock }}</p>
                 </div>
                 <div>
                   <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Prix vente (XOF)</p>
@@ -618,6 +681,38 @@ onMounted(() => {
             <p v-if="draft.features?.length" class="text-[11px] font-mono text-zinc-400 mt-1">
               Caractéristiques : <span v-for="(f, i) in draft.features" :key="i" class="mr-2">{{ f.name }} : {{ f.value }}</span>
             </p>
+          </div>
+
+          <!-- Supplier contact -->
+          <div class="border border-zinc-800 rounded-xl p-3 space-y-2 bg-[#08080c]">
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">📇 Contact fournisseur</p>
+              <button @click="saveSupplierContact" class="text-[10px] font-mono text-emerald-400 hover:text-emerald-300">💾 Enregistrer</button>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <label class="flex flex-col gap-0.5 text-[9px] font-mono text-zinc-500">
+                WeChat
+                <input v-model.trim="supplierContact.wechat" placeholder="ID WeChat" class="bg-black/40 border border-zinc-800 rounded px-2 py-1 text-[11px] text-white focus:outline-none focus:border-[#ff2a2a]/60" />
+              </label>
+              <label class="flex flex-col gap-0.5 text-[9px] font-mono text-zinc-500">
+                WhatsApp
+                <input v-model.trim="supplierContact.whatsapp" placeholder="+225 …" class="bg-black/40 border border-zinc-800 rounded px-2 py-1 text-[11px] text-white focus:outline-none focus:border-[#ff2a2a]/60" />
+              </label>
+              <label class="flex flex-col gap-0.5 text-[9px] font-mono text-zinc-500">
+                Email
+                <input v-model.trim="supplierContact.email" placeholder="fournisseur@…" class="bg-black/40 border border-zinc-800 rounded px-2 py-1 text-[11px] text-white focus:outline-none focus:border-[#ff2a2a]/60" />
+              </label>
+              <label class="flex flex-col gap-0.5 text-[9px] font-mono text-zinc-500">
+                Téléphone
+                <input v-model.trim="supplierContact.phone" placeholder="+86 …" class="bg-black/40 border border-zinc-800 rounded px-2 py-1 text-[11px] text-white focus:outline-none focus:border-[#ff2a2a]/60" />
+              </label>
+            </div>
+            <label class="flex flex-col gap-0.5 text-[9px] font-mono text-zinc-500">
+              Site web
+              <input v-model.trim="supplierContact.website" placeholder="https://…" class="bg-black/40 border border-zinc-800 rounded px-2 py-1 text-[11px] text-white focus:outline-none focus:border-[#ff2a2a]/60" />
+            </label>
+            <a v-if="sellerUrl(draft)" :href="sellerUrl(draft)" target="_blank" rel="noopener" class="inline-block text-[10px] font-mono text-sky-400 hover:underline">🏪 Ouvrir la fiche vendeur →</a>
+            <p v-if="supplierSaved" class="text-[9px] font-mono text-emerald-400">✓ Contact enregistré (réutilisé aux prochains imports)</p>
           </div>
 
           <!-- Category + features + AI -->
