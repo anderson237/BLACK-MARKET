@@ -1019,7 +1019,7 @@ async function confirmAllWhatsApp() {
                         <button @click="confirmPreorder(item)" :disabled="payingId === item.productId || confirmingId === item.productId"
                           class="inline-flex items-center justify-center gap-1.5 bg-[#ff2a2a] hover:bg-red-600 disabled:opacity-40 text-white text-[10px] font-mono font-bold px-3 py-2 rounded-xl transition-all cursor-pointer">
                           <span v-if="payingId === item.productId" class="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                          <template v-else><AppIcon name="wallet" :size="12" /> CONFIRMER & PAYER</template>
+                          <template v-else><AppIcon :name="payunitEnabled ? 'wallet' : 'whatsapp'" :size="12" /> {{ payunitEnabled ? 'CONFIRMER & PAYER' : 'CONFIRMER' }}</template>
                         </button>
                         <button @click="cart.remove(item.productId)"
                           class="inline-flex items-center justify-center gap-1 text-[10px] font-mono text-zinc-500 hover:text-red-400 border border-zinc-800 px-3 py-1.5 rounded-xl transition-all cursor-pointer">
@@ -1053,13 +1053,13 @@ async function confirmAllWhatsApp() {
                     <button @click="confirmAllPreorders" :disabled="payingAll || confirmingAll"
                       class="w-full inline-flex items-center justify-center gap-2 bg-[#ff2a2a] hover:bg-red-600 disabled:opacity-40 text-white text-xs font-mono font-bold px-4 py-3 rounded-xl transition-all cursor-pointer">
                       <span v-if="payingAll || confirmingAll" class="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                      <template v-else><AppIcon name="wallet" :size="14" /> CONFIRMER & PAYER TOUTES LES PRÉCOMMANDES</template>
+                      <template v-else><AppIcon :name="payunitEnabled ? 'wallet' : 'whatsapp'" :size="14" /> {{ payunitEnabled ? 'CONFIRMER & PAYER TOUTES LES PRÉCOMMANDES' : 'CONFIRMER TOUTES LES PRÉCOMMANDES' }}</template>
                     </button>
                     <button v-if="payunitEnabled" @click="confirmAllWhatsApp" :disabled="confirmingAll || payingAll"
                       class="w-full inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-mono font-bold px-4 py-2.5 rounded-xl transition-all cursor-pointer">
                       <AppIcon name="whatsapp" :size="14" /> Confirmer par WhatsApp (sans paiement en ligne)</button>
                     <p v-if="payError" class="text-[10px] text-red-400 font-mono">{{ payError }}</p>
-                    <p class="text-[9px] text-zinc-600 font-mono">CONFIRMER & PAYER sécurise votre commande par Mobile Money ou carte. L'option WhatsApp reste disponible pour confirmer sans paiement en ligne.</p>
+                    <p class="text-[9px] text-zinc-600 font-mono">{{ payunitEnabled ? "CONFIRMER & PAYER sécurise votre commande par Mobile Money ou carte. L'option WhatsApp reste disponible pour confirmer sans paiement en ligne." : 'CONFIRMER envoie votre précommande sur WhatsApp et crée votre commande. Vous pouvez aussi confirmer chaque article séparément.' }}</p>
                   </div>
                 </div>
               </template>
