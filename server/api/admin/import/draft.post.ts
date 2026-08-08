@@ -1,6 +1,7 @@
 import { requireAuth } from '~~/server/utils/auth'
 import { joDetail, importRemoteImage, priceToXof, type JoPlatform } from '~~/server/utils/justone'
 import { findLocalPrice, estimateTransport, getSupplierContact } from '~~/server/utils/storage'
+import { detectCategory } from '~~/server/utils/category'
 
 // Admin import pipeline (ST-017): draft a single product from any supported
 // platform.
@@ -69,6 +70,10 @@ export default defineEventHandler(async (event) => {
   // the admin picks one; the front asks /api/admin/import/transport for rates.
   const transport = await estimateTransport(String(body?.category || ''))
 
+  // Automatic category suggestion from the source title/description (vitrine
+  // filter). The admin can keep it or type any other category.
+  const suggestedCategory = detectCategory(detail.title, detail.desc)
+
   // Previously captured supplier contact (server-side) — pre-fill the draft.
   const sc = await getSupplierContact(platform, sourceId)
 
@@ -89,6 +94,7 @@ export default defineEventHandler(async (event) => {
       localPriceXof: lp ? lp.priceXof : undefined,
       localPriceLabel: lp ? lp.label : undefined,
       transport,
+      suggestedCategory,
       imageUrl: mainImage,
       gallery,
       condition: detail.condition || undefined,

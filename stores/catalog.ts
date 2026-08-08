@@ -18,6 +18,13 @@ export const useCatalogStore = defineStore('catalog', () => {
     return all.value.findIndex((p) => p.id === id)
   }
 
+  /** Products filtered by the active category ('' = Tous). */
+  function filtered() {
+    return activeCategory.value === 'Tous'
+      ? all.value
+      : all.value.filter((p) => (p.category || '') === activeCategory.value)
+  }
+
   async function init() {
     if (all.value.length) return
     loading.value = true
@@ -31,8 +38,9 @@ export const useCatalogStore = defineStore('catalog', () => {
 
   function resetAndSlice() {
     done.value = false
-    items.value = all.value.slice(0, PAGE_SIZE)
-    if (items.value.length >= all.value.length) done.value = true
+    const list = filtered()
+    items.value = list.slice(0, PAGE_SIZE)
+    if (items.value.length >= list.length) done.value = true
   }
 
   function setCategory(cat: string) {
@@ -43,9 +51,10 @@ export const useCatalogStore = defineStore('catalog', () => {
   function loadMore() {
     if (done.value || loading.value) return
     loading.value = true
+    const list = filtered()
     const next = items.value.length + PAGE_SIZE
-    items.value = all.value.slice(0, next)
-    if (items.value.length >= all.value.length) done.value = true
+    items.value = list.slice(0, next)
+    if (items.value.length >= list.length) done.value = true
     loading.value = false
   }
 
@@ -55,10 +64,11 @@ export const useCatalogStore = defineStore('catalog', () => {
       const data = await _fetchCatalog()
       all.value = data
       // Trim/expand the visible slice without losing pagination state.
+      const list = filtered()
       const trimmed = items.value.filter((p) => data.some((d) => d.id === p.id))
       items.value = trimmed
-      if (items.value.length < data.length) items.value = data.slice(0, Math.max(items.value.length, PAGE_SIZE))
-      if (items.value.length >= data.length) done.value = true
+      if (items.value.length < list.length) items.value = list.slice(0, Math.max(items.value.length, PAGE_SIZE))
+      if (items.value.length >= list.length) done.value = true
     } catch {
       // Keep current data on network hiccups.
     }

@@ -8,6 +8,9 @@
 // 6. Trending signals: Amazon best-seller, Douyin ventes 30 j, Taobao ventes…
 definePageMeta({ layout: 'admin' })
 
+import { CATEGORIES } from '~/types'
+import { useAdminStore } from '~/stores/admin'
+
 const config = useRuntimeConfig()
 const justoneEnabled = computed(() => Boolean(config.public.justoneEnabled))
 
@@ -141,6 +144,19 @@ const localPriceSaving = ref(false)
 // Transport config + estimate
 const transportConfig = ref<any>(null)
 const transportTab = ref(false)
+
+// Category suggestions for the free-text category input: transport categories
+// (they also drive the freight estimate) + categories already used by existing
+// products + the storefront seed categories. The admin can type any new value.
+const adminStore = useAdminStore()
+const categorySuggestions = computed(() => {
+  const set = new Set<string>()
+  for (const k of Object.keys(transportConfig.value?.categories || {})) if (k) set.add(k)
+  for (const p of adminStore.products || []) if (p?.category) set.add(p.category)
+  for (const c of CATEGORIES) if (c && c !== 'Tous') set.add(c)
+  if (draft.value?.suggestedCategory) set.add(draft.value.suggestedCategory)
+  return [...set]
+})
 
 // Supplier contact (manual capture in the draft modal, server-stored)
 const supplierContact = ref<any>({ sellerName: '', country: '', wechat: '', email: '', whatsapp: '', phone: '', website: '', note: '' })
@@ -294,7 +310,8 @@ async function openDraft(item: any) {
     publishDesc.value = d.description || ''
     publishPriceXof.value = d.priceXof || 0
     publishFeatures.value = Array.isArray(d.features) ? d.features.map((f: any) => f.value || f) : []
-    publishCategory.value = ''
+    // Automatic category suggestion from the source title (vitrine filter).
+    publishCategory.value = d.suggestedCategory || ''
     supplierContact.value = d.supplierContact || { sellerName: '', country: '', wechat: '', email: '', whatsapp: '', phone: '', website: '', note: '' }
     supplierSaved.value = false
   } catch (e: any) {
@@ -837,14 +854,20 @@ onMounted(() => {
           <!-- Category + features + AI -->
           <div class="space-y-2">
             <div>
-              <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Catégorie (pour l'estimation transport)</p>
-              <select
+              <div class="flex items-center justify-between">
+                <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Catégorie (filtre vitrine + estimation transport)</p>
+                <span v-if="draft?.suggestedCategory" class="text-[9px] font-mono text-emerald-400">⚡ Détectée : {{ draft.suggestedCategory }}</span>
+              </div>
+              <input
                 v-model="publishCategory"
-                class="w-full bg-black/40 border border-zinc-800 rounded-lg px-3 py-2 text-[12px] text-white focus:outline-none focus:border-[#ff2a2a]/60 cursor-pointer"
-              >
-                <option value="">— Choisir —</option>
-                <option v-for="(c, key) in transportConfig?.categories || {}" :key="key" :value="key">{{ key }}</option>
-              </select>
+                list="import-category-suggestions"
+                placeholder="— Choisir ou saisir une catégorie —"
+                class="w-full bg-black/40 border border-zinc-800 rounded-lg px-3 py-2 text-[12px] text-white focus:outline-none focus:border-[#ff2a2a]/60 cursor-text"
+              />
+              <datalist id="import-category-suggestions">
+                <option v-for="c in categorySuggestions" :key="c" :value="c">{{ c }}</option>
+              </datalist>
+              <p class="text-[9px] font-mono text-zinc-600 mt-1">Nouvelle catégorie ? Tapez-la : elle apparaîtra automatiquement dans les filtres de la vitrine dès la publication.</p>
             </div>
             <div>
               <div class="flex items-center justify-between">
