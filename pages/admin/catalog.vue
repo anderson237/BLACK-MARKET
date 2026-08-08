@@ -97,6 +97,14 @@ function stripHtml(h: string) {
   return String(h || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
+/** True when the product has at least one supplier-contact field filled. */
+function hasContact(p: any): boolean {
+  const c = p?.supplierContact
+  if (!c || typeof c !== 'object') return false
+  return ['sellerName', 'country', 'wechat', 'email', 'whatsapp', 'phone', 'website', 'note']
+    .some((k) => String(c[k] || '').trim() !== '')
+}
+
 // ---- Fiche produit detail modal ----
 const detailProduct = ref<Product | null>(null)
 const detailSlide = ref(0)
@@ -245,6 +253,7 @@ function copyLink(p: Product) {
               <span class="bg-[#ff2a2a] text-white text-[9px] uppercase font-bold tracking-widest px-2.5 py-1 rounded-lg shadow-md border border-[#ff2a2a]/55">{{ p.category }}</span>
               <span v-if="showTrash" class="bg-red-500 text-white text-[9px] uppercase font-bold tracking-widest px-2.5 py-1 rounded-lg shadow-md border border-red-500/55">En corbeille</span>
               <span v-if="p.sourceRmb" class="bg-black/95 text-yellow-500 border border-zinc-800 text-[8px] font-mono px-2 py-0.5 rounded shadow-sm w-fit">Sourcing: ¥{{ p.sourceRmb }} RMB</span>
+              <span v-if="hasContact(p)" class="bg-black/95 text-emerald-400 border border-emerald-500/40 text-[8px] font-mono px-2 py-0.5 rounded shadow-sm w-fit">📇 Fournisseur</span>
             </div>
 
             <!-- Video action -->
@@ -398,6 +407,24 @@ function copyLink(p: Product) {
                 <AppIcon name="chevronRight" :size="12" class="text-[#ff2a2a] mt-0.5" /><span>{{ f }}</span>
               </li>
             </ul>
+          </div>
+
+          <!-- Fiche fournisseur -->
+          <div v-if="hasContact(detailProduct)" class="space-y-2 bg-emerald-500/5 p-4 rounded-2xl border border-emerald-500/20">
+            <div class="flex items-center justify-between">
+              <p class="text-[9px] text-emerald-400 uppercase font-bold tracking-wider font-mono">📇 Fiche fournisseur</p>
+              <button @click="openEdit(detailProduct)" class="text-[9px] font-mono text-sky-400 hover:underline">Modifier →</button>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-[11px]">
+              <p v-if="detailProduct.supplierContact?.sellerName" class="text-slate-200"><span class="text-zinc-500 font-mono">Fournisseur :</span> {{ detailProduct.supplierContact.sellerName }}</p>
+              <p v-if="detailProduct.supplierContact?.country" class="text-slate-200"><span class="text-zinc-500 font-mono">📍 Pays :</span> {{ detailProduct.supplierContact.country }}</p>
+              <p v-if="detailProduct.supplierContact?.phone" class="text-slate-200"><span class="text-zinc-500 font-mono">📞 Tél :</span> {{ detailProduct.supplierContact.phone }}</p>
+              <p v-if="detailProduct.supplierContact?.whatsapp" class="text-slate-200"><span class="text-zinc-500 font-mono">💬 WhatsApp :</span> {{ detailProduct.supplierContact.whatsapp }}</p>
+              <p v-if="detailProduct.supplierContact?.wechat" class="text-slate-200"><span class="text-zinc-500 font-mono">💬 WeChat :</span> {{ detailProduct.supplierContact.wechat }}</p>
+              <p v-if="detailProduct.supplierContact?.email" class="text-slate-200 truncate"><span class="text-zinc-500 font-mono">✉️ Email :</span> {{ detailProduct.supplierContact.email }}</p>
+              <p v-if="detailProduct.supplierContact?.website" class="text-slate-200 truncate sm:col-span-2"><span class="text-zinc-500 font-mono">🌐 Site :</span> {{ detailProduct.supplierContact.website }}</p>
+              <p v-if="detailProduct.supplierContact?.note" class="text-zinc-300 italic sm:col-span-2">{{ detailProduct.supplierContact.note }}</p>
+            </div>
           </div>
 
           <!-- Actions -->

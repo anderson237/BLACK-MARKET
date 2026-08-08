@@ -11,6 +11,8 @@ const isNew = !props.product
 const config = useRuntimeConfig()
 const phoneNumberHint = config.public.phoneNumber || '—'
 
+const emptyContact = () => ({ sellerName: '', country: '', wechat: '', email: '', whatsapp: '', phone: '', website: '', note: '' })
+
 const draft = reactive({
   id: props.product?.id || '',
   title: props.product?.title || '',
@@ -19,7 +21,7 @@ const draft = reactive({
   originalDescription: props.product?.originalDescription || '',
   chineseDescription: props.product?.chineseDescription || '',
   features: [...(props.product?.features || [])],
-priceEur: props.product?.priceEur || 0,
+  priceEur: props.product?.priceEur || 0,
   priceXof: props.product?.priceXof || 0,
   discountPercent: props.product?.discountPercent || 0,
   discountEndsAt: props.product?.discountEndsAt || '',
@@ -37,6 +39,11 @@ priceEur: props.product?.priceEur || 0,
   stockStatus: props.product?.stockStatus || 'preorder',
   stockQuantity: props.product?.stockQuantity ?? 0,
   moq: props.product?.moq ?? 0,
+  sourcePriceTiers: [...(props.product?.sourcePriceTiers || [])],
+  sourceStock: props.product?.sourceStock ?? undefined,
+  // Contact fournisseur (import ST-017) — édité ici pour ne PAS être perdu à
+  // la sauvegarde d'un produit importé (la fiche vendeur publique le lit).
+  supplierContact: props.product?.supplierContact ? { ...emptyContact(), ...props.product.supplierContact } : emptyContact(),
 })
 
 const saving = ref(false)
@@ -91,7 +98,18 @@ async function save() {
       stockStatus: draft.stockStatus || 'preorder',
       stockQuantity: Math.max(0, Number(draft.stockQuantity) || 0),
       moq: Math.max(0, Number(draft.moq) || 0),
-featuredMedia: draft.videoUrl ? draft.featuredMedia || 'video' : 'image',
+      sourcePriceTiers: Array.isArray(draft.sourcePriceTiers) && draft.sourcePriceTiers.length ? draft.sourcePriceTiers : undefined,
+      sourceStock: Number(draft.sourceStock) > 0 ? Number(draft.sourceStock) : undefined,
+      supplierContact: (() => {
+        const c = draft.supplierContact || {}
+        const out: Record<string, string> = {}
+        for (const k of ['sellerName', 'country', 'wechat', 'email', 'whatsapp', 'phone', 'website', 'note'] as const) {
+          const v = String((c as any)[k] || '').trim()
+          if (v) out[k] = v
+        }
+        return Object.keys(out).length ? { ...out, updatedAt: new Date().toISOString() } : undefined
+      })(),
+      featuredMedia: draft.videoUrl ? draft.featuredMedia || 'video' : 'image',
       discountPercent: Math.min(100, Math.max(0, Number(draft.discountPercent) || 0)),
       discountEndsAt: draft.discountEndsAt || undefined,
     }
@@ -543,6 +561,50 @@ async function handleVideoFile(e: Event) {
           <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">WhatsApp (numéro du produit)</label>
           <input v-model="draft.waNumber" type="tel" inputmode="numeric" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="ex: 237691234567 — vide = numéro du site" />
           <p class="text-[9px] text-zinc-600 font-mono">Si vide, la précommande part vers le numéro du site ({{ phoneNumberHint }}).</p>
+        </div>
+
+        <!-- Contact fournisseur (fiche vendeur publique) -->
+        <div class="space-y-3 border border-zinc-800 rounded-2xl p-3 bg-[#101018]">
+          <div class="flex items-center justify-between">
+            <label class="text-[10px] text-zinc-400 font-mono uppercase tracking-widest">📇 Contact fournisseur</label>
+            <span v-if="draft.supplierContact && Object.values(draft.supplierContact).some((v: any) => String(v || '').trim())"
+              class="text-[9px] font-mono text-emerald-400">✓ affiché en « Fiche vendeur »</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="space-y-2">
+              <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Fournisseur</label>
+              <input v-model="draft.supplierContact.sellerName" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="Nom du fournisseur" />
+            </div>
+            <div class="space-y-2">
+              <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Pays</label>
+              <input v-model="draft.supplierContact.country" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="Chine, Turquie…" />
+            </div>
+            <div class="space-y-2">
+              <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">WeChat</label>
+              <input v-model="draft.supplierContact.wechat" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="ID WeChat" />
+            </div>
+            <div class="space-y-2">
+              <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">WhatsApp</label>
+              <input v-model="draft.supplierContact.whatsapp" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="+225 …" />
+            </div>
+            <div class="space-y-2">
+              <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Email</label>
+              <input v-model="draft.supplierContact.email" type="email" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="fournisseur@…" />
+            </div>
+            <div class="space-y-2">
+              <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Téléphone</label>
+              <input v-model="draft.supplierContact.phone" type="tel" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="+86 …" />
+            </div>
+            <div class="space-y-2 sm:col-span-2">
+              <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Site web</label>
+              <input v-model="draft.supplierContact.website" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="https://…" />
+            </div>
+            <div class="space-y-2 sm:col-span-2">
+              <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Note</label>
+              <input v-model="draft.supplierContact.note" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="Remarques…" />
+            </div>
+          </div>
+          <p class="text-[9px] text-zinc-600 font-mono">Si au moins un champ est rempli, la section « Fiche vendeur » s'affiche sur la fiche produit publique.</p>
         </div>
 
         <!-- Image upload + filigrane -->
