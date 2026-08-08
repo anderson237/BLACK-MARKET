@@ -1164,3 +1164,83 @@ export async function removePreorderThreadsFor(userId: string): Promise<number> 
   if (removed > 0) await saveChat(kept)
   return removed
 }
+
+// ---------------------------------------------------------------------------
+// PayUnit payments (blob bm-payments / payments.json)
+//
+// Maps a PayUnit checkout id to the orders it covers so the return page and the
+// notify webhook can reconcile a payment with our pending orders and mark them
+// paid exactly once (idempotent).
+// ---------------------------------------------------------------------------
+export interface PaymentRecord {
+  checkoutId: string
+  transactionId: string
+  userId: string
+  orderIds: string[]
+  amountXof: number
+  currency: string
+  status: 'PENDING' | 'FAILED' | 'CANCELLED' | 'SUCCESS'
+  createdAt: string
+  updatedAt: string
+}
+
+const PAYMENT_FILE = path.join(DATA_DIR, 'payments.json')
+
+async function loadPaymentsFile(): Promise<PaymentRecord[]> {
+  if (isNetlifyRuntime()) {
+    const raw = await blobGet('bm-payments', 'payments.json', 'text', 'strong')
+    if (raw != null) {
+      try {
+        const p = JSON.parse(raw)
+        if (Array.isArray(p)) return p
+      } catch {
+        /* corrupted -> seed */
+      }
+    }
+    return []
+  }
+  const p = await readJSON(PAYMENT_FILE)
+  return Array.isArray(p) ? p : []
+}
+
+export async function loadPayments(): Promise<PaymentRecord[]> {
+  return loadPaymentsFile()
+}
+
+export async function savePayments(list: PaymentRecord[]): Promise<void> {
+  if (isNetlifyRuntime()) {
+    return blobSet('bm-payments', 'payments.json', JSON.stringify(list, null, 2))
+  }
+  return writeJSON(PAYMENT_FILE, list)
+}
+
+/** Atomic read-modify-write on the payments store (same pattern as orders). */
+export async function mutatePayments<T>(
+  mutate: (payments: PaymentRecord[]) => { next: PaymentRecord[] | null; value: T },
+): Promise<T> {
+  if (isNetlifyRuntime()) {
+    return withBlobLock('bm-payments', 'payments.json', async () => {
+      const s = getStore({ name: 'bm-payments' })
+      let payments: PaymentRecord[] = []
+      try {
+        const raw = await s.get('payments.json', { type: 'text', consistency: 'strong' } as any)
+        if (raw != null) {
+          const parsed = JSON.parse(String(raw))
+          if (Array.isArray(parsed)) payments = parsed
+        }
+      } catch (err) {
+        console.error('[BLOBS] payments read failed:', err)
+      }
+      const { next, value } = mutate(JSON.parse(JSON.stringify(payments)))
+      if (next == null) return value
+      await s.set('payments.json', JSON.stringify(next, null, 2))
+      return value
+    })
+  }
+  return withLock('payments', async () => {
+    const payments = await loadPaymentsFile()
+    const { next, value } = mutate(payments)
+    if (next != null) await savePayments(payments)
+    return value
+  })
+}

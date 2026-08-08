@@ -481,6 +481,65 @@ const cartTab = ref<'cart' | 'orders'>('cart')
 const confirmingId = ref<string | null>(null)
 const confirmingAll = ref(false)
 
+// ---- Paiement en ligne (ST-016, PayUnit) ----
+// The PAYER buttons are only rendered when PayUnit is configured (env keys).
+const payunitEnabled = computed(() => Boolean(config.public.payunitEnabled))
+const payingId = ref<string | null>(null)
+const payingAll = ref(false)
+const payError = ref('')
+
+/** Start a PayUnit hosted checkout for one preorder item. */
+async function payPreorder(item: CartItem) {
+  if (!auth.isAuthed) return
+  payError.value = ''
+  payingId.value = item.productId
+  try {
+    const res = await fetch('/api/payments/initialize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.token}` },
+      body: JSON.stringify({ items: [{ productId: item.productId, quantity: Math.max(1, Number(item.quantity) || 1) }] }),
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      payError.value = json?.statusMessage || json?.message || 'Impossible de lancer le paiement.'
+      return
+    }
+    // Keep the item in the basket until the payment is confirmed (the status
+    // page clears it on SUCCESS); redirect to the hosted payment page.
+    window.location.href = json.redirectUrl
+  } catch {
+    payError.value = 'Erreur réseau. Réessayez.'
+  } finally {
+    payingId.value = null
+  }
+}
+
+/** Start a single PayUnit checkout covering the whole basket. */
+async function payAllPreorders() {
+  if (!cart.items.length) return
+  payError.value = ''
+  payingAll.value = true
+  try {
+    const res = await fetch('/api/payments/initialize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.token}` },
+      body: JSON.stringify({
+        items: cart.items.map((c) => ({ productId: c.productId, quantity: Math.max(1, Number(c.quantity) || 1) })),
+      }),
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      payError.value = json?.statusMessage || json?.message || 'Impossible de lancer le paiement.'
+      return
+    }
+    window.location.href = json.redirectUrl
+  } catch {
+    payError.value = 'Erreur réseau. Réessayez.'
+  } finally {
+    payingAll.value = false
+  }
+}
+
 async function confirmPreorder(item: CartItem) {
   if (!auth.isAuthed) return
   confirmingId.value = item.productId
@@ -936,7 +995,13 @@ async function confirmAllPreorders() {
                           <span>{{ expandedItemChat === item.productId ? 'Fermer' : 'Message' }}</span>
                           <span v-if="itemThreadUnread(item.productId)" class="px-1.5 rounded-full bg-[#ff2a2a] text-white text-[9px] leading-4 min-w-[16px] text-center">{{ itemThreadUnread(item.productId) }}</span>
                         </button>
-                        <button @click="confirmPreorder(item)" :disabled="confirmingId === item.productId"
+                        <button v-if="payunitEnabled" @click="payPreorder(item)" :disabled="payingId === item.productId || confirmingId === item.productId"
+                          class="inline-flex items-center justify-center gap-1.5 bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-white text-[10px] font-mono font-bold px-3 py-2 rounded-xl transition-all cursor-pointer"
+                          title="Payer cet article en ligne (Mobile Money / carte)">
+                          <span v-if="payingId === item.productId" class="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                          <template v-else><AppIcon name="wallet" :size="12" /> PAYER</template>
+                        </button>
+                        <button @click="confirmPreorder(item)" :disabled="confirmingId === item.productId || payingId === item.productId"
                           class="inline-flex items-center justify-center gap-1.5 bg-[#ff2a2a] hover:bg-red-600 disabled:opacity-40 text-white text-[10px] font-mono font-bold px-3 py-2 rounded-xl transition-all cursor-pointer">
                           <span v-if="confirmingId === item.productId" class="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                           <template v-else><AppIcon name="whatsapp" :size="12" /> CONFIRMER</template>
@@ -970,12 +1035,18 @@ async function confirmAllPreorders() {
                       <span class="text-zinc-500">TOTAL ({{ cart.items.length }} article{{ cart.items.length > 1 ? 's' : '' }}) :</span>
                       <span class="text-[#ff2a2a] font-bold ml-1">{{ format(cart.totalXof) }}</span>
                     </p>
-                    <button @click="confirmAllPreorders" :disabled="confirmingAll"
+                    <button v-if="payunitEnabled" @click="payAllPreorders" :disabled="payingAll || confirmingAll"
+                      class="w-full inline-flex items-center justify-center gap-2 bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-white text-xs font-mono font-bold px-4 py-3 rounded-xl transition-all cursor-pointer">
+                      <span v-if="payingAll" class="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      <template v-else><AppIcon name="wallet" :size="14" /> PAYER TOUTES LES PRÉCOMMANDES</template>
+                    </button>
+                    <button @click="confirmAllPreorders" :disabled="confirmingAll || payingAll"
                       class="w-full inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-mono font-bold px-4 py-3 rounded-xl transition-all cursor-pointer">
                       <span v-if="confirmingAll" class="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                       <template v-else><AppIcon name="whatsapp" :size="14" /> CONFIRMER TOUTES LES PRÉCOMMANDES</template>
                     </button>
-                    <p class="text-[9px] text-zinc-600 font-mono">Confirmer envoie votre précommande sur WhatsApp et crée votre commande. Vous pouvez aussi confirmer chaque article séparément.</p>
+                    <p v-if="payError" class="text-[10px] text-red-400 font-mono">{{ payError }}</p>
+                    <p class="text-[9px] text-zinc-600 font-mono">Payer en ligne sécurise votre commande par Mobile Money ou carte. Confirmer envoie votre précommande sur WhatsApp. Vous pouvez aussi confirmer chaque article séparément.</p>
                   </div>
                 </div>
               </template>
@@ -1076,6 +1147,9 @@ async function confirmAllPreorders() {
                     <p class="text-[10px] text-zinc-500 font-mono mt-0.5">x{{ o.quantity }} · {{ o.priceXof ? format(o.priceXof) : '' }} · {{ timeAgo(o.createdAt) }}</p>
                   </div>
                   <div class="flex flex-col items-end gap-1.5 shrink-0">
+                    <span v-if="o.payment?.status === 'paid'" class="inline-flex items-center gap-1 text-[9px] font-mono uppercase tracking-widest px-2 py-1 rounded border text-emerald-400 border-emerald-500/30">
+                      <AppIcon name="lock" :size="10" /> Payée
+                    </span>
                     <span class="inline-flex items-center gap-1 text-[9px] font-mono uppercase tracking-widest px-2 py-1 rounded border" :class="o.status === 'completed' ? 'text-emerald-400 border-emerald-500/30' : o.status === 'cancelled' ? 'text-red-400 border-red-500/30' : 'text-amber-400 border-amber-500/30'">
                       <AppIcon v-if="o.status === 'completed'" name="lock" :size="10" />
                       {{ o.status }}

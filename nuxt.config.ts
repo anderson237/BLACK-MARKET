@@ -13,6 +13,14 @@ export default defineNuxtConfig({
     // Server-only: shared secret used by the Netlify Scheduled Function to
     // trigger /api/admin/reminders/run (set via env NUXT_TASK_SECRET).
     taskSecret: "",
+    // Server-only PayUnit credentials (env NUXT_PAYUNIT_API_USER etc.).
+    // The client NEVER sees these — every PayUnit call happens server-side.
+    payunit: {
+      apiUser: process.env.PAYUNIT_API_USER || "",
+      apiPassword: process.env.PAYUNIT_API_PASSWORD || "",
+      appToken: process.env.PAYUNIT_APP_TOKEN || "",
+      mode: process.env.PAYUNIT_MODE || "test",
+    },
     public: {
       siteUrl: "https://deeproots-importexport.netlify.app",
       phoneNumber: "237683963007",
@@ -21,6 +29,9 @@ export default defineNuxtConfig({
       xofToEurRate: 655.957,
       googleClientId: process.env.GOOGLE_CLIENT_ID || "",
       ga4Id: process.env.GA4_ID || "",
+      // Payment buttons (PAYER) are only shown once PayUnit credentials are
+      // configured in the production environment.
+      payunitEnabled: Boolean(process.env.PAYUNIT_API_USER && process.env.PAYUNIT_APP_TOKEN),
     },
   },
   nitro: {
