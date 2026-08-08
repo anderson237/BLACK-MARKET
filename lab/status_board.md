@@ -33,6 +33,7 @@
 ## Historique des deploys
 
 | Date | Deploy URL | Contenu |
+| 2026-08-08 | 6a7786a7b8374abde18e079e | Vitrine : **badge « ❤️ J'aime » retiré des cards produit** (recouvrait la photo/vidéo en haut de carte) — le badge « 💬 Commenté » et le glow de bordure restent (build Nuxt) |
 | 2026-08-08 | 6a7782992187ba912b5f4db0 | ST-017 : **fix filtres catégorie vitrine** (resetAndSlice/loadMore/refresh filtrent par catégorie — ne faisaient rien avant) + **catégories auto à l'import** : détection par mots-clés FR/EN/CN (`detectCategory`), draft → `suggestedCategory`, UI pré-remplie + input libre avec datalist (transport + produits existants + seed) ; toute nouvelle catégorie devient un filtre vitrine automatiquement (build Nuxt) |
 | 2026-08-08 | 6a777f78bb09f7875a55c5f9 | ST-017 : **fiche vendeur sur toutes les fiches produit** (pays + téléphone + WhatsApp/WeChat/email/site/note, champs `country`/`sellerName` ajoutés au contact, affichée seulement si renseignée) + **filtres prix source ¥/$/€** + **🔥 BEST uniquement** (is_best_seller Amazon) (build Nuxt) |
 | 2026-08-08 | 6a777991db3b906e53abdb56 | ST-017 : **nombre de résultats configurable (10/20/30/50/custom, 1-100)** — pagination multi-pages côté serveur (10 pages max, pageToken TikTok, dédup par sourceId, max dispo si solde/limite API insuffisant) + **filtres prix min/max FCFA, ventes min, note min** appliqués avant la troncature (cache réutilisable, `extra` retiré des résultats → cache allégé) (build Nuxt) |
