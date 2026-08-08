@@ -124,6 +124,7 @@ const navItems = [
   { label: 'Utilisateurs', icon: 'crown', to: '/admin/users' },
   { label: 'Catégories', icon: 'tag', to: '/admin/categories' },
   { label: 'Génération IA', icon: 'sparkles', to: '/admin/ai' },
+  { label: 'Import Chine', icon: 'download', to: '/admin/import' },
   { label: 'Réglages', icon: 'settings', to: '/admin/settings' },
 ]
 

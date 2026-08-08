@@ -21,6 +21,12 @@ export default defineNuxtConfig({
       appToken: process.env.PAYUNIT_APP_TOKEN || "",
       mode: process.env.PAYUNIT_MODE || "test",
     },
+    // Server-only JustOne API credentials (env NUXT_JUSTONE_API_KEY).
+    // Used by the admin Xianyu/1688 import pipeline (ST-017). The client only
+    // sees `public.justoneEnabled` to show/hide the import screen.
+    justone: {
+      apiKey: process.env.JUSTONE_API_KEY || "",
+    },
     public: {
       siteUrl: "https://deeproots-importexport.netlify.app",
       phoneNumber: "237683963007",
@@ -32,6 +38,8 @@ export default defineNuxtConfig({
       // Payment buttons (PAYER) are only shown once PayUnit credentials are
       // configured in the production environment.
       payunitEnabled: Boolean(process.env.PAYUNIT_API_USER && process.env.PAYUNIT_APP_TOKEN),
+      // Import Xianyu/1688 (ST-017): enables the admin import screen.
+      justoneEnabled: Boolean(process.env.JUSTONE_API_KEY),
     },
   },
   nitro: {
