@@ -2,7 +2,7 @@ import { requireAuth, rateLimit } from '~~/server/utils/auth'
 import { mutateOrders, mutatePayments, loadProducts, loadAccounts } from '~~/server/utils/storage'
 import { migratePreorderToOrder } from '~~/server/utils/chat'
 import { publishSiteUpdate } from '~~/server/utils/realtime'
-import { payunitConfigured, initPayunitCheckout, type PayUnitItem } from '~~/server/utils/payunit'
+import { payunitConfigured, initPayunitCheckout, payunitCountryCode, type PayUnitItem } from '~~/server/utils/payunit'
 import { sendEmail } from '~~/server/utils/email'
 
 function adminEmail(): string {
@@ -165,6 +165,9 @@ export default defineEventHandler(async (event) => {
     cancel_url: `${siteUrl}/paiement/retour?tx=${encodeURIComponent(transactionId)}&canceled=1`,
     notify_url: `${siteUrl}/api/payments/webhook`,
     items,
+    // Pre-filter the hosted page to the client's local Mobile Money + card
+    // (e.g. BJ → MTN MoMo / Orange Money Bénin; CM → Orange / MTN Cameroun).
+    payment_country: payunitCountryCode(account?.country as string) || undefined,
   })
 
   // Persist the payment record so the return page / webhook can reconcile.

@@ -15,6 +15,25 @@
 
 const PAYUNIT_BASE_URL = 'https://gateway.payunit.net'
 
+// Country names (as stored on client accounts) -> ISO 3166-1 alpha-2 code,
+// used for `payment_country` so PayUnit only shows local providers (Orange
+// Money / MTN MoMo / Moov / M-Pesa / Airtel …) plus card where available.
+// Unknown countries => no filter (checkout shows every subscribed provider).
+const PAYUNIT_COUNTRY_CODE: Record<string, string> = {
+  cameroun: 'CM', 'côte d\'ivoire': 'CI', 'cote d\'ivoire': 'CI', sénégal: 'SN', 'senegal': 'SN',
+  togo: 'TG', bénin: 'BJ', 'benin': 'BJ', mali: 'ML', 'burkina faso': 'BF', niger: 'NE',
+  guinée: 'GN', 'guinee': 'GN', gabon: 'GA', rdc: 'CD', congo: 'CG', tchad: 'TD',
+  rwanda: 'RW', burundi: 'BI', centrafrique: 'CF', comores: 'KM', djibouti: 'DJ',
+  mauritanie: 'MR', madagascar: 'MG', nigéria: 'NG', 'nigeria': 'NG', ghana: 'GH',
+  kenya: 'KE', maroc: 'MA', algérie: 'DZ', 'algerie': 'DZ', tunisie: 'TN', 'egypte': 'EG',
+}
+
+/** Map a stored country name to its ISO code for PayUnit ('' if unknown). */
+export function payunitCountryCode(countryName: string): string {
+  const n = String(countryName || '').trim().toLowerCase()
+  return PAYUNIT_COUNTRY_CODE[n] || ''
+}
+
 export function payunitConfigured(): boolean {
   const c = useRuntimeConfig().payunit
   return Boolean(c.apiUser && c.apiPassword && c.appToken)
