@@ -10,6 +10,7 @@ export const useCatalogStore = defineStore('catalog', () => {
   const loading = ref(false)
   const done = ref(false)
   const activeCategory = ref('Tous')
+  const searchQuery = ref('')
 
   const categories = computed(() => ['Tous', ...new Set(all.value.map((p) => p.category).filter(Boolean))])
   const total = computed(() => all.value.length)
@@ -18,11 +19,27 @@ export const useCatalogStore = defineStore('catalog', () => {
     return all.value.findIndex((p) => p.id === id)
   }
 
-  /** Products filtered by the active category ('' = Tous). */
+  /** Products filtered by the active category ('' = Tous) AND the search query. */
   function filtered() {
-    return activeCategory.value === 'Tous'
+    const q = searchQuery.value.trim().toLowerCase()
+    let list = activeCategory.value === 'Tous'
       ? all.value
       : all.value.filter((p) => (p.category || '') === activeCategory.value)
+    if (q) {
+      list = list.filter(
+        (p) =>
+          (p.title || '').toLowerCase().includes(q) ||
+          (p.chineseTitle || '').toLowerCase().includes(q) ||
+          (p.description || '').toLowerCase().includes(q) ||
+          (p.category || '').toLowerCase().includes(q),
+      )
+    }
+    return list
+  }
+
+  function setSearch(q: string) {
+    searchQuery.value = String(q || '')
+    resetAndSlice()
   }
 
   async function init() {
@@ -74,5 +91,5 @@ export const useCatalogStore = defineStore('catalog', () => {
     }
   }
 
-  return { all, items, loading, done, activeCategory, categories, total, masterIndex, init, setCategory, loadMore, refresh }
+  return { all, items, loading, done, activeCategory, searchQuery, categories, total, masterIndex, init, setCategory, setSearch, loadMore, refresh }
 })

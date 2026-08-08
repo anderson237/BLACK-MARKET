@@ -101,6 +101,28 @@ onBeforeUnmount(() => {
         </span>
       </div>
 
+      <!-- Search bar -->
+      <div class="relative mb-4">
+        <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        </span>
+        <input
+          v-model="store.searchQuery"
+          @input="store.setSearch(store.searchQuery)"
+          type="search"
+          placeholder="Rechercher un produit… (nom, catégorie)"
+          class="w-full bg-[#15151e] border border-zinc-800 hover:border-zinc-700 focus:border-[#ff2a2a]/60 focus:outline-none rounded-full pl-10 pr-9 py-2.5 text-sm text-slate-100 placeholder:text-zinc-500 transition-colors"
+        />
+        <button
+          v-if="store.searchQuery"
+          @click="store.setSearch('')"
+          class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white text-sm px-1"
+          aria-label="Effacer la recherche"
+        >
+          ✕
+        </button>
+      </div>
+
       <!-- Category tabs -->
       <div class="flex flex-wrap gap-2 pb-4">
         <button
@@ -124,7 +146,15 @@ onBeforeUnmount(() => {
       </div>
 
       <div v-else-if="store.items.length === 0" class="py-24 text-center text-zinc-500 font-mono text-xs">
-        AUCUN DROP POUR LE MOMENT
+        <template v-if="store.searchQuery.trim()">
+          AUCUN RÉSULTAT POUR « {{ store.searchQuery.trim() }} »
+        </template>
+        <template v-else-if="store.activeCategory !== 'Tous'">
+          AUCUN DROP DANS « {{ store.activeCategory }} »
+        </template>
+        <template v-else>
+          AUCUN DROP POUR LE MOMENT
+        </template>
       </div>
 
       <div v-else class="masonry">
