@@ -1,8 +1,10 @@
 <script setup lang="ts">
 // Admin import Xianyu / 1688 (ST-017)
-// 1. Search by keyword -> results list
+// 1. Search by keyword -> results list (cached in history, "Nouveautés API" refreshes)
 // 2. Click a result -> draft (full detail + gallery downloaded locally)
 // 3. Edit title/desc/price -> publish to catalog (optional Gemini enrichment)
+// 4. Prices: yuan (source) / CFA (conversion) / marché local (table, optional)
+// 5. Transport estimate (air ~10 000 CFA/kg, sea ~320 000 CFA/m³, emballage inclus)
 definePageMeta({ layout: 'admin' })
 
 const config = useRuntimeConfig()
@@ -15,7 +17,13 @@ const searchError = ref('')
 const results = ref<any[]>([])
 const page = ref(1)
 const sort = ref('active')
+const cached = ref(false) // true when the results came from the history cache
 
+// History (cached searches)
+const history = ref<any[]>([])
+const historyLoading = ref(false)
+
+// Draft / publish
 const draftMode = ref(false)
 const drafting = ref(false)
 const draft = ref<any>(null)
@@ -29,7 +37,59 @@ const publishing = ref(false)
 const publishError = ref('')
 const successMsg = ref('')
 
-async function doSearch(reset = true) {
+// Local market prices table (third price)
+const localPrices = ref<any[]>([])
+const localPriceLabel = ref('')
+const localPriceMatch = ref('')
+const localPriceXof = ref(0)
+const localPriceSource = ref('')
+const localPriceSaving = ref(false)
+
+// Transport config + estimate
+const transportConfig = ref<any>(null)
+const transportTab = ref(false)
+
+function authHeaders(): Record<string, string> {
+  const auth = useAuthStore()
+  const headers: Record<string, string> = { Accept: 'application/json' }
+  if (auth.token) headers.Authorization = `Bearer ${auth.token}`
+  return headers
+}
+
+async function loadHistory() {
+  historyLoading.value = true
+  try {
+    const res = await $fetch('/api/admin/import/history', { headers: authHeaders() })
+    history.value = (res as any).history || []
+  } catch {
+    /* non-blocking */
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+async function clearHistory() {
+  try {
+    await $fetch('/api/admin/import/history', { method: 'DELETE', headers: authHeaders() })
+    history.value = []
+    successMsg.value = 'Historique vidé'
+  } catch (e: any) {
+    searchError.value = e?.data?.statusMessage || e?.message || 'Erreur'
+  }
+}
+
+function loadFromHistory(entry: any) {
+  platform.value = entry.platform
+  keyword.value = entry.keyword
+  sort.value = entry.sort
+  page.value = entry.page
+  results.value = entry.items || []
+  cached.value = true
+  searchError.value = ''
+  successMsg.value = `Recherche chargée depuis l'historique (cache)`
+}
+
+async function doSearch(reset = true, fresh = false) {
   const k = keyword.value.trim()
   if (!k) return
   searching.value = true
@@ -38,9 +98,15 @@ async function doSearch(reset = true) {
   if (reset) page.value = 1
   try {
     const res = await $fetch('/api/admin/import/search', {
-      params: { platform: platform.value, keyword: k, page: page.value, sort: sort.value },
+      method: 'GET',
+      headers: authHeaders(),
+      params: { platform: platform.value, keyword: k, page: page.value, sort: sort.value, fresh: fresh ? 1 : 0 },
     })
     results.value = (res as any).items || []
+    cached.value = Boolean((res as any).cached)
+    if (fresh) successMsg.value = 'Nouveautés récupérées depuis l\'API'
+    else if (cached.value) successMsg.value = 'Résultats depuis l\'historique (cache)'
+    loadHistory()
   } catch (e: any) {
     searchError.value = e?.data?.statusMessage || e?.message || 'Erreur de recherche'
     results.value = []
@@ -69,7 +135,8 @@ async function openDraft(item: any) {
   try {
     const res = await $fetch('/api/admin/import/draft', {
       method: 'POST',
-      body: { platform: item.platform, sourceId: item.sourceId },
+      headers: authHeaders(),
+      body: { platform: item.platform, sourceId: item.sourceId, titleFr: item.titleFr || '', keyword: keyword.value },
     })
     const d = (res as any).draft
     draft.value = d
@@ -105,6 +172,7 @@ async function doPublish() {
   try {
     const res = await $fetch('/api/admin/import/publish', {
       method: 'POST',
+      headers: authHeaders(),
       body: {
         platform: draft.value.platform,
         sourceId: draft.value.sourceId,
@@ -131,9 +199,115 @@ async function doPublish() {
   }
 }
 
+// ---- local market prices ----
+async function loadLocalPrices() {
+  try {
+    const res = await $fetch('/api/admin/import/local-prices', { headers: authHeaders() })
+    localPrices.value = (res as any).prices || []
+  } catch {
+    /* non-blocking */
+  }
+}
+
+async function saveLocalPrice() {
+  if (!localPriceLabel.value.trim() || !localPriceMatch.value.trim() || !(localPriceXof.value > 0)) return
+  localPriceSaving.value = true
+  try {
+    const res = await $fetch('/api/admin/import/local-prices', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: {
+        label: localPriceLabel.value,
+        match: localPriceMatch.value,
+        priceXof: localPriceXof.value,
+        source: localPriceSource.value,
+      },
+    })
+    localPrices.value = (res as any).prices || []
+    localPriceLabel.value = ''
+    localPriceMatch.value = ''
+    localPriceXof.value = 0
+    localPriceSource.value = ''
+    successMsg.value = 'Prix local ajouté'
+  } catch (e: any) {
+    searchError.value = e?.data?.statusMessage || e?.message || 'Erreur'
+  } finally {
+    localPriceSaving.value = false
+  }
+}
+
+async function removeLocalPrice(id: string) {
+  try {
+    const res = await $fetch(`/api/admin/import/local-prices/${id}`, { method: 'DELETE', headers: authHeaders() })
+    localPrices.value = (res as any).prices || []
+    successMsg.value = 'Prix local supprimé'
+  } catch {
+    /* non-blocking */
+  }
+}
+
+// ---- transport config ----
+async function loadTransportConfig() {
+  try {
+    const res = await $fetch('/api/admin/import/transport', { headers: authHeaders() })
+    transportConfig.value = (res as any).config || null
+  } catch {
+    /* non-blocking */
+  }
+}
+
+async function saveTransportConfig() {
+  if (!transportConfig.value) return
+  try {
+    const res = await $fetch('/api/admin/import/transport', {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: transportConfig.value,
+    })
+    transportConfig.value = (res as any).config || transportConfig.value
+    successMsg.value = 'Configuration transport enregistrée'
+  } catch (e: any) {
+    searchError.value = e?.data?.statusMessage || e?.message || 'Erreur'
+  }
+}
+
 const meta = computed(() => ({
   label: platform.value === 'xianyu' ? 'Xianyu (Goofish)' : '1688 (gros)',
 }))
+
+function fmtXof(n: number): string {
+  return new Intl.NumberFormat('fr-FR').format(Math.round(n || 0))
+}
+
+function fmtDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+  } catch {
+    return iso || ''
+  }
+}
+
+// Transport estimate for a category (based on the draft + configured rates).
+function transportFor(cat: string) {
+  if (!transportConfig.value) return null
+  const key = Object.keys(transportConfig.value.categories || {}).find(
+    (k) => k.toLowerCase() === String(cat || '').trim().toLowerCase(),
+  ) || 'Autre'
+  const c = transportConfig.value.categories[key]
+  if (!c) return null
+  return {
+    airXof: Math.round(c.weightKg * (transportConfig.value.airXofPerKg || 10000)),
+    seaXof: Math.round(c.volumeCbm * (transportConfig.value.seaXofPerCbm || 320000)),
+    weightKg: c.weightKg,
+    volumeCbm: c.volumeCbm,
+  }
+}
+
+onMounted(() => {
+  loadHistory()
+  loadLocalPrices()
+  loadTransportConfig()
+})
 </script>
 
 <template>
@@ -159,6 +333,26 @@ const meta = computed(() => ({
     </div>
 
     <template v-else>
+      <!-- History (cached searches) -->
+      <div v-if="history.length" class="border border-zinc-800 rounded-xl p-4 bg-[#0d0d14] space-y-2">
+        <div class="flex items-center justify-between gap-3">
+          <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Historique des recherches (cache)</p>
+          <button @click="clearHistory" class="text-[10px] font-mono text-red-400 hover:text-red-300">Vider l'historique</button>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button
+            v-for="h in history"
+            :key="h.key"
+            @click="loadFromHistory(h)"
+            class="px-2.5 py-1.5 rounded-lg border border-zinc-800 text-[10px] font-mono text-zinc-300 hover:text-white hover:border-[#ff2a2a]/40 transition-all text-left"
+          >
+            <span class="text-[#ff2a2a]">{{ h.platform === 'xianyu' ? 'XY' : '1688' }}</span> {{ h.keyword }}
+            <span class="text-zinc-600">p{{ h.page }}</span>
+            <span class="text-zinc-600 ml-1">({{ (h.items || []).length }})</span>
+          </button>
+        </div>
+      </div>
+
       <!-- Search controls -->
       <div class="border border-zinc-800 rounded-xl p-4 bg-[#0d0d14] space-y-3">
         <div class="flex flex-wrap gap-2">
@@ -197,7 +391,17 @@ const meta = computed(() => ({
             <span v-if="searching" class="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
             Rechercher
           </button>
+          <button
+            v-if="cached || results.length"
+            @click="doSearch(false, true)"
+            :disabled="searching"
+            class="px-4 py-2.5 rounded-lg border border-emerald-500/30 text-emerald-400 text-[11px] font-mono font-bold uppercase tracking-wider hover:bg-emerald-500/10 disabled:opacity-50 transition-all inline-flex items-center gap-2"
+          >
+            <span v-if="searching" class="w-3.5 h-3.5 border-2 border-emerald-500/40 border-t-emerald-400 rounded-full animate-spin" />
+            Nouveautés depuis l'API
+          </button>
         </div>
+        <p v-if="cached" class="text-[10px] font-mono text-emerald-500">💾 Résultats chargés depuis l'historique — aucun appel API facturé. Cliquez « Nouveautés depuis l'API » pour rafraîchir.</p>
         <p v-if="searchError" class="text-[11px] font-mono text-red-400">{{ searchError }}</p>
       </div>
 
@@ -220,7 +424,11 @@ const meta = computed(() => ({
             </span>
           </div>
           <div class="p-3 flex flex-col gap-1.5 flex-1">
-            <p class="text-[12px] text-zinc-200 line-clamp-2 min-h-[32px]">{{ item.title }}</p>
+            <p class="text-[12px] text-zinc-200 line-clamp-2 min-h-[32px]">{{ item.titleFr || item.title }}</p>
+            <div class="space-y-0.5">
+              <p class="text-[11px] font-mono text-zinc-400">¥{{ item.priceCny }} <span class="text-emerald-400">≈ {{ fmtXof(item.priceXof) }} FCFA</span></p>
+              <p v-if="item.localPriceXof" class="text-[11px] font-mono text-amber-400">🏷️ Marché local : {{ fmtXof(item.localPriceXof) }} FCFA</p>
+            </div>
             <p v-if="item.area" class="text-[10px] font-mono text-zinc-500">📍 {{ item.area }}</p>
             <button
               @click="draftMode = item; openDraft(item)"
@@ -249,7 +457,7 @@ const meta = computed(() => ({
     </template>
 
     <!-- Draft modal -->
-    <div v-if="draftMode && draft" class="fixed inset-0 z-50 overflow-y-auto">
+    <div v-if="draftMode" class="fixed inset-0 z-50 overflow-y-auto">
       <div class="min-h-full flex items-center justify-center p-4">
         <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" @click="closeDraft" />
         <div class="relative w-full max-w-3xl bg-[#10101a] border border-zinc-800 rounded-2xl shadow-2xl p-5 sm:p-6 space-y-4">
@@ -262,6 +470,12 @@ const meta = computed(() => ({
 
           <div v-if="publishError" class="text-[11px] font-mono text-red-400 border border-red-500/30 rounded-lg p-3">{{ publishError }}</div>
 
+          <div v-if="drafting && !draft" class="flex flex-col items-center justify-center py-16 gap-3">
+            <span class="w-8 h-8 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
+            <p class="text-[11px] font-mono text-zinc-500">Chargement du produit…</p>
+          </div>
+
+          <template v-else-if="draft">
           <div class="flex gap-4 flex-col sm:flex-row">
             <div class="sm:w-44 shrink-0 space-y-2">
               <div class="aspect-square rounded-xl overflow-hidden border border-zinc-800 bg-black/40">
@@ -284,11 +498,26 @@ const meta = computed(() => ({
                 <div>
                   <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Prix source (¥)</p>
                   <input type="number" :value="draft.priceCny" disabled class="w-full bg-black/20 border border-zinc-800 rounded-lg px-3 py-2 text-[12px] text-zinc-400" />
+                  <p class="text-[9px] font-mono text-zinc-600 mt-1">1 ¥ = 95 FCFA</p>
                 </div>
                 <div>
                   <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Prix vente (XOF)</p>
                   <input v-model.number="publishPriceXof" type="number" class="w-full bg-black/40 border border-zinc-800 rounded-lg px-3 py-2 text-[12px] text-white focus:outline-none focus:border-[#ff2a2a]/60" />
                 </div>
+              </div>
+              <div v-if="draft.localPriceXof" class="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2">
+                <p class="text-[11px] font-mono text-amber-400">🏷️ Marché local : {{ fmtXof(draft.localPriceXof) }} FCFA <span v-if="draft.localPriceLabel" class="text-amber-500/70">({{ draft.localPriceLabel }})</span></p>
+              </div>
+              <div v-if="transportFor(publishCategory)" class="rounded-lg border border-sky-500/30 bg-sky-500/5 px-3 py-2 space-y-1">
+                <p class="text-[10px] font-mono text-sky-400 uppercase tracking-widest">🚚 Transport estimé (emballage inclus)</p>
+                <p class="text-[11px] font-mono text-zinc-300">
+                  ✈️ Aérien : <span class="text-sky-300">{{ fmtXof(transportFor(publishCategory).airXof) }} FCFA</span>
+                  <span class="text-zinc-600">({{ transportFor(publishCategory).weightKg }} kg)</span>
+                </p>
+                <p class="text-[11px] font-mono text-zinc-300">
+                  🚢 Maritime : <span class="text-sky-300">{{ fmtXof(transportFor(publishCategory).seaXof) }} FCFA</span>
+                  <span class="text-zinc-600">({{ transportFor(publishCategory).volumeCbm }} m³)</span>
+                </p>
               </div>
             </div>
           </div>
@@ -316,8 +545,14 @@ const meta = computed(() => ({
           <!-- Category + features + AI -->
           <div class="space-y-2">
             <div>
-              <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Catégorie</p>
-              <input v-model="publishCategory" placeholder="ex : Téléphones" class="w-full bg-black/40 border border-zinc-800 rounded-lg px-3 py-2 text-[12px] text-white focus:outline-none focus:border-[#ff2a2a]/60" />
+              <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Catégorie (pour l'estimation transport)</p>
+              <select
+                v-model="publishCategory"
+                class="w-full bg-black/40 border border-zinc-800 rounded-lg px-3 py-2 text-[12px] text-white focus:outline-none focus:border-[#ff2a2a]/60 cursor-pointer"
+              >
+                <option value="">— Choisir —</option>
+                <option v-for="(c, key) in transportConfig?.categories || {}" :key="key" :value="key">{{ key }}</option>
+              </select>
             </div>
             <div>
               <div class="flex items-center justify-between">
@@ -350,6 +585,7 @@ const meta = computed(() => ({
             </button>
             <button @click="closeDraft" class="px-4 py-2.5 rounded-lg border border-zinc-800 text-[11px] font-mono text-zinc-400 hover:text-white transition-all">Annuler</button>
           </div>
+          </template>
         </div>
       </div>
     </div>
@@ -357,6 +593,62 @@ const meta = computed(() => ({
     <!-- success toast -->
     <div v-if="successMsg" class="fixed bottom-4 right-4 z-50 border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 text-[12px] font-mono rounded-xl px-4 py-3 backdrop-blur">
       {{ successMsg }}
+    </div>
+
+    <!-- Local market prices manager (3rd price) -->
+    <div class="border border-zinc-800 rounded-xl p-4 bg-[#0d0d14] space-y-3">
+      <div class="flex items-center justify-between gap-3">
+        <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Prix marché local (3e prix — affiché seulement si une correspondance existe)</p>
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+        <input v-model="localPriceLabel" placeholder="Libellé (ex: iPhone 16)" class="bg-black/40 border border-zinc-800 rounded-lg px-3 py-2 text-[12px] text-white placeholder-zinc-600 focus:outline-none focus:border-[#ff2a2a]/60" />
+        <input v-model="localPriceMatch" placeholder="Mot-clé (ex: iphone16)" class="bg-black/40 border border-zinc-800 rounded-lg px-3 py-2 text-[12px] text-white placeholder-zinc-600 focus:outline-none focus:border-[#ff2a2a]/60" />
+        <input v-model.number="localPriceXof" type="number" placeholder="Prix CFA" class="bg-black/40 border border-zinc-800 rounded-lg px-3 py-2 text-[12px] text-white placeholder-zinc-600 focus:outline-none focus:border-[#ff2a2a]/60" />
+        <input v-model="localPriceSource" placeholder="Source (optionnel)" class="bg-black/40 border border-zinc-800 rounded-lg px-3 py-2 text-[12px] text-white placeholder-zinc-600 focus:outline-none focus:border-[#ff2a2a]/60" />
+        <button @click="saveLocalPrice" :disabled="localPriceSaving" class="px-3 py-2 rounded-lg bg-[#ff2a2a] text-white text-[10px] font-mono font-bold uppercase tracking-wider hover:bg-[#ff3b3b] disabled:opacity-50">+ Ajouter</button>
+      </div>
+      <div v-if="localPrices.length" class="flex flex-wrap gap-2">
+        <span v-for="p in localPrices" :key="p.id" class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-zinc-800 text-[10px] font-mono text-zinc-300">
+          <span class="text-amber-400">{{ p.label }}</span>
+          <span class="text-zinc-500">« {{ p.match }} »</span>
+          <span class="text-emerald-400">{{ fmtXof(p.priceXof) }} F</span>
+          <button @click="removeLocalPrice(p.id)" class="text-red-400 hover:text-red-300">✕</button>
+        </span>
+      </div>
+    </div>
+
+    <!-- Transport config manager -->
+    <div class="border border-zinc-800 rounded-xl p-4 bg-[#0d0d14] space-y-3">
+      <div class="flex items-center justify-between gap-3">
+        <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Estimation transport transitaire (emballage inclus)</p>
+        <button @click="saveTransportConfig" class="text-[10px] font-mono text-emerald-400 hover:text-emerald-300">Enregistrer</button>
+      </div>
+      <p class="text-[10px] font-mono text-zinc-500">Sources marché 2026 : aérien 3–9,5 $/kg (~2 000–5 700 FCFA/kg) ; maritime LCL 50–250 $/m³ (~30 000–150 000 FCFA/m³). Joe Cargo tout-inclus (DDP) : aérien ≈ 10 000 FCFA/kg, maritime ≈ 320 000 FCFA/m³.</p>
+      <div v-if="transportConfig" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <label class="flex flex-col gap-1 text-[10px] font-mono text-zinc-400">
+          Fret aérien (FCFA/kg)
+          <input v-model.number="transportConfig.airXofPerKg" type="number" class="bg-black/40 border border-zinc-800 rounded-lg px-3 py-2 text-[12px] text-white" />
+        </label>
+        <label class="flex flex-col gap-1 text-[10px] font-mono text-zinc-400">
+          Fret maritime (FCFA/m³)
+          <input v-model.number="transportConfig.seaXofPerCbm" type="number" class="bg-black/40 border border-zinc-800 rounded-lg px-3 py-2 text-[12px] text-white" />
+        </label>
+      </div>
+      <div v-if="transportConfig" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+        <div v-for="(c, key) in transportConfig.categories" :key="key" class="border border-zinc-800 rounded-lg p-2 space-y-1.5">
+          <p class="text-[10px] font-mono text-zinc-300">{{ key }}</p>
+          <div class="flex gap-2">
+            <label class="flex-1 flex flex-col gap-0.5 text-[9px] font-mono text-zinc-500">
+              kg
+              <input v-model.number="c.weightKg" type="number" step="0.01" class="bg-black/40 border border-zinc-800 rounded px-2 py-1 text-[11px] text-white" />
+            </label>
+            <label class="flex-1 flex flex-col gap-0.5 text-[9px] font-mono text-zinc-500">
+              m³
+              <input v-model.number="c.volumeCbm" type="number" step="0.001" class="bg-black/40 border border-zinc-800 rounded px-2 py-1 text-[11px] text-white" />
+            </label>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>

@@ -1244,3 +1244,254 @@ export async function mutatePayments<T>(
     return value
   })
 }
+
+// ---------------------------------------------------------------------------
+// Import search history (ST-017) — blob bm-import-history / history.json
+//
+// Every admin search (platform + keyword + sort + page) is persisted with its
+// results so the admin can reload an old search WITHOUT re-hitting the JustOne
+// API (which costs money). A `fresh` search re-queries the API and updates the
+// stored entry. The list is capped to avoid unbounded blob growth.
+// ---------------------------------------------------------------------------
+export interface ImportSearchEntry {
+  key: string // platform|keyword|sort|page
+  platform: 'xianyu' | '1688'
+  keyword: string
+  sort: string
+  page: number
+  items: any[] // flattened + translated search results (no raw API payload)
+  updatedAt: string
+}
+
+const IMPORT_HISTORY_FILE = path.join(DATA_DIR, 'import-history.json')
+const IMPORT_HISTORY_MAX = 200
+
+async function loadImportHistoryFile(): Promise<ImportSearchEntry[]> {
+  if (isNetlifyRuntime()) {
+    const raw = await blobGet('bm-import-history', 'history.json', 'text', 'strong')
+    if (raw != null) {
+      try {
+        const p = JSON.parse(raw)
+        if (Array.isArray(p)) return p
+      } catch {
+        /* corrupted -> start fresh */
+      }
+    }
+    return []
+  }
+  const p = await readJSON(IMPORT_HISTORY_FILE)
+  return Array.isArray(p) ? p : []
+}
+
+export async function loadImportHistory(): Promise<ImportSearchEntry[]> {
+  return loadImportHistoryFile()
+}
+
+export function importHistoryKey(platform: string, keyword: string, sort: string, page: number): string {
+  return `${platform}|${String(keyword).toLowerCase().trim()}|${sort}|${page}`
+}
+
+/** Fetch one cached search entry by key (null when absent). */
+export async function getImportSearch(key: string): Promise<ImportSearchEntry | null> {
+  const list = await loadImportHistoryFile()
+  return list.find((e) => e.key === key) || null
+}
+
+/** Upsert a cached search entry (most recent first), capped at N entries. */
+export async function upsertImportSearch(entry: ImportSearchEntry): Promise<ImportSearchEntry[]> {
+  return mutateGeneric('bm-import-history', 'history.json', IMPORT_HISTORY_FILE, (list: ImportSearchEntry[]) => {
+    const idx = list.findIndex((e) => e.key === entry.key)
+    const next = [...list]
+    if (idx >= 0) next.splice(idx, 1)
+    next.unshift({ ...entry, updatedAt: new Date().toISOString() })
+    return next.slice(0, IMPORT_HISTORY_MAX)
+  })
+}
+
+/** Clear the whole import search history. */
+export async function clearImportHistory(): Promise<void> {
+  if (isNetlifyRuntime()) {
+    try {
+      await blobSet('bm-import-history', 'history.json', JSON.stringify([]))
+    } catch (err) {
+      console.error('[BLOBS] import history clear failed:', err)
+    }
+    return
+  }
+  await writeJSON(IMPORT_HISTORY_FILE, [])
+}
+
+// ---------------------------------------------------------------------------
+// Local market price table (ST-017) — blob bm-local-prices / prices.json
+//
+// Admin-maintained approximate price of a product on the LOCAL market (in CFA).
+// When an imported product's title/keyword matches one of these entries, the
+// admin UI shows a third price ("marché local") next to the yuan & CFA prices.
+// If no entry matches, nothing is shown (per user requirement).
+// ---------------------------------------------------------------------------
+export interface LocalPriceEntry {
+  id: string
+  label: string // ex: "iPhone 16"
+  match: string // lowercase substring matched against title + keyword
+  priceXof: number
+  source?: string
+  updatedAt: string
+}
+
+const LOCAL_PRICES_FILE = path.join(DATA_DIR, 'local-prices.json')
+
+async function loadLocalPricesFile(): Promise<LocalPriceEntry[]> {
+  if (isNetlifyRuntime()) {
+    const raw = await blobGet('bm-local-prices', 'prices.json', 'text', 'strong')
+    if (raw != null) {
+      try {
+        const p = JSON.parse(raw)
+        if (Array.isArray(p)) return p
+      } catch {
+        /* corrupted -> start fresh */
+      }
+    }
+    return []
+  }
+  const p = await readJSON(LOCAL_PRICES_FILE)
+  return Array.isArray(p) ? p : []
+}
+
+export async function loadLocalPrices(): Promise<LocalPriceEntry[]> {
+  return loadLocalPricesFile()
+}
+
+/** Best-effort local price lookup against a title/keyword (null = no match). */
+export async function findLocalPrice(title: string, keyword = ''): Promise<LocalPriceEntry | null> {
+  const entries = await loadLocalPricesFile()
+  const hay = `${title} ${keyword}`.toLowerCase()
+  let best: LocalPriceEntry | null = null
+  for (const e of entries) {
+    const m = String(e.match || '').toLowerCase()
+    if (m && hay.includes(m)) {
+      if (!best || m.length > String(best.match || '').length) best = e
+    }
+  }
+  return best
+}
+
+export async function upsertLocalPrice(entry: LocalPriceEntry): Promise<LocalPriceEntry[]> {
+  return mutateGeneric('bm-local-prices', 'prices.json', LOCAL_PRICES_FILE, (list: LocalPriceEntry[]) => {
+    const idx = list.findIndex((e) => e.id === entry.id)
+    const next = [...list]
+    if (idx >= 0) next[idx] = { ...entry, updatedAt: new Date().toISOString() }
+    else next.push({ ...entry, updatedAt: new Date().toISOString() })
+    return next
+  })
+}
+
+export async function deleteLocalPrice(id: string): Promise<LocalPriceEntry[]> {
+  return mutateGeneric('bm-local-prices', 'prices.json', LOCAL_PRICES_FILE, (list: LocalPriceEntry[]) => {
+    return list.filter((e) => e.id !== id)
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Transport estimate config (ST-017) — blob bm-transport / config.json
+//
+// Per-user (Joe Cargo) references: air freight ~10 000 CFA/kg, sea freight
+// ~320 000 CFA/m³. Weight/volume are per product CATEGORY and INCLUDE the
+// packaging (emballage inclus, per user requirement).
+// ---------------------------------------------------------------------------
+export interface TransportConfig {
+  airXofPerKg: number
+  seaXofPerCbm: number
+  categories: Record<string, { weightKg: number; volumeCbm: number }>
+}
+
+const DEFAULT_TRANSPORT: TransportConfig = {
+  airXofPerKg: 10000,
+  seaXofPerCbm: 320000,
+  categories: {
+    'Téléphones': { weightKg: 0.55, volumeCbm: 0.006 },
+    'Ordinateurs': { weightKg: 2.5, volumeCbm: 0.03 },
+    'Montres': { weightKg: 0.25, volumeCbm: 0.002 },
+    'Vêtements': { weightKg: 0.6, volumeCbm: 0.01 },
+    'Chaussures': { weightKg: 1.2, volumeCbm: 0.014 },
+    'Sacs': { weightKg: 1.0, volumeCbm: 0.012 },
+    'Écouteurs': { weightKg: 0.3, volumeCbm: 0.003 },
+    'Autre': { weightKg: 1.0, volumeCbm: 0.01 },
+  },
+}
+
+const TRANSPORT_FILE = path.join(DATA_DIR, 'transport.json')
+
+export async function loadTransportConfig(): Promise<TransportConfig> {
+  let raw: any = null
+  if (isNetlifyRuntime()) {
+    raw = await blobGet('bm-transport', 'config.json', 'text', 'strong')
+  } else {
+    raw = await readJSON(TRANSPORT_FILE)
+  }
+  if (raw && typeof raw === 'object') {
+    return {
+      airXofPerKg: Number(raw.airXofPerKg) || DEFAULT_TRANSPORT.airXofPerKg,
+      seaXofPerCbm: Number(raw.seaXofPerCbm) || DEFAULT_TRANSPORT.seaXofPerCbm,
+      categories: { ...DEFAULT_TRANSPORT.categories, ...(raw.categories || {}) },
+    }
+  }
+  return JSON.parse(JSON.stringify(DEFAULT_TRANSPORT))
+}
+
+export async function saveTransportConfig(cfg: TransportConfig): Promise<void> {
+  if (isNetlifyRuntime()) {
+    return blobSet('bm-transport', 'config.json', JSON.stringify(cfg, null, 2))
+  }
+  return writeJSON(TRANSPORT_FILE, cfg)
+}
+
+/** Estimate freight costs for a category (emballage inclus). Returns null if
+ *  the category is unknown (only default fallback used). */
+export async function estimateTransport(category: string): Promise<{ airXof: number; seaXof: number; weightKg: number; volumeCbm: number } | null> {
+  const cfg = await loadTransportConfig()
+  const key = Object.keys(cfg.categories).find((k) => k.toLowerCase() === String(category || '').trim().toLowerCase()) || 'Autre'
+  const cat = cfg.categories[key]
+  if (!cat) return null
+  return {
+    airXof: Math.round(cat.weightKg * cfg.airXofPerKg),
+    seaXof: Math.round(cat.volumeCbm * cfg.seaXofPerCbm),
+    weightKg: cat.weightKg,
+    volumeCbm: cat.volumeCbm,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Generic atomic read-modify-write over a JSON blob/file (shared helper used
+// by the import-history / local-prices stores above).
+// ---------------------------------------------------------------------------
+async function mutateGeneric<T>(
+  blobStore: string,
+  blobKey: string,
+  filePath: string,
+  mutate: (list: T[]) => T[],
+): Promise<T[]> {
+  if (isNetlifyRuntime()) {
+    return withBlobLock(blobStore, blobKey, async () => {
+      const s = getStore({ name: blobStore })
+      let list: T[] = []
+      try {
+        const raw = await s.get(blobKey, { type: 'text', consistency: 'strong' } as any)
+        if (raw != null) {
+          const parsed = JSON.parse(String(raw))
+          if (Array.isArray(parsed)) list = parsed
+        }
+      } catch (err) {
+        console.error(`[BLOBS] ${blobStore} read failed:`, err)
+      }
+      const next = mutate(JSON.parse(JSON.stringify(list)))
+      await s.set(blobKey, JSON.stringify(next, null, 2))
+      return next
+    })
+  }
+  return withLock(blobStore, async () => {
+    const list = (await readJSON(filePath)) || []
+    const next = mutate(Array.isArray(list) ? list : [])
+    await writeJSON(filePath, next)
+    return next
+  })
+}

@@ -31,7 +31,7 @@ export default defineNuxtConfig({
       siteUrl: "https://deeproots-importexport.netlify.app",
       phoneNumber: "237683963007",
       currency: "XOF",
-      rmbToXofRate: 85,
+      rmbToXofRate: 95,
       xofToEurRate: 655.957,
       googleClientId: process.env.GOOGLE_CLIENT_ID || "",
       ga4Id: process.env.GA4_ID || "",

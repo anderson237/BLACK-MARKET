@@ -1,5 +1,6 @@
 import { requireAuth } from '~~/server/utils/auth'
 import { joSearch, joDetail, importRemoteImage, cnyToXof } from '~~/server/utils/justone'
+import { findLocalPrice, estimateTransport } from '~~/server/utils/storage'
 
 // Admin import pipeline (ST-017): draft a single product from Xianyu or 1688.
 // Body: { platform: 'xianyu'|'1688', sourceId }
@@ -12,6 +13,7 @@ export default defineEventHandler(async (event) => {
   const platform = body?.platform === '1688' ? '1688' : 'xianyu'
   const sourceId = String(body?.sourceId || '').trim()
   if (!sourceId) throw createError({ statusCode: 400, statusMessage: 'Identifiant source manquant.' })
+  const titleFr = String(body?.titleFr || '').trim()
 
   let detail
   try {
@@ -31,6 +33,13 @@ export default defineEventHandler(async (event) => {
 
   const priceXof = cnyToXof(detail.priceCny)
 
+  // Third price: local market approximation (only when a table entry matches).
+  const lp = await findLocalPrice(String(titleFr || detail.title || ''), String(body?.keyword || ''))
+
+  // Transport estimate (emballage inclus) — category defaults to "Autre" until
+  // the admin picks one; the front asks /api/admin/import/transport for rates.
+  const transport = await estimateTransport(String(body?.category || ''))
+
   return {
     success: true,
     draft: {
@@ -40,12 +49,15 @@ export default defineEventHandler(async (event) => {
         ? `https://www.goofish.com/item?id=${detail.sourceId}`
         : `https://s.1688.com/selloffer/offer_search.htm?keywords=${encodeURIComponent(detail.title)}`,
       sourceTitle: detail.title,
-      title: detail.title, // placeholder — the AI enrichment (translate/fr) runs at publish time
+      title: titleFr || detail.title, // French translation pre-filled from search when available
       chineseTitle: detail.title,
       chineseDescription: detail.desc,
       description: detail.desc,
       priceCny: detail.priceCny,
       priceXof,
+      localPriceXof: lp ? lp.priceXof : undefined,
+      localPriceLabel: lp ? lp.label : undefined,
+      transport,
       imageUrl: mainImage,
       gallery,
       condition: detail.condition || undefined,

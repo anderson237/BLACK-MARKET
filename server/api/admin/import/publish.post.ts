@@ -57,7 +57,7 @@ Fais le travail suivant :
 2. Traduis/adapte la description en français de manière claire et fidèle.
 3. Rédige un argumentaire de vente premium en français (bénéfices clients, crédible).
 4. Extrais 3 à 5 caractéristiques techniques clés.
-5. Suggère un prix de vente EUR et XOF. Convertis le prix d'achat (1 RMB ≈ 85 XOF ≈ 0.13 EUR) et applique une marge d'importation réaliste (frais d'envoi 5-10 € / 3000-6000 XOF inclus).
+5. Suggère un prix de vente EUR et XOF. Convertis le prix d'achat (1 RMB ≈ 95 XOF ≈ 0.14 EUR) et applique une marge d'importation réaliste (frais d'envoi 5-10 € / 3000-6000 XOF inclus).
 Réponds strictement en JSON au schéma demandé.
 `
     const response = await generateContentWithRetry(
@@ -101,8 +101,8 @@ Réponds strictement en JSON au schéma demandé.
     finalId = `${baseId}_${crypto.randomBytes(3).toString('hex')}`
   }
 
-  // Margin: if the admin kept the machine-computed price (cnyToXof includes a
-  // 1.35 margin), the final display price keeps that value.
+  // Margin: if the admin kept the machine-computed price (cnyToXof applies the
+  // fixed 1 CNY = 95 XOF rate), the final display price keeps that value.
   const computedXof = cnyToXof(priceCny)
   const aiXof = Number(enriched?.priceXof) || 0
 

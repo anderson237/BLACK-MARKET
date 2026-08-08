@@ -296,11 +296,12 @@ export async function importRemoteImage(url: string, index = 0): Promise<string>
 
 // ---------------------------------------------------------------------------
 // CNY -> XOF conversion. Uses the same fixed anchor as the storefront
-// (runtimeConfig.public.rmbToXofRate, default 85). Price computed with a
-// margin multiplier so the import is profitable out of the box.
+// (runtimeConfig.public.rmbToXofRate, default 95). The admin asked for a
+// transparent "1 yuan = 95 FCFA" conversion: the XOF price is exactly
+// priceCny * rate (no hidden margin multiplier by default).
 // ---------------------------------------------------------------------------
 
-export function cnyToXof(priceCny: number, margin = 1.35): number {
-  const rate = Number(useRuntimeConfig().public.rmbToXofRate) || 85
+export function cnyToXof(priceCny: number, margin = 1): number {
+  const rate = Number(useRuntimeConfig().public.rmbToXofRate) || 95
   return Math.round(priceCny * rate * margin)
 }
