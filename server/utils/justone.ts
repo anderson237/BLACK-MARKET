@@ -343,7 +343,7 @@ function flattenTaobaoSearch(json: any): JoSearchItem[] {
       title: String(d?.itemName || ''),
       price: Number.isFinite(price) ? price : 0,
       currency: 'CNY',
-      imageUrl: pic.startsWith('http') ? pic : `https:${pic}`,
+      imageUrl: taobaoImageUrl(pic),
       area: String(d?.itemLoc || ''),
       sellerNick: String(d?.shopName || ''),
       sourceUrl: `https://item.taobao.com/item.htm?id=${d.itemId}`,
@@ -367,7 +367,7 @@ function flattenTaobaoDetail(json: any): JoDetail | null {
   if (Array.isArray(imgs)) {
     for (const i of imgs) {
       const url = String(typeof i === 'string' ? i : i?.url || i?.imageUrl || i?.fullPathImageURI || '')
-      if (url) images.push(url.startsWith('http') ? url : `https:${url}`)
+      if (url) images.push(taobaoImageUrl(url))
     }
   }
   const price = Number(String(offer.priceInfo?.price ?? offer.price ?? offer.priceYuanDouble ?? offer.discntPriceYuan ?? '').replace(/[^0-9.]/g, ''))
@@ -382,6 +382,27 @@ function flattenTaobaoDetail(json: any): JoDetail | null {
     features: [],
     extra: { offer },
   }
+}
+
+// ---------------------------------------------------------------------------
+// Taobao image CDN normalisation.
+// The search API returns URLs on g.search[1-3].alicdn.com/img/bao/uploaded/
+// which are blocked/geo-restricted (connection timeout). The very same file is
+// served from img.alicdn.com/imgextra/<bucket>/<sellerId>/<file> where <bucket>
+// is the SECOND path segment after "uploaded" (i1/i2/i3/i4). Verified live:
+// https://img.alicdn.com/imgextra/i4/{sellerId}/{file} -> 200 image/webp.
+// ---------------------------------------------------------------------------
+export function taobaoImageUrl(url: string): string {
+  const raw = String(url || '').trim()
+  if (!raw) return ''
+  // https://g.search[N].alicdn.com/img/bao/uploaded/iX/iY/<sellerId>/<file>
+  const m = raw.match(/^https?:\/\/g\.search\d?\.alicdn\.com\/img\/bao\/uploaded\/(?:[^/]+\/)?(i[1-4])\/(i[1-4])\/(.+)$/)
+  if (m) {
+    const bucket = m[2] // second segment = the imgextra bucket
+    return `https://img.alicdn.com/imgextra/${bucket}/${m[3]}`
+  }
+  // Protocol-relative or already on the working CDN -> pass through.
+  return raw.startsWith('//') ? `https:${raw}` : raw
 }
 
 // ---------------------------------------------------------------------------
