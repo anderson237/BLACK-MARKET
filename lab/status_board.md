@@ -33,6 +33,7 @@
 ## Historique des deploys
 
 | Date | Deploy URL | Contenu |
+| 2026-08-08 | 6a77908003f222a3008f75d4 | Import : **fix images Taobao en recherche** — l'API renvoie des URLs `g.search[N].alicdn.com/img/bao/uploaded/` (bloquées, timeout) ; `taobaoImageUrl()` les réécrit vers `img.alicdn.com/imgextra/<bucket>/` (vérifié 200 webp sur 5 URLs), appliqué aux flatteners search + detail (build Nuxt) |
 | 2026-08-08 | 6a778b4d43195056ebc77567 | Vitrine : **barre de recherche produit** au-dessus des onglets catégorie (recherche sur titre/chinois/description/catégorie, combinée avec le filtre catégorie actif, bouton effacer, message vide adapté) (build Nuxt) |
 | 2026-08-08 | 6a7789332187baadc65f4dbe | Admin : **infos fournisseur visibles et éditables dans le catalogue admin** — fix critique (le contact fournisseur était silencieusement perdu à chaque édition d'un produit importé : `supplierContact` absent du modal) ; section « 📇 Contact fournisseur » éditable dans l'éditeur produit, badge « 📇 Fournisseur » sur les cards + « Fiche fournisseur » dans le modal détail (build Nuxt) |
 | 2026-08-08 | 6a7786a7b8374abde18e079e | Vitrine : **badge « ❤️ J'aime » retiré des cards produit** (recouvrait la photo/vidéo en haut de carte) — le badge « 💬 Commenté » et le glow de bordure restent (build Nuxt) |
