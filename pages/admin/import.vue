@@ -475,8 +475,8 @@ onMounted(() => {
           class="border border-zinc-800 rounded-xl overflow-hidden bg-[#0d0d14] flex flex-col group"
         >
           <div class="aspect-square relative bg-black/40">
-            <img v-if="item.imageUrl" :src="item.imageUrl" :alt="item.title" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-              loading="lazy" />
+            <img v-if="item.imageUrl" :src="item.imageUrl" :alt="item.title" referrerpolicy="no-referrer" loading="lazy" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              @error="($event.target as HTMLImageElement).style.display='none'" />
             <div v-else class="absolute inset-0 grid place-items-center text-zinc-700 text-[10px] font-mono">no img</div>
             <span class="absolute top-2 left-2 text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-black/60 text-white backdrop-blur">
               {{ PLATFORMS.find((p) => p.id === item.platform)?.short || item.platform }}
@@ -548,10 +548,12 @@ onMounted(() => {
           <div class="flex gap-4 flex-col sm:flex-row">
             <div class="sm:w-44 shrink-0 space-y-2">
               <div class="aspect-square rounded-xl overflow-hidden border border-zinc-800 bg-black/40">
-                <img v-if="draft.imageUrl" :src="draft.imageUrl" alt="" class="w-full h-full object-cover" />
+                <img v-if="draft.imageUrl" :src="draft.imageUrl" alt="" referrerpolicy="no-referrer" class="w-full h-full object-cover"
+                  @error="($event.target as HTMLImageElement).style.display='none'" />
               </div>
               <div v-if="draft.gallery?.length" class="grid grid-cols-5 gap-1">
-                <img v-for="(g, i) in draft.gallery.slice(0, 5)" :key="i" :src="g" alt="" class="aspect-square object-cover rounded border border-zinc-800" loading="lazy" />
+                <img v-for="(g, i) in draft.gallery.slice(0, 5)" :key="i" :src="g" alt="" referrerpolicy="no-referrer" loading="lazy" class="aspect-square object-cover rounded border border-zinc-800"
+                    @error="($event.target as HTMLImageElement).style.display='none'" />
               </div>
             </div>
             <div class="flex-1 min-w-0 space-y-3">
@@ -703,24 +705,24 @@ onMounted(() => {
       <div v-if="transportConfig" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <label class="flex flex-col gap-1 text-[10px] font-mono text-zinc-400">
           Fret aérien (FCFA/kg)
-          <input v-model.number="transportConfig.airXofPerKg" type="number" class="bg-black/40 border border-zinc-800 rounded-lg px-3 py-2 text-[12px] text-white" />
+          <input v-model.number="transportConfig.airXofPerKg" type="number" class="w-full min-w-0 bg-black/40 border border-zinc-800 rounded-lg px-3 py-2 text-[12px] text-white" />
         </label>
         <label class="flex flex-col gap-1 text-[10px] font-mono text-zinc-400">
           Fret maritime (FCFA/m³)
-          <input v-model.number="transportConfig.seaXofPerCbm" type="number" class="bg-black/40 border border-zinc-800 rounded-lg px-3 py-2 text-[12px] text-white" />
+          <input v-model.number="transportConfig.seaXofPerCbm" type="number" class="w-full min-w-0 bg-black/40 border border-zinc-800 rounded-lg px-3 py-2 text-[12px] text-white" />
         </label>
       </div>
       <div v-if="transportConfig" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
         <div v-for="(c, key) in transportConfig.categories" :key="key" class="border border-zinc-800 rounded-lg p-2 space-y-1.5">
           <p class="text-[10px] font-mono text-zinc-300">{{ key }}</p>
           <div class="flex gap-2">
-            <label class="flex-1 flex flex-col gap-0.5 text-[9px] font-mono text-zinc-500">
+            <label class="flex-1 min-w-0 flex flex-col gap-0.5 text-[9px] font-mono text-zinc-500">
               kg
-              <input v-model.number="c.weightKg" type="number" step="0.01" class="bg-black/40 border border-zinc-800 rounded px-2 py-1 text-[11px] text-white" />
+              <input v-model.number="c.weightKg" type="number" step="0.01" class="w-full min-w-0 bg-black/40 border border-zinc-800 rounded px-2 py-1 text-[11px] text-white" />
             </label>
-            <label class="flex-1 flex flex-col gap-0.5 text-[9px] font-mono text-zinc-500">
+            <label class="flex-1 min-w-0 flex flex-col gap-0.5 text-[9px] font-mono text-zinc-500">
               m³
-              <input v-model.number="c.volumeCbm" type="number" step="0.001" class="bg-black/40 border border-zinc-800 rounded px-2 py-1 text-[11px] text-white" />
+              <input v-model.number="c.volumeCbm" type="number" step="0.001" class="w-full min-w-0 bg-black/40 border border-zinc-800 rounded px-2 py-1 text-[11px] text-white" />
             </label>
           </div>
         </div>
