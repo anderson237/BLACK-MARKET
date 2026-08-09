@@ -1,4 +1,4 @@
-import { joDetail, importRemoteImage, priceToXof, type JoPlatform } from '~~/server/utils/justone'
+import { joDetail, importRemoteImage, priceToXof, type JoPlatform, type JoDetail } from '~~/server/utils/justone'
 import { findLocalPrice, estimateTransport, getSupplierContact } from '~~/server/utils/storage'
 import { detectCategory } from '~~/server/utils/category'
 
@@ -19,6 +19,15 @@ export interface DraftSource {
   moq?: number
   priceTiers?: any[]
   stock?: number
+  /**
+   * Détail déjà extrait (BL-007 headless goofish). Quand présent, buildDraft
+   * l'utilise TEL QUEL au lieu d'appeler joDetail() → le chemin JustOneAPI
+   * (défaut) reste byte-identical. `detail` doit être une JoDetail au format
+   * identique au flattener (scraperGoofish.ts le garantit).
+   */
+  detail?: JoDetail
+  /** Moteur ayant produit `detail` — journalisation / réponse API. */
+  detailSource?: 'justone' | 'headless'
 }
 
 function sourceUrlFor(platform: JoPlatform, sourceId: string): string {
@@ -46,11 +55,16 @@ export async function buildDraft(source: DraftSource): Promise<any> {
   const region = source.region || 'US'
 
   let detail
-  try {
-    detail = await joDetail(platform, sourceId, region)
-  } catch (err: any) {
-    // Balance / quota errors surface verbatim so the admin can recharge.
-    throw err
+  if (source.detail) {
+    // BL-007 : détail pré-extrait (headless goofish) — pas d'appel JustOneAPI.
+    detail = source.detail
+  } else {
+    try {
+      detail = await joDetail(platform, sourceId, region)
+    } catch (err: any) {
+      // Balance / quota errors surface verbatim so the admin can recharge.
+      throw err
+    }
   }
 
   // Download up to 5 pictures locally (degraded: remote URL kept on failure).

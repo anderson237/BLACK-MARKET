@@ -168,9 +168,12 @@ async function importFromUrl() {
     supplierSaved.value = false
     productUrl.value = ''
   } catch (e: any) {
-    publishError.value = e?.data?.statusMessage || e?.message || 'Erreur d\u2019import du lien'
+    // L'erreur s'affiche sous le champ URL (le modal draft reste fermé), pas
+    // dans le modal — sinon elle disparaît avec la fermeture du modal.
+    urlError.value = e?.data?.statusMessage || e?.message || 'Erreur d\u2019import du lien'
     draftMode.value = false
     draft.value = null
+    publishError.value = ''
   } finally {
     urlBusy.value = false
   }

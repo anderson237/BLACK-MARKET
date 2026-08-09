@@ -79,7 +79,7 @@ async function joGet<T>(path: string, params: Record<string, string>): Promise<T
       // Balance / quota errors: surface a readable message to the admin.
       const msg =
         json.code === 601 || json.code === 602
-          ? 'Solde Just One API insuffisant : rechargez le compte (dashboard.justoneapi.com) pour les appels de détail.'
+          ? 'Solde Just One API insuffisant : rechargez le compte (dashboard.justoneapi.com) puis réessayez.'
           : json.code === 303
             ? 'Quota quotidien Just One API atteint, réessayez demain.'
             : `Just One API erreur ${json.code}: ${String(json.message || '').slice(0, 120)}`
