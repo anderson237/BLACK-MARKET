@@ -212,7 +212,7 @@ export default defineEventHandler(async (event) => {
     out.push({
       ...item,
       titleFr: frMap[idx] || '',
-      priceXof: priceToXof(item),
+      priceXof: await priceToXof(item),
       localPriceXof: lp ? lp.priceXof : undefined,
       localPriceLabel: lp ? lp.label : undefined,
     })

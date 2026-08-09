@@ -135,7 +135,7 @@ Réponds strictement en JSON au schéma demandé.
 
   // Margin: if the admin kept the machine-computed price (priceToXof applies
   // the source-currency conversion), the final display price keeps that value.
-  const computedXof = priceToXof({ price, currency })
+  const computedXof = await priceToXof({ price, currency })
   const aiXof = Number(enriched?.priceXof) || 0
 
   const product = sanitizeProduct({

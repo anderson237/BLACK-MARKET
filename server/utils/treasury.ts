@@ -40,7 +40,7 @@ export interface TreasurySnapshot {
 export async function computeTreasury(): Promise<TreasurySnapshot> {
   const [productsRaw, orders, expenses, treasury] = await Promise.all([loadProducts(), loadOrders(), loadExpenses(), loadTreasury()])
   const products = productsRaw.filter((p: any) => !p.deleted)
-  const rows = revenueRows(orders, products)
+  const rows = await revenueRows(orders, products)
   const initial = Number(treasury.settings?.initialBalanceXof) || 0
   const now = new Date()
 

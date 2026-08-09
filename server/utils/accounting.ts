@@ -1,10 +1,14 @@
-import { RMB_TO_XOF_RATE, XOF_PER_EUR } from './constants'
+import { loadRates } from './rates'
 
 // ---------------------------------------------------------------------------
 // Accounting helpers shared by /api/accounting, the expense CRUD and the CSV
 // export. Revenue only counts orders the shop actually receives money for
 // (processing = confirmed/paid, shipped, completed). Pending = preorder intent
 // (not paid yet), cancelled = never paid.
+//
+// ALL currency conversions read the SAME persisted admin-editable rates as the
+// import pipeline (server/utils/rates.ts) so the comptabilité and the import
+// prices can never disagree (they used to: 95 vs 85).
 // ---------------------------------------------------------------------------
 
 export const REVENUE_STATUSES = ['processing', 'completed', 'shipped'] as const
@@ -18,24 +22,27 @@ export function isRevenueStatus(status: string): boolean {
 /** Purchase cost in FCFA for one unit of a product.
  *  Uses prix d'achat fournisseur + transport (RMB) when present, else the
  *  legacy source price in RMB. */
-export function productCostXof(p?: any): number {
+export async function productCostXof(p?: any): Promise<number> {
   if (!p) return 0
   const purchase = Number(p.purchaseRmb) || 0
   const shipping = Number(p.shippingRmb) || 0
   const rmb = purchase > 0 ? purchase + shipping : Number(p.sourceRmb) || 0
-  return Math.round(rmb * RMB_TO_XOF_RATE)
+  const { cnyToXof: rate } = await loadRates()
+  return Math.round(rmb * rate)
 }
 
 /** Suggested selling price in FCFA from cost + margin, rounded to 100. */
-export function sellingPriceXof(purchaseRmb: number, shippingRmb: number, marginPercent: number): number {
+export async function sellingPriceXof(purchaseRmb: number, shippingRmb: number, marginPercent: number): Promise<number> {
   const total = (Number(purchaseRmb) || 0) + (Number(shippingRmb) || 0)
   if (total <= 0) return 0
-  const raw = total * (1 + (Number(marginPercent) || 0) / 100) * RMB_TO_XOF_RATE
+  const { cnyToXof: rate } = await loadRates()
+  const raw = total * (1 + (Number(marginPercent) || 0) / 100) * rate
   return Math.max(0, Math.round(raw / 100) * 100)
 }
 
-export function sellingPriceEur(xof: number): number {
-  return Math.round(xof / XOF_PER_EUR)
+export async function sellingPriceEur(xof: number): Promise<number> {
+  const { eurToXof: rate } = await loadRates()
+  return Math.round(xof / rate)
 }
 
 // ---- date helpers (all date math in local time) ----
@@ -115,7 +122,7 @@ export interface RevenueRow {
 }
 
 /** Flatten paid orders into revenue rows carrying their estimated COGS. */
-export function revenueRows(orders: any[], products: any[]): RevenueRow[] {
+export async function revenueRows(orders: any[], products: any[]): Promise<RevenueRow[]> {
   const byId = new Map(products.map((p) => [p.id, p]))
   const rows: RevenueRow[] = []
   for (const o of orders) {
@@ -127,7 +134,7 @@ export function revenueRows(orders: any[], products: any[]): RevenueRow[] {
       order: o,
       product,
       revenueXof: price * qty,
-      costXof: productCostXof(product) * qty,
+      costXof: (await productCostXof(product)) * qty,
     })
   }
   return rows

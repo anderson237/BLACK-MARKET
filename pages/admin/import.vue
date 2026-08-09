@@ -133,6 +133,49 @@ const publishing = ref(false)
 const publishError = ref('')
 const successMsg = ref('')
 
+// Paste-a-link flow: same draft pipeline as a search-result click, but the
+// platform + source id are detected from a product URL.
+const productUrl = ref('')
+const urlBusy = ref(false)
+const urlError = ref('')
+
+async function importFromUrl() {
+  const u = productUrl.value.trim()
+  if (!u) {
+    urlError.value = 'Collez d\'abord le lien du produit.'
+    return
+  }
+  urlBusy.value = true
+  urlError.value = ''
+  draftMode.value = true
+  draft.value = null
+  publishError.value = ''
+  successMsg.value = ''
+  try {
+    const res = await $fetch('/api/admin/import/from-url', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: { url: u, titleFr: '', keyword: keyword.value, category: '' },
+    })
+    const d = (res as any).draft
+    draft.value = d
+    publishTitle.value = d.title || ''
+    publishDesc.value = d.description || ''
+    publishPriceXof.value = d.priceXof || 0
+    publishFeatures.value = Array.isArray(d.features) ? d.features.map((f: any) => f.value || f) : []
+    publishCategory.value = d.suggestedCategory || ''
+    supplierContact.value = d.supplierContact || { sellerName: '', country: '', wechat: '', email: '', whatsapp: '', phone: '', website: '', note: '' }
+    supplierSaved.value = false
+    productUrl.value = ''
+  } catch (e: any) {
+    publishError.value = e?.data?.statusMessage || e?.message || 'Erreur d\u2019import du lien'
+    draftMode.value = false
+    draft.value = null
+  } finally {
+    urlBusy.value = false
+  }
+}
+
 // Local market prices table (third price)
 const localPrices = ref<any[]>([])
 const localPriceLabel = ref('')
@@ -531,6 +574,33 @@ onMounted(() => {
             >✕</button>
           </div>
         </div>
+      </div>
+
+      <!-- Paste a product URL -->
+      <div class="border border-zinc-800 rounded-xl p-4 bg-[#0d0d14] space-y-2">
+        <div class="flex items-center justify-between gap-3">
+          <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">🔗 Importer depuis un lien produit</p>
+          <span class="text-[9px] font-mono text-zinc-600">Xianyu · 1688 · Taobao · TikTok Shop · Amazon · Douyin</span>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <input
+            v-model="productUrl"
+            @keyup.enter="importFromUrl"
+            :disabled="urlBusy"
+            placeholder="Collez l'URL du produit (ex: https://www.goofish.com/item?id=…, https://detail.1688.com/offer/….html, https://www.amazon.fr/dp/…)"
+            class="flex-1 min-w-[240px] bg-black/40 border border-zinc-800 rounded-lg px-3 py-2.5 text-[13px] text-white placeholder-zinc-600 focus:outline-none focus:border-[#ff2a2a]/60 disabled:opacity-50"
+          />
+          <button
+            @click="importFromUrl"
+            :disabled="urlBusy"
+            class="px-4 py-2.5 rounded-lg bg-[#ff2a2a] text-white text-[11px] font-mono font-bold uppercase tracking-wider hover:bg-[#ff3b3b] disabled:opacity-50 transition-all inline-flex items-center gap-2"
+          >
+            <span v-if="urlBusy" class="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+            Importer
+          </button>
+        </div>
+        <p v-if="urlError" class="text-[11px] font-mono text-red-400">{{ urlError }}</p>
+        <p class="text-[10px] font-mono text-zinc-600">Détection automatique de la plateforme et de l'identifiant, puis même traitement qu'un résultat de recherche : détail, images, conversion FCFA, transport, catégorie auto, traduction. (Pinduoduo/Shopee/Temu non supportés.)</p>
       </div>
 
       <!-- Search controls -->

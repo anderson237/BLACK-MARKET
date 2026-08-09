@@ -49,6 +49,55 @@ async function saveGa4() {
 const envBadge = (ok: boolean) =>
   ok ? 'text-green-400 border-green-500/30 bg-green-500/10' : 'text-amber-400 border-amber-500/30 bg-amber-500/10'
 
+// ---- Taux de conversion (persistés, modifiables) ----
+const rates = reactive({ cnyToXof: 95, eurToXof: 655.957, usdToXof: 700 })
+const ratesLoading = ref(true)
+const ratesSaving = ref(false)
+const ratesSaved = ref(false)
+
+async function loadRates() {
+  ratesLoading.value = true
+  try {
+    const res = await fetch('/api/admin/rates', { headers: store.headers() })
+    const json = await res.json().catch(() => ({}))
+    if (res.ok && json?.rates) {
+      rates.cnyToXof = Number(json.rates.cnyToXof) || 95
+      rates.eurToXof = Number(json.rates.eurToXof) || 655.957
+      rates.usdToXof = Number(json.rates.usdToXof) || 700
+    }
+  } catch {
+    /* garde les valeurs par défaut */
+  } finally {
+    ratesLoading.value = false
+  }
+}
+
+async function saveRates() {
+  ratesSaving.value = true
+  ratesSaved.value = false
+  try {
+    const res = await fetch('/api/admin/rates', {
+      method: 'PUT',
+      headers: store.headers(),
+      body: JSON.stringify({ cnyToXof: rates.cnyToXof, eurToXof: rates.eurToXof, usdToXof: rates.usdToXof }),
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(json?.statusMessage || json?.message || `Erreur ${res.status}`)
+    if (json?.rates) {
+      rates.cnyToXof = Number(json.rates.cnyToXof) || 95
+      rates.eurToXof = Number(json.rates.eurToXof) || 655.957
+      rates.usdToXof = Number(json.rates.usdToXof) || 700
+    }
+    ratesSaved.value = true
+    setTimeout(() => (ratesSaved.value = false), 2500)
+  } catch {
+    ratesSaved.value = false
+  } finally {
+    ratesSaving.value = false
+  }
+}
+
+
 const services = computed(() => [
   { name: 'Gemini (Génération IA)', ok: hasGemini.value, desc: 'GEMINI_API_KEY — indispensable pour l\'onglet Génération IA et le copywriting.' },
   { name: 'Google OAuth (Connexion Google)', ok: hasGoogle.value, desc: 'GOOGLE_CLIENT_ID — connexion sociale (optionnelle).' },
@@ -72,6 +121,7 @@ onMounted(() => {
   hasGoogle.value = Boolean(config.public.googleClientId)
   store.loadAdmins()
   loadGa4()
+  loadRates()
 })
 
 // ---- Formulaire éditable (persisté en localStorage) ----
@@ -194,6 +244,49 @@ else {
             class="w-full bg-black border border-zinc-800 rounded-xl px-3 py-2.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-[#ff2a2a]/50 placeholder-zinc-600" />
         </div>
       </form>
+
+      <!-- Taux de conversion -->
+      <div class="bg-[#0d0d14] rounded-3xl p-5 border border-zinc-800 space-y-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-base font-extrabold text-white font-mono uppercase tracking-wider">💱 TAUX DE CONVERSION</h3>
+            <p class="text-[10px] font-mono text-zinc-500">1 yuan / 1 euro / 1 dollar → FCFA</p>
+          </div>
+          <button @click="saveRates" :disabled="ratesSaving || ratesLoading"
+            class="bg-[#ff2a2a] hover:bg-red-600 disabled:opacity-40 text-white text-xs font-mono font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 transition-all shrink-0">
+            {{ ratesSaved ? 'ENREGISTRÉ ✓' : 'ENREGISTRER' }}
+          </button>
+        </div>
+
+        <div v-if="ratesLoading" class="text-[10px] font-mono text-zinc-500">Chargement…</div>
+        <template v-else>
+          <div>
+            <label class="flex items-center gap-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-wider mb-1.5">🇨🇳 1 ¥ yuan → FCFA</label>
+            <input v-model.number="rates.cnyToXof" type="number" min="1" step="0.001" placeholder="95"
+              class="w-full bg-black border border-zinc-800 rounded-xl px-3 py-2.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-[#ff2a2a]/50 placeholder-zinc-600" />
+            <p class="text-[9px] font-mono text-zinc-600 mt-1">Conversion des prix des plateformes chinoises (Xianyu, 1688, Taobao, Douyin, TikTok Shop) et des coûts d'achat en comptabilité.</p>
+          </div>
+
+          <div>
+            <label class="flex items-center gap-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-wider mb-1.5">🇪🇺 1 € euro → FCFA</label>
+            <input v-model.number="rates.eurToXof" type="number" min="1" step="0.001" placeholder="655.957"
+              class="w-full bg-black border border-zinc-800 rounded-xl px-3 py-2.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-[#ff2a2a]/50 placeholder-zinc-600" />
+            <p class="text-[9px] font-mono text-zinc-600 mt-1">Peg officiel du franc CFA (655,957 FCFA pour 1 €).</p>
+          </div>
+
+          <div>
+            <label class="flex items-center gap-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-wider mb-1.5">🇺🇸 1 $ dollar US → FCFA</label>
+            <input v-model.number="rates.usdToXof" type="number" min="1" step="0.001" placeholder="700"
+              class="w-full bg-black border border-zinc-800 rounded-xl px-3 py-2.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-[#ff2a2a]/50 placeholder-zinc-600" />
+            <p class="text-[9px] font-mono text-zinc-600 mt-1">Approximation modifiable — le dollar n'est pas arrimé au franc CFA.</p>
+          </div>
+
+          <div class="flex items-center gap-2.5 pt-1">
+            <span class="shrink-0 w-2 h-2 rounded-full bg-emerald-400" />
+            <p class="text-[10px] font-mono text-zinc-500">Appliquer aux prix : les taux sont persistés côté serveur et utilisés par l'import (Xianyu/1688/Taobao/TikTok/Amazon/Douyin) et la comptabilité.</p>
+          </div>
+        </template>
+      </div>
 
       <!-- Google Analytics (GA4) -->
       <div class="bg-[#0d0d14] rounded-3xl p-5 border border-zinc-800 space-y-5">

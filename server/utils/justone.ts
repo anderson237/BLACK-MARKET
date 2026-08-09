@@ -782,6 +782,7 @@ export async function joDetail(platform: JoPlatform, sourceId: string, region: s
 // ---------------------------------------------------------------------------
 
 import { saveImage, looksLikeImage } from '~~/server/utils/storage'
+import { loadRates } from '~~/server/utils/rates'
 import crypto from 'node:crypto'
 
 export async function importRemoteImage(url: string, index = 0): Promise<string> {
@@ -800,31 +801,31 @@ export async function importRemoteImage(url: string, index = 0): Promise<string>
 
 // ---------------------------------------------------------------------------
 // Currency conversions -> XOF. The storefront XOF is the canonical currency.
-//   - CNY: anchored at runtimeConfig.public.rmbToXofRate (default 95, the
-//     "1 yuan = 95 FCFA" transparent rule the admin asked for).
-//   - EUR: fixed official peg 655.957 XOF per EUR (runtimeConfig.public.
-//     eurToXofRate).
-//   - USD: configurable approximation runtimeConfig.public.usdToXofRate
-//     (default 700; NOT a fixed peg).
+// The rates are PERSISTED and admin-editable (server/utils/rates.ts, blob
+// bm-rates): every conversion here reads the same source as the accounting
+// module so the import pipeline and the comptabilité can never disagree.
+//   - CNY: 1 yuan = N FCFA (default 95).
+//   - EUR: official peg 655.957 XOF per EUR (default).
+//   - USD: approximation, NOT a fixed peg (default 700).
 // ---------------------------------------------------------------------------
 
-export function cnyToXof(priceCny: number, margin = 1): number {
-  const rate = Number(useRuntimeConfig().public.rmbToXofRate) || 95
+export async function cnyToXof(priceCny: number, margin = 1): Promise<number> {
+  const { cnyToXof: rate } = await loadRates()
   return Math.round(priceCny * rate * margin)
 }
 
-export function eurToXof(priceEur: number, margin = 1): number {
-  const rate = Number(useRuntimeConfig().public.eurToXofRate) || 655.957
+export async function eurToXof(priceEur: number, margin = 1): Promise<number> {
+  const { eurToXof: rate } = await loadRates()
   return Math.round(priceEur * rate * margin)
 }
 
-export function usdToXof(priceUsd: number, margin = 1): number {
-  const rate = Number(useRuntimeConfig().public.usdToXofRate) || 700
+export async function usdToXof(priceUsd: number, margin = 1): Promise<number> {
+  const { usdToXof: rate } = await loadRates()
   return Math.round(priceUsd * rate * margin)
 }
 
 /** Convert a JoSearchItem/JoDetail price to XOF using its own currency. */
-export function priceToXof(item: { price: number; currency: JoCurrency }): number {
+export async function priceToXof(item: { price: number; currency: JoCurrency }): Promise<number> {
   if (!item?.price) return 0
   switch (item.currency) {
     case 'EUR': return eurToXof(item.price)

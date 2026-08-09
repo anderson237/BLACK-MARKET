@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
 
   const [productsRaw, orders, expenses] = await Promise.all([loadProducts(), loadOrders(), loadExpenses()])
   const products = productsRaw.filter((p: any) => !p.deleted)
-  const rows = revenueRows(orders, products)
+  const rows = await revenueRows(orders, products)
   const now = new Date()
   const allExpenses = expenses.reduce((s: number, e: any) => s + (Number(e.amountXof) || 0), 0)
 

@@ -16,8 +16,8 @@ import {
   normalizeKpiSettings,
   periodMonths,
 } from '~~/server/utils/accounting'
-import { RMB_TO_XOF_RATE } from '../utils/constants'
 import { EXPENSE_CATEGORY_LABEL } from '../../data/expenseCategories'
+import { loadRates } from '~~/server/utils/rates'
 
 const ALLOWED_ROLES = ['admin', 'editor', 'publisher']
 
@@ -29,9 +29,9 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, statusMessage: 'Accès réservé à la gestion.' })
   }
 
-  const [productsRaw, orders, expenses] = await Promise.all([loadProducts(), loadOrders(), loadExpenses()])
+  const [productsRaw, orders, expenses, rates] = await Promise.all([loadProducts(), loadOrders(), loadExpenses(), loadRates()])
   const products = productsRaw.filter((p: any) => !p.deleted)
-  const rows = revenueRows(orders, products) as Row[]
+  const rows = await revenueRows(orders, products) as Row[]
   const settings = normalizeKpiSettings(await loadKpiSettings())
   const now = new Date()
 
@@ -191,28 +191,28 @@ export default defineEventHandler(async (event) => {
   // ---- stock : valeur, rotation, DIO, dormant ----
   const stockProducts = products.filter((p: any) => (Number(p.stockQuantity) || 0) > 0)
   const stockUnits = stockProducts.reduce((s, p: any) => s + Number(p.stockQuantity), 0)
-  const stockValueXof = stockProducts.reduce((s, p: any) => s + productCostXof(p) * Number(p.stockQuantity), 0)
+  let stockValueXof = 0
+  for (const p of stockProducts) stockValueXof += (await productCostXof(p)) * Number(p.stockQuantity)
   const rotation = stockValueXof > 0 ? costXofLast12m / stockValueXof : 0
   const dio = rotation > 0 ? Math.round(365 / rotation) : 0
   const sixMonthsAgo = new Date(now)
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
   const soldRecently = new Set(rows.filter((r) => new Date(r.order.createdAt || 0) >= sixMonthsAgo).map((r) => String(r.order.productId || '')))
   const dormantProducts = stockProducts.filter((p: any) => !soldRecently.has(String(p.id)))
-  const dormantValueXof = dormantProducts.reduce((s, p: any) => s + productCostXof(p) * Number(p.stockQuantity), 0)
-  const potentialMargin = products.reduce(
-    (s, p: any) => s + Math.max(0, sellingPriceXof(Number(p.purchaseRmb) || 0, Number(p.shippingRmb) || 0, Number(p.marginPercent) || 0) - productCostXof(p)),
-    0,
-  )
-  const lowMargin = products
-    .map((p: any) => {
-      const price = Number(p.priceXof) || 0
-      const cost = productCostXof(p)
-      const marginPct = price > 0 ? Math.round(((price - cost) / price) * 1000) / 10 : 0
-      return { id: p.id, title: p.title, priceXof: price, costXof: cost, marginPct, stockQuantity: Number(p.stockQuantity) || 0 }
-    })
-    .filter((x) => x.priceXof > 0 && x.marginPct < 30)
-    .sort((a, b) => a.marginPct - b.marginPct)
-    .slice(0, 10)
+  let dormantValueXof = 0
+  for (const p of dormantProducts) dormantValueXof += (await productCostXof(p)) * Number(p.stockQuantity)
+  let potentialMargin = 0
+  for (const p of products) {
+    potentialMargin += Math.max(0, (await sellingPriceXof(Number(p.purchaseRmb) || 0, Number(p.shippingRmb) || 0, Number(p.marginPercent) || 0)) - (await productCostXof(p)))
+  }
+  const lowMargin = []
+  for (const p of products) {
+    const price = Number(p.priceXof) || 0
+    const cost = await productCostXof(p)
+    const marginPct = price > 0 ? Math.round(((price - cost) / price) * 1000) / 10 : 0
+    if (price > 0 && marginPct < 30) lowMargin.push({ id: p.id, title: p.title, priceXof: price, costXof: cost, marginPct, stockQuantity: Number(p.stockQuantity) || 0 })
+  }
+  lowMargin.sort((a: any, b: any) => a.marginPct - b.marginPct).slice(0, 10)
 
   const stock = {
     units: stockUnits,
@@ -257,7 +257,8 @@ export default defineEventHandler(async (event) => {
     accounting: {
       generatedAt: now.toISOString(),
       currency: 'XOF',
-      rmbRate: RMB_TO_XOF_RATE,
+      rmbRate: rates.cnyToXof,
+      rates,
       revenueStatuses: [...REVENUE_STATUSES],
       settings,
       kpi: {

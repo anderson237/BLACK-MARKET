@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
   if (session.role !== 'admin') throw createError({ statusCode: 403, statusMessage: 'Accès administrateur requis.' })
   const [productsRaw, orders, social, accounts, events] = await Promise.all([loadProducts(), loadOrders(), getSocial(), loadAccounts(), getEvents()])
   const products = productsRaw.filter((p: any) => !p.deleted)
-  const rows = revenueRows(orders, products)
+  const rows = await revenueRows(orders, products)
   const comments = social.comments || []
   const likeIndex = social.likes || {}
 
