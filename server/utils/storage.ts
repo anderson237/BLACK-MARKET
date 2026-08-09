@@ -560,7 +560,7 @@ async function saveSocial(data: any): Promise<void> {
 const LOCK_TTL_MS = 10000
 const LOCK_TIMEOUT_MS = 20000
 
-async function withBlobLock<T>(storeName: string, key: string, fn: () => Promise<T>): Promise<T> {
+export async function withBlobLock<T>(storeName: string, key: string, fn: () => Promise<T>): Promise<T> {
   const s = getStore({ name: storeName })
   const lockKey = `${key}.lock`
   const deadline = Date.now() + LOCK_TIMEOUT_MS

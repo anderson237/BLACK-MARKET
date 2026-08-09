@@ -122,6 +122,9 @@ const historyLoading = ref(false)
 // Draft / publish
 const draftMode = ref(false)
 const drafting = ref(false)
+// BL-007 v2 : moteur EFFECTIVEMENT utilisé pour le brouillon courant
+// ('headless' = scraper goofish gratuit, 'justone' = JustOneAPI).
+const lastEngine = ref<'headless' | 'justone' | ''>('')
 const draft = ref<any>(null)
 const publishTitle = ref('')
 const publishDesc = ref('')
@@ -159,6 +162,7 @@ async function importFromUrl() {
     })
     const d = (res as any).draft
     draft.value = d
+    lastEngine.value = (res as any)?.source?.engine === 'headless' ? 'headless' : ((res as any)?.source?.engine === 'justone' ? 'justone' : '')
     publishTitle.value = d.title || ''
     publishDesc.value = d.description || ''
     publishPriceXof.value = d.priceXof || 0
@@ -352,6 +356,7 @@ async function openDraft(item: any) {
     })
     const d = (res as any).draft
     draft.value = d
+    lastEngine.value = (res as any)?.source?.engine === 'headless' ? 'headless' : ((res as any)?.source?.engine === 'justone' ? 'justone' : '')
     publishTitle.value = d.title || ''
     publishDesc.value = d.description || ''
     publishPriceXof.value = d.priceXof || 0
@@ -791,9 +796,15 @@ onMounted(() => {
         <div class="relative w-full max-w-3xl bg-[#10101a] border border-zinc-800 rounded-2xl shadow-2xl p-5 sm:p-6 space-y-4">
           <div class="flex items-center justify-between gap-3">
             <h2 class="text-sm font-extrabold font-mono uppercase tracking-widest text-white">Aperçu produit</h2>
-            <button @click="closeDraft" class="w-8 h-8 rounded-lg border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white">
-              <AppIcon name="close" :size="14" />
-            </button>
+            <div class="flex items-center gap-2">
+              <span v-if="lastEngine" class="text-[9px] font-mono font-bold px-2 py-0.5 rounded border uppercase"
+                :class="lastEngine === 'headless' ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' : 'text-sky-400 border-sky-500/30 bg-sky-500/10'">
+                {{ lastEngine === 'headless' ? '🛰️ Headless' : '⚡ JustOneAPI' }}
+              </span>
+              <button @click="closeDraft" class="w-8 h-8 rounded-lg border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white">
+                <AppIcon name="close" :size="14" />
+              </button>
+            </div>
           </div>
 
           <div v-if="publishError" class="text-[11px] font-mono text-red-400 border border-red-500/30 rounded-lg p-3">{{ publishError }}</div>

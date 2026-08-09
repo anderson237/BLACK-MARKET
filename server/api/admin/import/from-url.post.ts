@@ -1,7 +1,7 @@
 import { requireAuth } from '~~/server/utils/auth'
 import { buildDraft, type DraftSource } from '~~/server/utils/draftBuilder'
 import { parseProductUrl, unsupportedHint } from '~~/server/utils/urlParser'
-import { scrapeGoofishDetail } from '~~/server/utils/scraperGoofish'
+import { fetchProductDetail } from '~~/server/utils/engine'
 
 // Admin import pipeline (ST-017): paste a product URL (Xianyu / 1688 / Taobao
 // / TikTok Shop / Amazon / Douyin) -> platform + sourceId are detected, then
@@ -10,12 +10,15 @@ import { scrapeGoofishDetail } from '~~/server/utils/scraperGoofish'
 // supplier contact pre-fill.
 // Body: { url, titleFr?, keyword?, category? }
 //
-// BL-007 (prototype headless goofish): pour Xianyu on tente d'abord le scraper
-// headless gratuit (scraperGoofish.ts, interception de l'API interne MTOP) —
-// il fonctionne même quand le solde JustOneAPI est à zéro (code 601). En cas
-// d'échec headless, fallback sur JustOneAPI (chemin existant intact). Le champ
-// `detail` injecté dans buildDraft est une JoDetail au même format que le
-// flattener → UI / pipeline inchangés.
+// BL-007 v2 (toggle de source) : le moteur est choisi dans le toggle admin
+// (blob bm-sources, server/utils/sources.ts) :
+//   - xianyu + toggle 'headless' (défaut) : scraper goofish gratuit (MTOP
+//     intercepté) d'abord ; en cas d'échec (timeout / anti-bot / navigateur
+//     indisponible) FALLBACK AUTOMATIQUE JustOneAPI.
+//   - xianyu + toggle 'justone' : JustOneAPI directement.
+//   - autres plateformes : JustOneAPI (le headless n'est testé que pour
+//     goofish).
+// Le champ `source.engine` retourné reflète le moteur EFFECTIVEMENT utilisé.
 
 export default defineEventHandler(async (event) => {
   const session = await requireAuth(event)
@@ -42,23 +45,13 @@ export default defineEventHandler(async (event) => {
     region: parsed.region,
   }
 
-  // BL-007 : goofish headless d'abord, JustOneAPI en fallback (inchangé).
-  let engine: 'justone' | 'headless' = 'justone'
-  if (parsed.platform === 'xianyu') {
-    try {
-      const headlessDetail = await scrapeGoofishDetail(parsed.sourceId)
-      draftSource.detail = headlessDetail
-      draftSource.detailSource = 'headless'
-      engine = 'headless'
-      console.log(
-        `[from-url] xianyu ${parsed.sourceId} : détail via headless goofish (${headlessDetail.price} CNY, ${headlessDetail.images.length} image(s))`,
-      )
-    } catch (err: any) {
-      console.warn(
-        `[from-url] headless goofish indisponible pour ${parsed.sourceId}, fallback JustOneAPI : ${String(err?.message || err).slice(0, 160)}`,
-      )
-    }
-  }
+  // BL-007 v2 : consultation du toggle + fallback automatique (engine.ts).
+  const { detail, engine } = await fetchProductDetail(parsed.platform, parsed.sourceId, parsed.region || 'US')
+  draftSource.detail = detail
+  draftSource.detailSource = engine
+  console.log(
+    `[from-url] ${parsed.platform} ${parsed.sourceId} : détail via ${engine} (${detail.price} ${detail.currency}, ${detail.images.length} image(s))`,
+  )
 
   const draft = await buildDraft(draftSource)
 

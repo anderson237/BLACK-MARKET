@@ -6,14 +6,22 @@
 // APPROCHE (validée par le Lab le 2026-08-09) :
 //   1. Un navigateur headless GRATUIT (playwright-core) ouvre
 //      https://www.goofish.com/item?id=<id> avec un profil "humain"
-//      (Edge local en dev / chromium-headless-shell en prod, flags
-//      --disable-blink-features=AutomationControlled + webdriver masqué).
-//   2. APPROCHE PRÉFÉRÉE : on intercepte la réponse de l'API interne MTOP
+//      (Edge local en dev / chromium-headless-shell en prod / navigateur
+//      distant browserless.io).
+//   2. MODE DISTANT (BL-007 v2) : si la variable d'env
+//      `GOOFISH_BROWSER_WS_ENDPOINT` est définie (ex. browserless.io,
+//      `wss://chrome.browserless.io/playwright-chromium?token=...`), on se
+//      connecte via `chromium.connect(wsEndpoint)` — pas de binaire à
+//      embarquer en Netlify, le navigateur vit chez browserless.
+//      SINON : `chromium.launch()` local (Edge dev / chromium-headless-shell)
+//      — comportement v1 conservé.
+//   3. APPROCHE PRÉFÉRÉE : on intercepte la réponse de l'API interne MTOP
 //      `mtop.taobao.idle.pc.detail` (page.on('response') + r.json()) → JSON
 //      structuré complet (itemDO / sellerDO / imageInfos / desc…).
-//   3. FALLBACK : extraction DOM directe (titre via <title>, prix ¥ via regex
+//   4. FALLBACK : extraction DOM directe (titre via <title>, prix ¥ via regex
 //      sur innerText, images alicdn via querySelectorAll, description).
-//   4. Retry sur erreur temporaire RGV587 (anti-bot intermittent).
+//   5. Retry sur erreur temporaire RGV587 (anti-bot intermittent), borné par
+//      un délai GLOBAL (`totalTimeoutMs`, défaut 45 s — contrainte ticket).
 //
 // CONTRAT DE SORTIE : objet normalisé au format JO Detail — IDENTIQUE au
 // schéma produit par flattenXianyuDetail() dans server/utils/justone.ts
@@ -21,20 +29,17 @@
 // et l'UI admin restent donc INCHANGÉS : ce module est une source de détail
 // interchangeable avec JustOneAPI.
 //
-// ⚠️ PROTOTYPE (BL-007) — NON PRÊT POUR LA PROD :
-//   - Pas de toggle de source UI (ticket séparé) ; la bascule se fait dans la
-//     route /api/admin/import/from-url (xianyu -> headless, fallback justone).
-//   - En Netlify, aucun binaire navigateur n'est embarqué dans le repo ; le
-//     build doit télécharger chromium-headless-shell (~110 Mo) dans la fonction
-//     et pointer GOOFISH_BROWSER_PATH dessus (ou utiliser un navigateur distant).
-//   - Module volontairement framework-free (pas de #imports / createError) :
-//     il peut être exécuté standalone via `npx tsx scripts/test-scraper-goofish.ts`.
+// ⚠️ SÉCURITÉ : le token browserless (query string du WS endpoint) ne doit
+// JAMAIS fuiter au client — il est lu côté serveur uniquement et masqué dans
+// tous les logs via maskWsEndpoint().
 //
 // ENTREE :  sourceId (string) — identifiant item goofish, ex. "1072126350734"
 // SORTIE :  Promise<JoDetail> (même shape que le flattener JustOneAPI)
 // RISQUES : captcha anti-bot (RGV587), taux de blocage IP, surcoût temps
-//           d'exécution serveur (~10-25 s), dépendance au rendu JS goofish.
-// PARAMS :  (optionnel) { maxAttempts?, timeoutMs?, browserPath?, headless? }
+//           d'exécution serveur (~10-25 s local, ~10-30 s distant),
+//           dépendance au rendu JS goofish.
+// PARAMS :  (optionnel) { maxAttempts?, timeoutMs?, totalTimeoutMs?,
+//            browserPath?, wsEndpoint?, headless? }
 // ---------------------------------------------------------------------------
 
 import { existsSync } from 'node:fs'
@@ -44,6 +49,37 @@ import type { JoDetail } from './justone'
 /** URL produit goofish (même forme que draftBuilder.sourceUrlFor). */
 export function goofishItemUrl(sourceId: string): string {
   return `https://www.goofish.com/item?id=${encodeURIComponent(String(sourceId || ''))}`
+}
+
+// ---------------------------------------------------------------------------
+// Mode distant browserless (BL-007 v2).
+// GOOFISH_BROWSER_WS_ENDPOINT : endpoint WebSocket Playwright, ex.
+//   wss://chrome.browserless.io/playwright-chromium?token=xxxxxxxx
+// S'il est défini → `chromium.connect(wsEndpoint)` ; sinon lancement local.
+// ---------------------------------------------------------------------------
+
+function browserWsEndpoint(): string {
+  return String(process.env.GOOFISH_BROWSER_WS_ENDPOINT || '').trim()
+}
+
+/** `true` quand un navigateur distant (browserless) est configuré. */
+export function isRemoteBrowserConfigured(): boolean {
+  return Boolean(browserWsEndpoint())
+}
+
+/**
+ * Masque un endpoint WebSocket avant journalisation : le token browserless
+ * vit dans la query string et ne doit jamais apparaître dans les logs.
+ */
+export function maskWsEndpoint(ws: string): string {
+  try {
+    const u = new URL(ws)
+    u.search = ''
+    u.hash = ''
+    return u.toString().replace(/\/+$/, '')
+  } catch {
+    return '<ws endpoint>'
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -82,16 +118,46 @@ export interface ScraperGoofishOptions {
   maxAttempts?: number
   /** Timeout par navigation, ms. Défaut 40 000 (contrainte ticket ~40 s). */
   timeoutMs?: number
-  /** Chemin explicite vers un navigateur (outrepasse la détection). */
+  /**
+   * Délai GLOBAL de scrapeGoofishDetail, ms. Défaut 45 000 (~45 s max, comme
+   * demandé au ticket BL-007 v2). Les retries s'arrêtent dès que ce budget est
+   * consommé — le message d'erreur le dit explicitement.
+   */
+  totalTimeoutMs?: number
+  /** Chemin explicite vers un navigateur (outrepasse la détection locale). */
   browserPath?: string
-  /** Défaut true. Mis à false pour débugger (fenêtre visible). */
+  /**
+   * Endpoint WebSocket d'un navigateur distant (browserless.io…). Défaut :
+   * variable d'env GOOFISH_BROWSER_WS_ENDPOINT. Prioritaire sur le lancement
+   * local dès qu'il est non vide.
+   */
+  wsEndpoint?: string
+  /** Défaut true. Mis à false pour débugger (fenêtre visible, local only). */
   headless?: boolean
 }
 
-const DEFAULT_OPTIONS: Required<Pick<ScraperGoofishOptions, 'maxAttempts' | 'timeoutMs' | 'headless'>> = {
+const DEFAULT_OPTIONS: Required<Pick<ScraperGoofishOptions, 'maxAttempts' | 'timeoutMs' | 'totalTimeoutMs' | 'headless'>> = {
   maxAttempts: 2,
   timeoutMs: 40_000,
+  totalTimeoutMs: 45_000,
   headless: true,
+}
+
+async function connectRemoteBrowser(opts: ScraperGoofishOptions): Promise<Browser> {
+  const ws = (opts.wsEndpoint || browserWsEndpoint() || '').trim()
+  const masked = maskWsEndpoint(ws)
+  const connectTimeout = Math.min(opts.timeoutMs || DEFAULT_OPTIONS.timeoutMs, 30_000)
+  console.log(`[scraper-goofish] connexion navigateur DISTANT (browserless): ${masked} (timeout ${connectTimeout} ms)`)
+  try {
+    // chromium.connect -> Browser connecté (le contexte/les pages vivent chez
+    // browserless). Timeout borné pour ne pas dépasser le budget global.
+    return await chromium.connect(ws, { timeout: connectTimeout })
+  } catch (err) {
+    throw new Error(
+      `scraperGoofish: impossible de se connecter au navigateur distant ${masked} ` +
+        `(${String(err?.message || err).slice(0, 180)}). Vérifiez GOOFISH_BROWSER_WS_ENDPOINT (token valide, quota browserless).`,
+    )
+  }
 }
 
 async function launchHeadless(opts: ScraperGoofishOptions): Promise<Browser> {
@@ -114,9 +180,20 @@ async function launchHeadless(opts: ScraperGoofishOptions): Promise<Browser> {
   } catch (err) {
     throw new Error(
       `scraperGoofish: impossible de lancer le navigateur headless (${String(err?.message || err).slice(0, 180)}). ` +
-        'En dev, Edge doit être installé. En prod, GOOFISH_BROWSER_PATH doit pointer vers chromium-headless-shell.',
+        'En dev, Edge doit être installé. En prod, définissez GOOFISH_BROWSER_WS_ENDPOINT (browserless) ' +
+        'ou GOOFISH_BROWSER_PATH vers chromium-headless-shell.',
     )
   }
+}
+
+/**
+ * Dispatcher navigateur : mode distant browserless si un WS endpoint est
+ * disponible (option ou env), sinon lancement local (v1).
+ */
+async function openBrowser(opts: ScraperGoofishOptions): Promise<Browser> {
+  const ws = (opts.wsEndpoint || browserWsEndpoint() || '').trim()
+  if (ws) return connectRemoteBrowser(opts)
+  return launchHeadless(opts)
 }
 
 // ---------------------------------------------------------------------------
@@ -390,13 +467,27 @@ export async function scrapeGoofishDetail(
 ): Promise<JoDetail> {
   const options = { ...DEFAULT_OPTIONS, ...opts }
   const url = goofishItemUrl(sourceId)
+  const mode = browserWsEndpoint() ? 'distant (browserless)' : 'local'
+  console.log(`[scraper-goofish] scrape ${sourceId} — mode ${mode} — budget ${options.totalTimeoutMs} ms`)
   let lastErr: unknown = null
 
+  // Budget global (~45 s par défaut) : le retry RGV587 s'arrête dès que le
+  // délai total est consommé, pour ne jamais dépasser le timeout serveur.
+  const deadline = Date.now() + options.totalTimeoutMs
+
   for (let attempt = 1; attempt <= options.maxAttempts; attempt++) {
+    const remaining = deadline - Date.now()
+    if (remaining <= 5_000) {
+      lastErr = new Error(`délai global dépassé (${options.totalTimeoutMs} ms)`)
+      break
+    }
+    // Timeout de navigation borné par le temps restant (garde 3 s de marge).
+    const navTimeout = Math.min(options.timeoutMs, Math.max(10_000, remaining - 3_000))
+
     let browser: Browser | null = null
     try {
-      browser = await launchHeadless(options)
-      const detail = await scrapeOnce(browser, url, String(sourceId), options.timeoutMs)
+      browser = await openBrowser(options)
+      const detail = await scrapeOnce(browser, url, String(sourceId), navTimeout)
       if (detail) {
         console.log(
           `[scraper-goofish] SUCCÈS ${sourceId} — "${detail.title}" — ${detail.price} CNY — ${detail.images.length} image(s)`,
@@ -419,5 +510,5 @@ export async function scrapeGoofishDetail(
     lastErr instanceof Error
       ? lastErr.message
       : String(lastErr || 'erreur inconnue')
-  throw new Error(`scraperGoofish: échec après ${options.maxAttempts} tentative(s) pour ${sourceId} — ${msg}`)
+  throw new Error(`scraperGoofish: échec après ${options.maxAttempts} tentative(s) (budget ${options.totalTimeoutMs} ms) pour ${sourceId} — ${msg}`)
 }

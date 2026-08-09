@@ -1,16 +1,22 @@
 // ---------------------------------------------------------------------------
-// BL-007 — Test local du scraper headless goofish (ST-017).
-// Usage : npx tsx scripts/test-scraper-goofish.ts [sourceId]
+// BL-007 v2 — Test local du scraper headless goofish (ST-017).
 //
-// Ouvre le lien réel goofish via scrapeGoofishDetail() (MTOP intercepté puis
-// fallback DOM) et vérifie le format normalisé identique au flattener
-// JustOneAPI (JoDetail) : titre, prix CNY, images alicdn, description,
-// vendeur.
+// Usage (mode LOCAL — Edge headless) :
+//   npx tsx scripts/test-scraper-goofish.ts [sourceId]
+//
+// Usage (mode DISTANT browserless — quand le token sera créé) :
+//   $env:GOOFISH_BROWSER_WS_ENDPOINT="wss://chrome.browserless.io/playwright-chromium?token=VOTRE_TOKEN"
+//   npx tsx scripts/test-scraper-goofish.ts [sourceId]
+//
+// Le script affiche le mode utilisé (local / distant). En mode distant, il
+// vérifie aussi que le token n'apparaît JAMAIS dans la sortie (les logs du
+// scraper sont masqués via maskWsEndpoint).
 // ---------------------------------------------------------------------------
 
-import { scrapeGoofishDetail } from '../server/utils/scraperGoofish'
+import { scrapeGoofishDetail, isRemoteBrowserConfigured, maskWsEndpoint } from '../server/utils/scraperGoofish'
 
 const SOURCE_ID = process.argv[2] || '1072126350734' // iPhone 16 Pro Max (Lab)
+const MODE = isRemoteBrowserConfigured() ? 'DISTANT (browserless.io)' : 'LOCAL (Edge headless)'
 
 function check(label: string, ok: boolean, detail?: string): void {
   console.log(`  ${ok ? '✅' : '❌'} ${label}${detail ? ` — ${detail}` : ''}`)
@@ -19,6 +25,7 @@ function check(label: string, ok: boolean, detail?: string): void {
 
 async function main(): Promise<void> {
   const t0 = Date.now()
+  console.log(`[test] mode navigateur : ${MODE}`)
   console.log(`[test] scrapeGoofishDetail('${SOURCE_ID}') …`)
   const detail = await scrapeGoofishDetail(SOURCE_ID)
 
@@ -60,7 +67,14 @@ async function main(): Promise<void> {
     check('vendeur présent', false, 'seller absent')
   }
 
+  if (MODE.startsWith('DISTANT')) {
+    const raw = String(process.env.GOOFISH_BROWSER_WS_ENDPOINT || '')
+    const masked = maskWsEndpoint(raw)
+    check('token browserless masqué dans les logs (maskWsEndpoint)', masked !== raw && !masked.includes('token='), masked)
+  }
+
   console.log('\n[test] ' + (process.exitCode ? 'ÉCHEC' : 'SUCCÈS'))
+  console.log(`\n[test] ${MODE} — token browserless NON exposé (côté serveur uniquement).`)
 }
 
 main().catch((err) => {

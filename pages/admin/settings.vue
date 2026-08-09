@@ -97,6 +97,67 @@ async function saveRates() {
   }
 }
 
+// ---- Source d'import par plateforme (BL-007 v2 : headless / JustOneAPI) ----
+type SourceEngine = 'headless' | 'justone'
+const SOURCE_PLATFORM_LABELS: { key: string; label: string; hint: string }[] = [
+  { key: 'xianyu', label: 'Xianyu (Goofish)', hint: 'Headless prioritaire (gratuit, MTOP intercepté) — JustOneAPI en secours.' },
+  { key: '1688', label: '1688', hint: 'JustOneAPI (headless non testé sur 1688).' },
+  { key: 'taobao', label: 'Taobao / Tmall', hint: 'JustOneAPI (headless non testé sur Taobao).' },
+  { key: 'tiktok-shop', label: 'TikTok Shop', hint: 'JustOneAPI (headless non testé sur TikTok).' },
+  { key: 'amazon', label: 'Amazon', hint: 'JustOneAPI (headless non testé sur Amazon).' },
+  { key: 'douyin-ec', label: 'Douyin', hint: 'JustOneAPI (headless non testé sur Douyin).' },
+]
+const sources = reactive<Record<string, SourceEngine>>({
+  xianyu: 'headless', '1688': 'justone', taobao: 'justone', 'tiktok-shop': 'justone', amazon: 'justone', 'douyin-ec': 'justone',
+})
+const sourcesLoading = ref(true)
+const sourcesSaving = ref(false)
+const sourcesSaved = ref(false)
+
+async function loadSources() {
+  sourcesLoading.value = true
+  try {
+    const res = await fetch('/api/admin/import/sources', { headers: store.headers() })
+    const json = await res.json().catch(() => ({}))
+    if (res.ok && json?.sources) {
+      for (const p of SOURCE_PLATFORM_LABELS) {
+        const v = json.sources[p.key]
+        if (v === 'headless' || v === 'justone') sources[p.key] = v
+      }
+    }
+  } catch {
+    /* garde les valeurs par défaut */
+  } finally {
+    sourcesLoading.value = false
+  }
+}
+
+async function saveSources() {
+  sourcesSaving.value = true
+  sourcesSaved.value = false
+  try {
+    const res = await fetch('/api/admin/import/sources', {
+      method: 'PUT',
+      headers: store.headers(),
+      body: JSON.stringify({ sources: { ...sources } }),
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(json?.statusMessage || json?.message || `Erreur ${res.status}`)
+    if (json?.sources) {
+      for (const p of SOURCE_PLATFORM_LABELS) {
+        const v = json.sources[p.key]
+        if (v === 'headless' || v === 'justone') sources[p.key] = v
+      }
+    }
+    sourcesSaved.value = true
+    setTimeout(() => (sourcesSaved.value = false), 2500)
+  } catch {
+    sourcesSaved.value = false
+  } finally {
+    sourcesSaving.value = false
+  }
+}
+
 
 const services = computed(() => [
   { name: 'Gemini (Génération IA)', ok: hasGemini.value, desc: 'GEMINI_API_KEY — indispensable pour l\'onglet Génération IA et le copywriting.' },
@@ -122,6 +183,7 @@ onMounted(() => {
   store.loadAdmins()
   loadGa4()
   loadRates()
+  loadSources()
 })
 
 // ---- Formulaire éditable (persisté en localStorage) ----
@@ -284,6 +346,43 @@ else {
           <div class="flex items-center gap-2.5 pt-1">
             <span class="shrink-0 w-2 h-2 rounded-full bg-emerald-400" />
             <p class="text-[10px] font-mono text-zinc-500">Appliquer aux prix : les taux sont persistés côté serveur et utilisés par l'import (Xianyu/1688/Taobao/TikTok/Amazon/Douyin) et la comptabilité.</p>
+          </div>
+        </template>
+      </div>
+
+      <!-- Source d'import par plateforme -->
+      <div class="bg-[#0d0d14] rounded-3xl p-5 border border-zinc-800 space-y-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-base font-extrabold text-white font-mono uppercase tracking-wider">🛰️ SOURCE D'IMPORT</h3>
+            <p class="text-[10px] font-mono text-zinc-500">Moteur de récupération du détail produit par plateforme</p>
+          </div>
+          <button @click="saveSources" :disabled="sourcesSaving || sourcesLoading"
+            class="bg-[#ff2a2a] hover:bg-red-600 disabled:opacity-40 text-white text-xs font-mono font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 transition-all shrink-0">
+            {{ sourcesSaved ? 'ENREGISTRÉ ✓' : 'ENREGISTRER' }}
+          </button>
+        </div>
+
+        <div v-if="sourcesLoading" class="text-[10px] font-mono text-zinc-500">Chargement…</div>
+        <template v-else>
+          <div v-for="p in SOURCE_PLATFORM_LABELS" :key="p.key" class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800/60 last:border-0 pb-3 last:pb-0">
+            <div class="min-w-0">
+              <p class="text-[11px] font-mono font-bold text-slate-200">{{ p.label }}</p>
+              <p class="text-[9px] font-mono text-zinc-600 mt-0.5">{{ p.hint }}</p>
+            </div>
+            <select :value="sources[p.key]" @change="sources[p.key] = ($event.target as HTMLSelectElement).value as SourceEngine"
+              class="shrink-0 bg-black border border-zinc-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-[#ff2a2a]/50 cursor-pointer">
+              <option value="headless" class="bg-[#0d0d14]">Headless (gratuit)</option>
+              <option value="justone" class="bg-[#0d0d14]">JustOneAPI</option>
+            </select>
+          </div>
+
+          <div class="flex items-center gap-2.5 pt-1">
+            <span class="shrink-0 w-2 h-2 rounded-full" :class="sources.xianyu === 'headless' ? 'bg-emerald-400' : 'bg-amber-400'" />
+            <p class="text-[10px] font-mono text-zinc-500">
+              <template v-if="sources.xianyu === 'headless'">Xianyu passe par le navigateur headless gratuit (fonctionne même solde JustOneAPI à zéro) — JustOneAPI reste le secours automatique.</template>
+              <template v-else>Xianyu passe par JustOneAPI (le headless reste disponible en basculant ce réglage).</template>
+            </p>
           </div>
         </template>
       </div>
