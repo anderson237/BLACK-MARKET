@@ -1,4 +1,4 @@
-// ---------------------------------------------------------------------------
+﻿// ---------------------------------------------------------------------------
 // BL-007 — Prototype headless goofish (ST-017) : remplacement JustOneAPI pour
 // le détail produit Xianyu/Goofish pendant que le solde du compte est à zéro
 // (code 601 INSUFFICIENT BALANCE).
@@ -10,7 +10,7 @@
 //      distant browserless.io).
 //   2. MODE DISTANT (BL-007 v2) : si la variable d'env
 //      `GOOFISH_BROWSER_WS_ENDPOINT` est définie (ex. browserless.io,
-//      `wss://chrome.browserless.io/playwright-chromium?token=...`), on se
+//      `wss://chrome.browserless.io/chromium/playwright?token=...`), on se
 //      connecte via `chromium.connect(wsEndpoint)` — pas de binaire à
 //      embarquer en Netlify, le navigateur vit chez browserless.
 //      SINON : `chromium.launch()` local (Edge dev / chromium-headless-shell)
@@ -54,7 +54,7 @@ export function goofishItemUrl(sourceId: string): string {
 // ---------------------------------------------------------------------------
 // Mode distant browserless (BL-007 v2).
 // GOOFISH_BROWSER_WS_ENDPOINT : endpoint WebSocket Playwright, ex.
-//   wss://chrome.browserless.io/playwright-chromium?token=xxxxxxxx
+//   wss://chrome.browserless.io/chromium/playwright?token=xxxxxxxx
 // S'il est défini → `chromium.connect(wsEndpoint)` ; sinon lancement local.
 // ---------------------------------------------------------------------------
 
@@ -512,3 +512,4 @@ export async function scrapeGoofishDetail(
       : String(lastErr || 'erreur inconnue')
   throw new Error(`scraperGoofish: échec après ${options.maxAttempts} tentative(s) (budget ${options.totalTimeoutMs} ms) pour ${sourceId} — ${msg}`)
 }
+

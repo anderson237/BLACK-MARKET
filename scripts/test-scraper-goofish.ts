@@ -1,11 +1,11 @@
-// ---------------------------------------------------------------------------
+﻿// ---------------------------------------------------------------------------
 // BL-007 v2 — Test local du scraper headless goofish (ST-017).
 //
 // Usage (mode LOCAL — Edge headless) :
 //   npx tsx scripts/test-scraper-goofish.ts [sourceId]
 //
 // Usage (mode DISTANT browserless — quand le token sera créé) :
-//   $env:GOOFISH_BROWSER_WS_ENDPOINT="wss://chrome.browserless.io/playwright-chromium?token=VOTRE_TOKEN"
+//   $env:GOOFISH_BROWSER_WS_ENDPOINT="wss://chrome.browserless.io/chromium/playwright?token=VOTRE_TOKEN"
 //   npx tsx scripts/test-scraper-goofish.ts [sourceId]
 //
 // Le script affiche le mode utilisé (local / distant). En mode distant, il
@@ -81,3 +81,4 @@ main().catch((err) => {
   console.error('\n[test] ERREUR:', err?.message || err)
   process.exit(1)
 })
+

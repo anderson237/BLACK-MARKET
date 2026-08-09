@@ -1,4 +1,4 @@
-// ---------------------------------------------------------------------------
+﻿// ---------------------------------------------------------------------------
 // BL-007 v2 — Test du FALLBACK AUTOMATIQUE JustOneAPI quand le headless échoue.
 //
 // Scénario : on force un endpoint browserless INJOIGNABLE (GOOFISH_BROWSER_WS_ENDPOINT
@@ -15,7 +15,7 @@
 // Usage : npx tsx --tsconfig .nuxt/tsconfig.json scripts/test-fallback-headless.ts
 // ---------------------------------------------------------------------------
 
-process.env.GOOFISH_BROWSER_WS_ENDPOINT = 'wss://chrome.browserless.io/playwright-chromium?token=INVALID_TOKEN_FOR_TEST'
+process.env.GOOFISH_BROWSER_WS_ENDPOINT = 'wss://chrome.browserless.io/chromium/playwright?token=INVALID_TOKEN_FOR_TEST'
 
 // Le script tourne hors runtime Nitro : on polyfille les deux auto-imports
 // utilisés par justone.ts (joDetail) pour que le fallback puisse réellement
@@ -69,3 +69,4 @@ async function main() {
 }
 
 main().catch((e) => { console.error('\n[fallback] ERREUR:', e?.message || e); process.exit(1) })
+
