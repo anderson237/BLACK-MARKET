@@ -1,80 +1,1028 @@
 ﻿# Quant Lab — Status Board
 
-> Tenue par : Lab Director — Dernière mise à jour : 2026-08-08
+## Ressources IA mémorisées (2026-08-09)
 
-## Stratégies / Produits
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
 
-| ID | Objet | Gate courant | Statut | Notes |
-|----|-------|--------------|--------|-------|
-| ST-001 | Rebranding BLACK MARKET → Deep Roots Logistics | LIVE | ✅ Déployé | Tagline « Votre ancre mondiale pour le commerce international », favicon/logo/SEO/meta mis à jour. |
-| ST-002 | Renommage domaine Netlify → deeproots-importexport.netlify.app | LIVE | ✅ Déployé | Site Netlify renommé via API ; toutes les URL du code remplacées (robots, sitemap, og-image, social). |
-| ST-003 | Nettoyage sourcing/Chine/EUR-RMB (images + descriptions live) | LIVE | ✅ Déployé | 16 produits nettoyés ; 3 images régénérées avec filigrane « DEEP ROOTS © 2026 » (prod_1, prod_1786019057166, prod_1786016492719). Aucune trace « BLACK MARKET » restante. |
-| ST-004 | Fix login Google OAuth 2.0 | LIVE | ✅ Corrigé | Origine JavaScript `https://deeproots-importexport.netlify.app` ajoutée dans Google Cloud Console pour le client OAuth `809279866832-…`. Login fonctionnel. |
-| ST-005 | Feature Promo / Réduction (badge %, prix barré, countdown) | LIVE | ✅ Déployé | Champs `discountPercent` + `discountEndsAt` sur Product ; éditeur admin ; badge `-X%` sur carte ; prix barré + prix promo ; countdown « Fin dans j h m s » (carte + fiche). |
-| ST-006 | Devise configurable (XOF/EUR/USD) + sélecteur public | LIVE | ✅ Déployé | Devise par défaut persistée côté serveur (`/api/settings`) ; composable SSR-safe `useCurrency` (XOF unit canonique) ; sélecteur en header + drawer mobile ; conversion prix dynamique (cartes, fiche produit, compte client, WhatsApp). Préférence locale (localStorage) prioritaire. |
-| ST-007 | Panier de précommandes + confirmation WhatsApp | LIVE | ✅ Déployé | Bouton PRÉCOMMANDER = ajouter au panier (API `/api/cart` persistée par utilisateur en blob) ; badge panier dans header + drawer ; dashboard client : onglet « Précommandes » avec **CONFIRMER** (par article) et **CONFIRMER TOUTES** (bouton global) → crée la commande + ouvre WhatsApp ; prix promo appliqué à l'ajout. |
-| ST-008 | Admin : vue Paniers non confirmés (relance) | LIVE | ✅ Déployé | Page `/admin/carts` + route `/api/admin/carts` (joint comptes clients) : KPI (paniers/articles/valeur), recherche, détail des articles, bouton **RELANCER SUR WHATSAPP** avec message pré-rempli. Lecture panier en **consistance forte** (fix du flux client + admin). |
-| ST-009 | Export CSV des paniers non confirmés | LIVE | ✅ Déployé | Bouton **⬇ EXPORTER CSV** sur `/admin/carts` : exporte la liste filtrée (client, email, téléphone, pays, articles, total F CFA, dernière activité, détail, lien WhatsApp) au format Excel FR (BOM UTF-8, séparateur `;`). |
-| ST-010 | Rappel automatique des paniers abandonnés | LIVE | ✅ Déployé | Netlify Scheduled Function `netlify/functions/remind-carts.mjs` (`@hourly`) → POST `/api/admin/reminders/run` (auth par `x-task-secret` = `NUXT_TASK_SECRET`, ou session admin). Logique `server/utils/reminders.ts` : scan paniers inactifs ≥ 48 h, cooldown 72 h, journalisation `bm-reminders` anti-doublon. **Email réel ACTIF** (clé Resend configurée) : template percutant texte + HTML (branding rouge, images produits, bouton CTA « CONFIRMER MA PRÉCOMMANDE », ligne FOMO) ; sujet accrocheur. Bouton **⟳ LANCER LE RAPPEL** dans l'UI admin (dry-run sûr, résultats affichés). |
-| ST-012 | Chat commandes / précommandes (client ↔ admin) | LIVE | ✅ Déployé | Threads : `pre:<userId>` (panier), `pre:<userId>:<productId>` (**par article**, accordéon « style commentaires »), `general:<userId>` (**chat général**, onglet Chat du compte client), `ord:<orderId>` (commandes). Blob `bm-chat`. Client écrit depuis `/compte` (Précommandes : bouton **Message** par article → discussion dépliée, historique + post ; onglet **Chat** général ; Commandes), admin répond depuis `/admin/carts` (par article + panier + général) & `/admin/orders` (modal détail). Badges non-lus des deux côtés. **Désactivation à la livraison** : fil de commande `completed` verrouillé (lecture seule, 400 serveur client+admin, prop `locked` ChatPanel). **Migration** à la confirmation : tous les fils pre (legacy + par article) fusionnés dans le fil ordre avec dédupe par id, `clientReadTs`/`adminReadTs` max conservés. **Temps réel** : SSE + fallback poll 2 s. **Email admin** (Resend) à la confirmation. Test e2e prod OK (général, par article, lock livraison, migration multi-fils). Commits `29d090c`, `96e4954`, `c3da739`, `0083a1c` ; deploys `6a76231a6a27afd09fa22933`, `6a762e1c327b4f22a3fca706`, `6a76321eda82b423bfadd203`. |
-| ST-013 | Temps réel site-wide + anti-flash + brouillon chat persistant | LIVE | ✅ Déployé | Répond à « le chat marche bien mais il y a un refresh qui flashe dans tout le site » (message détruit pendant la frappe) + « pourquoi le chat est instantané mais pas les stats/produits ». **Fix flash/saisie** : `/compte` squelettes seulement au 1er chargement (`v-if="loadingData && !data"`). **Brouillon persistant** : `ChatPanel` draftKey `bm_chat_draft_<side>_<threadId>` (sessionStorage, restaure au setup, clear après envoi). **Anti-FOUC thème** : script head inline avant premier paint (`bm_theme === 'light'` → classe `.light`). **Re-renders poll réduits** : stores chat/adminChat ne mutent que si `JSON.stringify` diffère. **SSE site-wide** : `server/utils/realtime.ts` → `publishSiteUpdate('catalog'|'orders'|'stats')` sur canal `site` ; endpoint public `server/api/events.get.ts` (sans auth, ping 15 s) ; mutations produits (post/put/delete/permanent/restore) et commandes (post/put/delete) publient ; client `composables/useSiteEvents.ts` (fetch SSE, backoff 0.5s..5s, dispatch `bm:site`), démarré depuis `app.vue`. Écouteurs : accueil (`store.refresh()` kind catalog), fiche produit (`refresh()` kind catalog + navigateTo si disparu), `/compte` (kind orders → reload silencieux 400 ms), layout admin (`loadOrders`+`loadStats` sur orders, `loadProducts` sur catalog). **Fallbacks poll** (limite Netlify push intra-instance constatée en e2e) : accueil 30 s, fiche produit 60 s (admin garde ses 12 s). Deploys `6a7639a013f8270ecd94957e`, `6a763bb6821d4e73c8f2b3a2`. Commit `7b46e95`. |
-| ST-014 | Fix suppression commandes + suppression comptes + UI dashboard client + sécurité admin | LIVE | ✅ Déployé | **Bug supprimer commande** : les boutons liste (`/admin/orders`) posaient `deleting = o.id` sans dialogue de confirmation → rien ne se passait. Fix : modal de confirmation (z-60) + ref `removing`, bouton du modal détail routé par la même confirmation. **Suppression de comptes** : nouvelle route `server/api/users/[id].delete.ts` (admin only) supprime le compte (tous providers : Google/email/phone), nettoie le blob legacy `bm-users`, le panier (`deleteCart`) et les threads chat ; garde-fous : propriétaire (400) et auto-suppression (400). Store `deleteUser` + bouton **Supprimer** dans `/admin/users` (caché pour owner/self/admins) avec modal de confirmation. **UI dashboard client** : bouton « DISCUTER DE MES PRÉCOMMANDES » retiré (chaque article a déjà son bouton Message) ; onglet « Chat » renommé « Chat avec l'administrateur » ; badge non-lus Précommandes limité aux fils par article. **Sécurité (gate 8)** : contrôle admin ajouté sur 9 routes qui n'avaient que `requireAuth` (n'importe quel client connecté pouvait supprimer des commandes/modifier des produits/lire toutes les commandes et stats) : `orders.get`, `orders/[id].put`, `orders/[id].delete`, `products.post`, `products.put`, `products/[id].delete`, `products/[id].permanent`, `products/[id].restore`, `stats.get`. **Fix light mode bulles chat** : exceptions `bg-[#ff2a2a]/90` (texte blanc conservé) + override `bg-[#1c1c26]` (bulle reçue claire) + `bg-black/20`. Tests e2e prod : client 403 sur `/api/orders`, DELETE commande OK, DELETE compte OK (login → 401 après), owner 400. Deploy `6a7640ca49ba94bd44e2538a`. |
-| ST-015 | Corbeille commandes + admin (admins/trésorerie/paniers) + partage + like persistant + temps réel | LIVE | ✅ Déployé | **Corbeille commandes** (soft-delete) : `loadOrders()` filtre `deleted`, `loadAllOrders()` expose la corbeille ; DELETE → `deleted`+`deletedAt` + purge chat `ord:` ; routes `restore.post` + `permanent.delete` ; `orders.get` renvoie `{orders, trash}` ; section **Corbeille** dans `/admin/orders` (Restaurer / Définitif) ; store `trashOrders`+`restoreOrder`+`deleteOrderPermanent` ; KPI actualisés via `loadStats()`. **Verrou distribué `mutateOrders`** (withBlobLock, même pattern que social) appliqué à create/update/delete/restore/permanent/lead → plus de perte d'écriture concurrente (bug « commande restaurée disparaît »). **Consistance forte** étendue : `loadUsers`, `loadAccountsFile`, `loadAllOrders`, `loadTreasury` (fix bouton RAFRAÎCHIR admin + fix 404 édition trésorerie). **Admins** : bouton ✕ « retirer les droits admin » sur chaque pastille non-owner (section ADMINISTRATEURS, `/admin/users`) ; `marxelarthur@gmail.com` retiré. **Trésorerie** : édition des mouvements manuels — route `PUT /api/treasury/entries/:id` + bouton crayon + modal d'édition (libellé/montant/date/moyen/note). **Paniers admin** : suppression définitive d'une précommande non confirmée — route `DELETE /api/admin/carts/:userId` + `removePreorderThreadsFor()` (purge threads `pre:`) + bouton **SUPPRIMER** dans `/admin/carts`. **Partage produit** : popover multi-réseaux — WhatsApp, Facebook, Gmail (URLs web) ; Messenger & TikTok via Web Share API natif (mobile) ou copie du lien ; Copier le lien ; tracking `share()` élargi (`wa/fb/gmail/messenger/tiktok/copy`). **Like persistant** : `refreshCount` ne fige plus `liked=false` serveur sur un like local (merge `data.liked === true || likedSet.has(id)`) → le bouton reste allumé après refresh. **Highlight cartes** : `ProductCard` brille (fond/bordure rouge + badges « ❤️ J'aime » / « 💬 Commenté ») pour les produits likés/commentés par le visiteur, persisté en localStorage (`bm_likes_v1` + nouveau `bm_commented_v1` via `commentsStore.markCommented`). **Corbeille visible partout** : carte d'alerte rouge sur le Dashboard (`/admin`) avec compteur + boutons Restaurer/Gérer, lien **Corbeille** dans la sidebar admin avec badge du nombre (desktop + mobile), ancre `#corbeille` sur `/admin/orders` avec scroll auto, resync serveur si la liste locale est vide au moment du DELETE. **Like temps réel (comme le chat)** : `events.post.ts` publie `publishSiteUpdate('catalog')` sur like/unlike/comment (idem `comments.post.ts`) → le SSE `bm:site` rafraîchit les compteurs like/commentaire de la vitrine sans attendre le poll ; **idempotence serveur par user** (`pushEvent` ne ré-incrémente pas si le user a déjà liké — testé : 2× like → count=1, unlike → 0, re-like → 1) ; **réparation like perdu** : `refreshCount` re-poste le like si le local dit liké mais le serveur non (POST initial perdu au refresh) → le rouge persiste. Deploys `6a7650ab6a27aff983a22c0e`, `6a7651fd099a2b01744a7d77`, `6a765397c56797b024e8e272`, `6a76730e8c5929089bbea0d3`, `6a767555da82b49d57adbe7f`. Commits `cbef52f`, `b2249e6`. |
-| ST-016 | Intégration PayUnit (paiement en ligne Mobile Money / carte) | 4 — Implémentation | 🚧 En cours | Hosted checkout PayUnit : `server/utils/payunit.ts` (init + status + `payment_country` selon pays du client — OM/MTN MoMo/Moov locaux + CB), routes `/api/payments/initialize` + `/api/payments/status` + webhook `/api/payments/webhook`, blob `bm-payments`, page `/paiement/retour`, **CONFIRMER lance le checkout PayUnit** (+ option WhatsApp secondaire, labels dynamiques). App PayUnit DEEPROOTS créée (SANDBOX, PAYMENTS_COLLECTION) ; clés sandbox fournies ; en attente des **API USER / API PASSWORD** (validation en cours côté PayUnit) pour le test e2e sandbox. Deploys `6a76a74593cb36869edd8f6e`, `6a76ffc5e6d60f3fcd772d03`, `6a7700f8327b4f6d11fca6c8`, `6a77027493cb36f5e7dd8f86`. |
-| ST-017 | Pipeline d'import Xianyu / Goofish (~150 produits/semaine) | 4 — Implémentation | 🚧 En cours | Client JustOneAPI (`server/utils/justone.ts`) : search + détail Xianyu & 1688, téléchargement images → blob local, conversion CNY→XOF (**1 ¥ = 95 FCFA modifiable**, marge par défaut supprimée). **Import par lien produit** : coller une URL Xianyu/1688/Taobao/TikTok Shop/Amazon/Douyin → détection auto plateforme+ID (`urlParser.ts`), même pipeline draft que clic résultat via `draftBuilder.ts` partagé (route `/api/admin/import/from-url`), hints Pinduoduo/Shopee/Temu non supportés. **Taux de conversion persistants modifiables** : blob `bm-rates` + routes `/api/admin/rates` + carte 💱 Réglages admin (CFA/¥, CFA/€, CFA/$) — unifie 95 (import) vs 85 (compta), toutes les conversions justone + accounting les lisent. **Fix upload vidéo** : `.click()` programmatique au lieu du `<label for>`+display:none. **Historique/cache des recherches** : chaque recherche (plateforme+mot-clé+tri+page) persistée (blob `bm-import-history`, cap 200) ; une recherche répétée retourne le cache SANS appel API payant (`cached:true`), bouton « Nouveautés depuis l'API » force `fresh=1` ; historique rechargeable + vidable (`/api/admin/import/history`). **3 prix** : ¥ yuan + conversion CFA (×95) + **marché local** (table admin blob `bm-local-prices`, affiché seulement si correspondance sur titre/mot-clé ; routes CRUD `/api/admin/import/local-prices`). **Estimation transport transitaire** (emballage inclus) : aérien 10 000 FCFA/kg + maritime 320 000 FCFA/m³ par défaut (recherche marché 2026 : aérien 3–9,5 $/kg, LCL 50–250 $/m³), configurable par catégorie (blob `bm-transport`), affichée dans le brouillon. Routes admin `/api/admin/import/search|draft|publish|history|local-prices|transport` (auth admin). UI `/admin/import` : historique (recharger/vider), badge cache, recherche fresh, 3 prix, sélecteur catégorie + estimation transport, gestion prix locaux + config transport. ⚠️ **Solde JustOne API insuffisant pour le détail 1688 (code 601)** — recherche 1688 OK, détail Xianyu OK. **Étude multi-plateforme (cycle 2, 2026-08-08) — endpoints JustOneAPI confirmés + structures réponse décryptées par appels réels** : TikTok Shop (`/api/tiktok-shop/search-products/v1` region US/GB/FR/SG/MY/PH/TH/VN/ID — réponse `data.data.products[]` : product_id, title, image.url_list, product_price_info.sale_price_decimal/currency_name, sold_info.sold_count, rate_info, seller_info.shop_name, seo_url.canonical_url, load_more_params.offset/page_token ; détail `/api/tiktok-shop/get-product-detail/v1` productId+region), Amazon (`/api/amazon/search-products/v1` keyword|ASIN, country (24 places : US/FR/GB/DE/IT/ES/JP…), sortBy RELEVANCE|LOWEST_PRICE|HIGHEST_PRICE|REVIEWS|NEWEST|BEST_SELLERS, productCondition, isPrime, dealsAndDiscounts, page — réponse `data.products[]` : asin, product_title, product_price "949,00 €", product_original_price, currency, product_star_rating, product_num_ratings, product_url, product_photo, is_best_seller, is_amazon_choice, is_prime, sales_volume, delivery, has_variations), Douyin E-commerce (`/api/douyin-ec/search-item-list/v1` keyword+page+searchId (search_id de la réponse pour paginer) — réponse `data.summary_promotions[]` : product_id, base_model.product_info.name/main_img.url_list/detail_url/month_sale.origin/good_ratio.origin, **prix** marketing_info.price_desc.price.origin (centimes ¥, 1590=15,90 ¥) + regular_price, shop_info.shop_name), **Taobao/Tmall** (`/api/taobao/search-item-list/v1` keyword+sort `_sale`|`_bid`|`bid`|`_coefp`+tmall bool+startPrice+endPrice+page — réponse `data.model.itemList[]` : itemId, itemName, discntPriceYuan/priceYuanDouble, picUrlFull/picUrlList, shopId/shopName, orderPayUV (ventes), itemLoc ; détails `/api/taobao/get-item-detail/v1|v3|v4|v5|v6|v9` itemId ; shop list `/api/taobao/get-shop-item-list/v1` userId). **TikTok 301 intermittent (COLLECT FAILED, réessayer)** ; codes : 0 OK, 301 collect failed, 302 TOO FAST (rate limit), 303 quota, 601 solde, 602 budget. **Implémentation multi-plateforme livrée (2026-08-08, cycle 2, build OK + deploy)** : `justone.ts` réécrit — client 6 plateformes `xianyu|1688|taobao|tiktok-shop|amazon|douyin-ec`, interfaces `JoSearchItem`/`JoDetail` normalisées + 6 flatteners, retry ×2 sur 301/302 (backoff 1,5 s) ; `search.get.ts`/`draft.post.ts`/`publish.post.ts` étendus — param `region` (US par défaut, FR au choix pour tiktok-shop/amazon), **fallback TikTok FR→US sur 301 répété**, conversion prix `priceToXof()` (CNY×95, EUR×655,957 fixe — peg officiel, USD×700 configurable `NUXT_PUBLIC_USD_TO_XOF_RATE`) ; `storage.ts` : `region` dans `ImportSearchEntry` + clé `importHistoryKey` ; UI `/admin/import` : 6 boutons plateformes (XY/1688/TB/TT/AMZ/DY), toggle région, tris par plateforme (dont BEST_SELLERS Amazon), métriques trending (🛒 ventes / ⭐ note / badge BEST), prix source selon devise. **Validation flatteners sur JSON réels** : Amazon 949 EUR (48 items), Douyin 15,9 ¥ (30), Taobao 8999 ¥ (10), TikTok 5,98 USD (5). **Lot suivant (2026-08-08, deploy `6a7772e6dc70690ae2e772f2`)** : **MOQ + barème de prix 1688** (`shopAddition.quantityPrices` → `moq` + `priceTiers`, ex. 1~29个=6,44¥) affichés carte + brouillon ; **stock Taobao** (`frontStock` → `stock`) affiché seulement si présent (1688 expose `bookedCount`=commandes, pas de stock ; aucune plateforme n'expose de limite d'achat/personne → rien affiché) ; **contacts fournisseurs (option 3)** — champs manuels WeChat/WhatsApp/Email/Téléphone/Site dans l'aperçu produit, sauvegarde serveur blob `bm-supplier-contacts` (route `contact.post.ts`, réutilisée aux prochains imports), stockés sur le produit publié (`supplierContact`) ; **bouton « Fiche vendeur »** (Taobao `shop{shopId}.taobao.com`, 1688 `detail.1688.com/offer/{id}`, autres sourceUrl) sur carte + brouillon ; **suppression individuelle** de l'historique (bouton ✕ par entrée, `deleteImportSearch`, DELETE avec body `{key}`) ; **réordonnancement accessoires** (search 1688/Taobao/Xianyu triés « pertinence » → les coques/films « 适用于 » passent en fin, jamais supprimés, désactivé si le mot-clé est un accessoire). ⚠️ Détails Amazon/Douyin/Taobao/TikTok non testés par appels réels (endpoints documentés, solde 601 pour 1688). Deploy `6a7772e6dc70690ae2e772f2`. |
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).
 
-| ID | Objet | Priorité | Notes |
-|----|-------|----------|-------|
-| BL-001 | ~~Sélecteur de devise configurable~~ | — | ✅ **Fait** (ST-006). |
-| BL-002 | ~~Suppression complète des références legacy `src/` (React)~~ | — | ✅ **Fait** (ST-011) : `src/`, `client-site/`, `server.ts`, `admin.html`, scripts legacy supprimés. Seed produits migré `server/data/products-seed.ts` (byte-exact, import updaté) ; constantes `server/utils/constants.ts` ; README/tsconfig/package.json nettoyés ; deps React/Express/Leaflet/Recharts/dotenv retirées. |
-| BL-003 | ~~Nettoyage `client-site/` (ancien domaine + ancien branding)~~ | — | ✅ **Fait** (ST-011) : dossier entier supprimé du repo. |
-| BL-004 | ~~Admin : voir les paniers non confirmés~~ | — | ✅ **Fait** (ST-008). |
-| BL-005 | **Solde JustOne API insuffisant** (code 601) | 🚧 Contournement testé | Le solde est épuisé (search + détail → 601 INSUFFICIENT BALANCE). **Solution headless TESTÉE (2026-08-09)** : Playwright + Edge headless (gratuit, open source, --disable-blink-features=AutomationControlled) → **goofish détail fonctionne** : API interne mtop.taobao.idle.pc.detail répond SUCCESS avec JSON structuré complet (titre, soldPrice 5300, originalPrice 6000, desc, categoryId, sellerDO) + extraction DOM directe (133 images alicdn). **Couverture multi-sites testée** : Amazon ❌ (anti-bot 404 volontaire) ; Taobao ❌ (redirection login) ; 1688 ⚠️ (redirection home, API mtop = token requis) ; goofish ✅ détail + search intermittent (parfois RGV587_ERROR temporaire). **Poids** : client playwright-core 12,8 Mo (sans navigateur) ; Chromium complet ~170 Mo (proche limite 250 Mo Netlify) ; option chromium-headless-shell (~110 Mo) à valider. **Question 150 produits** : une page goofish ≈ 20-30 résultats (pagination par pageNum/scroll) → 150 produits = multi-pages ou requêtes successives, pas en un seul appel (identique à JustOneAPI qui pagine aussi). **Décision** : source toggleable JustOneAPI ↔ headless par plateforme. Fix UX 601 prêt, non déployé. |
-| BL-006 | **Scrapabilité de DeepRoots** (constat, non bloquant) | ℹ️ Info | Testé 2026-08-09 : DeepRoots est **SSR** — le HTML brut de l'accueil (203 Ko) contient **tout le catalogue** (`__NUXT_DATA__` + JSON-LD ItemList) → un scraper peut tout copier sans JS (inverse de goofish qui est SPA CSR vide). ⚠️ Si la protection du catalogue devient un enjeu : mesures possibles (rate-limiting, protection de `catalog.json`, obfuscation des prix), mais attention au SEO (les moteurs exigent du SSR). Décision à prendre avec l'utilisateur ; pas de ticket ouvert tant que le besoin n'est pas explicite. |
-| BL-007 | **Headless goofish (browserless)** (ST-017) | ✅ **LIVE** — testé en prod | **Fonctionne en production** : import par lien goofish via **browserless.io Free** (clé API active, GOOFISH_BROWSER_WS_ENDPOINT en env prod). E2E prod : HTTP 200 en 15 s, engine: headless, iPhone 16 Pro Max 银色 256G, vendeur 小南科技数码 (深圳), 5300 ¥ → 503 500 FCFA, 5 images locales, transport, condition 在线. **Toggle par plateforme** (Réglages admin → SOURCE D'IMPORT, headless|justone, défaut xianyu=headless) + **fallback auto JustOneAPI** si headless échoue. Volume Free ≈ 500-800 extractions/mois (besoin ≈ 600). ⚠️ Si dépassement → Plan B Background Function. Commits 2e1e3aa, 29dd454, e914058 ; deploys 6a78170d, 6a781ab2. |
+## Ressources IA mémorisées (2026-08-09)
 
-## Historique des deploys
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
 
-| Date | Deploy URL | Contenu |
-| 2026-08-09 | 6a781ab2821d4e591ff2b19f | ST-017/BL-007 : **headless goofish EN PROD via browserless** — clé API browserless configurée (GOOFISH_BROWSER_WS_ENDPOINT en prod, scope all) ; fix chemin endpoint /chromium/playwright (le /playwright-chromium du v2 renvoyait 404). **Test e2e prod RÉUSSI** : POST /api/admin/import/from-url avec le lien goofish iPhone → HTTP 200 en 15 s, engine: headless, titre « iPhone 16 Pro Max银色 256G », vendeur 小南科技数码 (深圳), 5300 ¥ → 503 500 FCFA, 5 images locales, transport estimé, condition 在线 (build Nuxt) |
-| 2026-08-09 | 6a78170d5f6cf15b623e3e77 | ST-017/BL-007 : **headless v2** — mode navigateur distant browserless (WSS via GOOFISH_BROWSER_WS_ENDPOINT, token masqué) + **toggle source par plateforme** (server/utils/sources.ts blob m-sources, routes GET/PUT /api/admin/import/sources, carte SOURCE D'IMPORT dans Réglages) + engine.ts fetchProductDetail (headless d'abord pour xianyu, **fallback auto JustOneAPI**, contrat JoDetail inchangé) + badge moteur headless|justone dans l'aperçu import ; fix build leaflet (déployé) ; fix UX erreur 601 sous le champ URL ; message 601 sans adresse TRC (build Nuxt) |
-| 2026-08-09 | 6a77fcbd1a77aa05a2a192bf | ST-017 : **importer depuis un lien produit** — coller une URL Xianyu/1688/Taobao/TikTok Shop/Amazon/Douyin → détection auto plateforme+ID (`server/utils/urlParser.ts`), même pipeline que clic résultat (détail, images, conversion FCFA, transport, catégorie auto, contact fournisseur) via `draftBuilder.ts` partagé + route `/api/admin/import/from-url` ; hints clairs Pinduoduo/Shopee/Temu non supportés + **taux de conversion persistants et modifiables** (blob `bm-rates`, routes `/api/admin/rates`, carte 💱 dans Réglages admin — unifie l'incohérence 95 import vs 85 comptabilité, toutes les conversions justone + accounting lisent les mêmes taux) + **fix upload vidéo** (le pattern `<label for>` + input display:none n'ouvrait pas le file manager sur certains navigateurs → bouton + `.click()` programmatique, appliqué aussi aux uploads image/galerie) (build Nuxt) |
-| 2026-08-08 | 6a77908003f222a3008f75d4 | Import : **fix images Taobao en recherche** — l'API renvoie des URLs `g.search[N].alicdn.com/img/bao/uploaded/` (bloquées, timeout) ; `taobaoImageUrl()` les réécrit vers `img.alicdn.com/imgextra/<bucket>/` (vérifié 200 webp sur 5 URLs), appliqué aux flatteners search + detail (build Nuxt) |
-| 2026-08-08 | 6a778b4d43195056ebc77567 | Vitrine : **barre de recherche produit** au-dessus des onglets catégorie (recherche sur titre/chinois/description/catégorie, combinée avec le filtre catégorie actif, bouton effacer, message vide adapté) (build Nuxt) |
-| 2026-08-08 | 6a7789332187baadc65f4dbe | Admin : **infos fournisseur visibles et éditables dans le catalogue admin** — fix critique (le contact fournisseur était silencieusement perdu à chaque édition d'un produit importé : `supplierContact` absent du modal) ; section « 📇 Contact fournisseur » éditable dans l'éditeur produit, badge « 📇 Fournisseur » sur les cards + « Fiche fournisseur » dans le modal détail (build Nuxt) |
-| 2026-08-08 | 6a7786a7b8374abde18e079e | Vitrine : **badge « ❤️ J'aime » retiré des cards produit** (recouvrait la photo/vidéo en haut de carte) — le badge « 💬 Commenté » et le glow de bordure restent (build Nuxt) |
-| 2026-08-08 | 6a7782992187ba912b5f4db0 | ST-017 : **fix filtres catégorie vitrine** (resetAndSlice/loadMore/refresh filtrent par catégorie — ne faisaient rien avant) + **catégories auto à l'import** : détection par mots-clés FR/EN/CN (`detectCategory`), draft → `suggestedCategory`, UI pré-remplie + input libre avec datalist (transport + produits existants + seed) ; toute nouvelle catégorie devient un filtre vitrine automatiquement (build Nuxt) |
-| 2026-08-08 | 6a777f78bb09f7875a55c5f9 | ST-017 : **fiche vendeur sur toutes les fiches produit** (pays + téléphone + WhatsApp/WeChat/email/site/note, champs `country`/`sellerName` ajoutés au contact, affichée seulement si renseignée) + **filtres prix source ¥/$/€** + **🔥 BEST uniquement** (is_best_seller Amazon) (build Nuxt) |
-| 2026-08-08 | 6a777991db3b906e53abdb56 | ST-017 : **nombre de résultats configurable (10/20/30/50/custom, 1-100)** — pagination multi-pages côté serveur (10 pages max, pageToken TikTok, dédup par sourceId, max dispo si solde/limite API insuffisant) + **filtres prix min/max FCFA, ventes min, note min** appliqués avant la troncature (cache réutilisable, `extra` retiré des résultats → cache allégé) (build Nuxt) |
-| 2026-08-08 | 6a77769f1830de2889e19acd | ST-017 : tris universels prix ↑/↓ + 🔥 Produits du moment (ventes) + ⭐ Top note pour TikTok Shop / Douyin / 1688 (tri client-side, l'API n'expose pas de tri), libellés SORTS harmonisés Taobao/Amazon (valeurs API inchangées) (build Nuxt) |
-| 2026-08-08 | 6a7772e6dc70690ae2e772f2 | ST-017 : MOQ + barème 1688, stock Taobao, contacts fournisseurs (blob bm-supplier-contacts, option 3), bouton fiche vendeur, suppression individuelle historique, réordonnancement accessoires (build Nuxt) |
-| 2026-08-08 | 6a776dcdb2499cde21e8bf73 | ST-017 : fix images CDN anti-hotlink (referrerpolicy no-referrer) + fix inputs transport débordants (w-full min-w-0) (build Nuxt) |
-| 2026-08-08 | 6a776a86ced1266aa4f8cd67 | ST-017 : impl multi-plateforme (cycle 2) — justone.ts 6 plateformes (Xianyu/1688/Taobao/TikTok/Amazon/Douyin), région US/FR + fallback TikTok FR→US, taux EUR 655,957 fixe + USD 700 configurable, tris + métriques trending UI (build Nuxt) |
-| 2026-08-08 | 6a77626ac56797f450e8e330 | ST-017 : historique/cache recherches (blob, cache sans appel API + fresh), 3 prix (yuan/CFA/marché local via table admin), estimation transport transitaire configurable (aérien/maritime, emballage inclus) (build Nuxt) |
-| 2026-08-08 | 6a775a80eeb48ffff222cc3d | ST-017 : traduction auto titres (batch Gemini au search) + prix ¥/CFA (1¥=95F) + fix modal Aperçu (erreur visible) + taux 95 (build Nuxt) |
-| 2026-08-08 | 6a77574dff6f042f164ebbac | ST-017 : fix 401 import — headers `Authorization` (Bearer token) ajoutés aux appels search/draft/publish dans /admin/import (build Nuxt) |
-| 2026-08-08 | 6a771a61f45a1a8b520bfad6 | ST-017 : import Xianyu/1688 — client JustOneAPI + routes admin import + UI /admin/import (build Nuxt, token JUSTONE_API_KEY en prod) |
-| 2026-08-08 | 6a7719f076ec248dc93898e1 | ST-017 : import Xianyu/1688 — premières routes + page (build Nuxt) |
-|------|-----------|---------|
-| 2026-08-08 | 6a767555da82b49d57adbe7f | ST-015 : like temps réel (publishSiteUpdate like/unlike/comment) + idempotence par user + réparation like perdu au refresh (build Nuxt) |
-| 2026-08-08 | 6a76730e8c5929089bbea0d3 | ST-015 : corbeille visible partout — carte alerte Dashboard + lien sidebar avec badge + ancre `#corbeille` + resync store (build Nuxt) |
-| 2026-08-07 | 6a765397c56797b024e8e272 | ST-015 : loadTreasury en consistance forte — fix 404 édition trésorerie (build Nuxt) |
-| 2026-08-07 | 6a7651fd099a2b01744a7d77 | ST-015 : mutateOrders (verrou distribué) réécrit toutes les écritures orders (build Nuxt) |
-| 2026-08-07 | 6a7650ab6a27aff983a22c0e | ST-015 : corbeille commandes + retrait admins + édition trésorerie + suppression panier + partage multi-réseaux + like persistant + highlight cartes (build Nuxt) |
-| 2026-08-07 | 6a7640ca49ba94bd44e2538a | ST-014 : fix suppression commandes + suppression comptes + UI dashboard client + sécurité admin 9 routes + fix light mode bulles chat (build Nuxt) |
-| 2026-08-07 | 6a763bb6821d4e73c8f2b3a2 | ST-013 : fallbacks poll catalogue (accueil 30 s, fiche produit 60 s) — limite push intra-instance Netlify (build Nuxt) |
-| 2026-08-07 | 6a7639a013f8270ecd94957e | ST-013 : SSE site-wide (catalog/orders/stats) + anti-flash `/compte` + brouillon chat + anti-FOUC thème (build Nuxt) |
-| 2026-08-07 | 6a76321eda82b423bfadd203 | Chat par article + général + lock livraison (ST-012) — accordéons, threads `pre:<userId>:<productId>` / `general:<userId>`, migration multi-fils (build Nuxt) |
-| 2026-08-07 | 6a762e1c327b4f22a3fca706 | Chat temps réel ST-012 : SSE push instantané + fallback poll 2 s (build Nuxt) |
-| 2026-08-07 | 6a76231a6a27afd09fa22933 | Chat commandes/précommandes (ST-012) — threads client↔admin, badges, migration, email admin (build Nuxt) |
-| 2026-08-07 | 6a761db4dad05aab57c58cc1 | Template email percutant + fix cooldown (build Nuxt) |
-| 2026-08-07 | 6a761bae8e00e00d2bf33e26 | RESEND_API_KEY activée (redeploy) |
-| 2026-08-07 | 6a761965b8374a89a48e06d7 | Nettoyage legacy + export CSV + rappel auto (build Nuxt) |
-| 2026-08-07 | 6a7617b11a77aa7cf5a192cd | Secret NUXT_TASK_SECRET appliqué (redeploy) |
-| 2026-08-07 | 6a761739dd545d5e2ead75a2 | Endpoint rappel + scheduled function (build Nuxt) |
-| 2026-08-07 | 6a76168ddd545d57c5ad77b7 | Export CSV + rappel auto (build Nuxt) |
-| 2026-08-07 | 6a76131cb2499c5d0de8bfe1 | Admin Paniers non confirmés + consistance forte (build Nuxt) |
-| 2026-08-07 | 6a76105d5973314cddb374ce | Panier de précommandes + confirmation WhatsApp (build Nuxt) |
-| 2026-08-07 | 6a75df55d31e83f0d26d1b | Devise configurable XOF/EUR/USD (build Nuxt) |
-| 2026-08-07 | 6a75c245706fad2ea22fd4af | Rebrand + promo (build Nuxt) |
-| 2026-08-07 | 6a75b9f09487b322ce4ca3b3 | Domaine renommé |
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).> Tenue par : Lab Director — Dernière mise à jour : 2026-08-08
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).## Stratégies / Produits
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| ID | Objet | Gate courant | Statut | Notes |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).|----|-------|--------------|--------|-------|
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| ST-001 | Rebranding BLACK MARKET → Deep Roots Logistics | LIVE | ✅ Déployé | Tagline « Votre ancre mondiale pour le commerce international », favicon/logo/SEO/meta mis à jour. |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| ST-002 | Renommage domaine Netlify → deeproots-importexport.netlify.app | LIVE | ✅ Déployé | Site Netlify renommé via API ; toutes les URL du code remplacées (robots, sitemap, og-image, social). |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| ST-003 | Nettoyage sourcing/Chine/EUR-RMB (images + descriptions live) | LIVE | ✅ Déployé | 16 produits nettoyés ; 3 images régénérées avec filigrane « DEEP ROOTS © 2026 » (prod_1, prod_1786019057166, prod_1786016492719). Aucune trace « BLACK MARKET » restante. |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| ST-004 | Fix login Google OAuth 2.0 | LIVE | ✅ Corrigé | Origine JavaScript `https://deeproots-importexport.netlify.app` ajoutée dans Google Cloud Console pour le client OAuth `809279866832-…`. Login fonctionnel. |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| ST-005 | Feature Promo / Réduction (badge %, prix barré, countdown) | LIVE | ✅ Déployé | Champs `discountPercent` + `discountEndsAt` sur Product ; éditeur admin ; badge `-X%` sur carte ; prix barré + prix promo ; countdown « Fin dans j h m s » (carte + fiche). |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| ST-006 | Devise configurable (XOF/EUR/USD) + sélecteur public | LIVE | ✅ Déployé | Devise par défaut persistée côté serveur (`/api/settings`) ; composable SSR-safe `useCurrency` (XOF unit canonique) ; sélecteur en header + drawer mobile ; conversion prix dynamique (cartes, fiche produit, compte client, WhatsApp). Préférence locale (localStorage) prioritaire. |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| ST-007 | Panier de précommandes + confirmation WhatsApp | LIVE | ✅ Déployé | Bouton PRÉCOMMANDER = ajouter au panier (API `/api/cart` persistée par utilisateur en blob) ; badge panier dans header + drawer ; dashboard client : onglet « Précommandes » avec **CONFIRMER** (par article) et **CONFIRMER TOUTES** (bouton global) → crée la commande + ouvre WhatsApp ; prix promo appliqué à l'ajout. |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| ST-008 | Admin : vue Paniers non confirmés (relance) | LIVE | ✅ Déployé | Page `/admin/carts` + route `/api/admin/carts` (joint comptes clients) : KPI (paniers/articles/valeur), recherche, détail des articles, bouton **RELANCER SUR WHATSAPP** avec message pré-rempli. Lecture panier en **consistance forte** (fix du flux client + admin). |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| ST-009 | Export CSV des paniers non confirmés | LIVE | ✅ Déployé | Bouton **⬇ EXPORTER CSV** sur `/admin/carts` : exporte la liste filtrée (client, email, téléphone, pays, articles, total F CFA, dernière activité, détail, lien WhatsApp) au format Excel FR (BOM UTF-8, séparateur `;`). |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| ST-010 | Rappel automatique des paniers abandonnés | LIVE | ✅ Déployé | Netlify Scheduled Function `netlify/functions/remind-carts.mjs` (`@hourly`) → POST `/api/admin/reminders/run` (auth par `x-task-secret` = `NUXT_TASK_SECRET`, ou session admin). Logique `server/utils/reminders.ts` : scan paniers inactifs ≥ 48 h, cooldown 72 h, journalisation `bm-reminders` anti-doublon. **Email réel ACTIF** (clé Resend configurée) : template percutant texte + HTML (branding rouge, images produits, bouton CTA « CONFIRMER MA PRÉCOMMANDE », ligne FOMO) ; sujet accrocheur. Bouton **⟳ LANCER LE RAPPEL** dans l'UI admin (dry-run sûr, résultats affichés). |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| ST-012 | Chat commandes / précommandes (client ↔ admin) | LIVE | ✅ Déployé | Threads : `pre:<userId>` (panier), `pre:<userId>:<productId>` (**par article**, accordéon « style commentaires »), `general:<userId>` (**chat général**, onglet Chat du compte client), `ord:<orderId>` (commandes). Blob `bm-chat`. Client écrit depuis `/compte` (Précommandes : bouton **Message** par article → discussion dépliée, historique + post ; onglet **Chat** général ; Commandes), admin répond depuis `/admin/carts` (par article + panier + général) & `/admin/orders` (modal détail). Badges non-lus des deux côtés. **Désactivation à la livraison** : fil de commande `completed` verrouillé (lecture seule, 400 serveur client+admin, prop `locked` ChatPanel). **Migration** à la confirmation : tous les fils pre (legacy + par article) fusionnés dans le fil ordre avec dédupe par id, `clientReadTs`/`adminReadTs` max conservés. **Temps réel** : SSE + fallback poll 2 s. **Email admin** (Resend) à la confirmation. Test e2e prod OK (général, par article, lock livraison, migration multi-fils). Commits `29d090c`, `96e4954`, `c3da739`, `0083a1c` ; deploys `6a76231a6a27afd09fa22933`, `6a762e1c327b4f22a3fca706`, `6a76321eda82b423bfadd203`. |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| ST-013 | Temps réel site-wide + anti-flash + brouillon chat persistant | LIVE | ✅ Déployé | Répond à « le chat marche bien mais il y a un refresh qui flashe dans tout le site » (message détruit pendant la frappe) + « pourquoi le chat est instantané mais pas les stats/produits ». **Fix flash/saisie** : `/compte` squelettes seulement au 1er chargement (`v-if="loadingData && !data"`). **Brouillon persistant** : `ChatPanel` draftKey `bm_chat_draft_<side>_<threadId>` (sessionStorage, restaure au setup, clear après envoi). **Anti-FOUC thème** : script head inline avant premier paint (`bm_theme === 'light'` → classe `.light`). **Re-renders poll réduits** : stores chat/adminChat ne mutent que si `JSON.stringify` diffère. **SSE site-wide** : `server/utils/realtime.ts` → `publishSiteUpdate('catalog'|'orders'|'stats')` sur canal `site` ; endpoint public `server/api/events.get.ts` (sans auth, ping 15 s) ; mutations produits (post/put/delete/permanent/restore) et commandes (post/put/delete) publient ; client `composables/useSiteEvents.ts` (fetch SSE, backoff 0.5s..5s, dispatch `bm:site`), démarré depuis `app.vue`. Écouteurs : accueil (`store.refresh()` kind catalog), fiche produit (`refresh()` kind catalog + navigateTo si disparu), `/compte` (kind orders → reload silencieux 400 ms), layout admin (`loadOrders`+`loadStats` sur orders, `loadProducts` sur catalog). **Fallbacks poll** (limite Netlify push intra-instance constatée en e2e) : accueil 30 s, fiche produit 60 s (admin garde ses 12 s). Deploys `6a7639a013f8270ecd94957e`, `6a763bb6821d4e73c8f2b3a2`. Commit `7b46e95`. |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| ST-014 | Fix suppression commandes + suppression comptes + UI dashboard client + sécurité admin | LIVE | ✅ Déployé | **Bug supprimer commande** : les boutons liste (`/admin/orders`) posaient `deleting = o.id` sans dialogue de confirmation → rien ne se passait. Fix : modal de confirmation (z-60) + ref `removing`, bouton du modal détail routé par la même confirmation. **Suppression de comptes** : nouvelle route `server/api/users/[id].delete.ts` (admin only) supprime le compte (tous providers : Google/email/phone), nettoie le blob legacy `bm-users`, le panier (`deleteCart`) et les threads chat ; garde-fous : propriétaire (400) et auto-suppression (400). Store `deleteUser` + bouton **Supprimer** dans `/admin/users` (caché pour owner/self/admins) avec modal de confirmation. **UI dashboard client** : bouton « DISCUTER DE MES PRÉCOMMANDES » retiré (chaque article a déjà son bouton Message) ; onglet « Chat » renommé « Chat avec l'administrateur » ; badge non-lus Précommandes limité aux fils par article. **Sécurité (gate 8)** : contrôle admin ajouté sur 9 routes qui n'avaient que `requireAuth` (n'importe quel client connecté pouvait supprimer des commandes/modifier des produits/lire toutes les commandes et stats) : `orders.get`, `orders/[id].put`, `orders/[id].delete`, `products.post`, `products.put`, `products/[id].delete`, `products/[id].permanent`, `products/[id].restore`, `stats.get`. **Fix light mode bulles chat** : exceptions `bg-[#ff2a2a]/90` (texte blanc conservé) + override `bg-[#1c1c26]` (bulle reçue claire) + `bg-black/20`. Tests e2e prod : client 403 sur `/api/orders`, DELETE commande OK, DELETE compte OK (login → 401 après), owner 400. Deploy `6a7640ca49ba94bd44e2538a`. |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| ST-015 | Corbeille commandes + admin (admins/trésorerie/paniers) + partage + like persistant + temps réel | LIVE | ✅ Déployé | **Corbeille commandes** (soft-delete) : `loadOrders()` filtre `deleted`, `loadAllOrders()` expose la corbeille ; DELETE → `deleted`+`deletedAt` + purge chat `ord:` ; routes `restore.post` + `permanent.delete` ; `orders.get` renvoie `{orders, trash}` ; section **Corbeille** dans `/admin/orders` (Restaurer / Définitif) ; store `trashOrders`+`restoreOrder`+`deleteOrderPermanent` ; KPI actualisés via `loadStats()`. **Verrou distribué `mutateOrders`** (withBlobLock, même pattern que social) appliqué à create/update/delete/restore/permanent/lead → plus de perte d'écriture concurrente (bug « commande restaurée disparaît »). **Consistance forte** étendue : `loadUsers`, `loadAccountsFile`, `loadAllOrders`, `loadTreasury` (fix bouton RAFRAÎCHIR admin + fix 404 édition trésorerie). **Admins** : bouton ✕ « retirer les droits admin » sur chaque pastille non-owner (section ADMINISTRATEURS, `/admin/users`) ; `marxelarthur@gmail.com` retiré. **Trésorerie** : édition des mouvements manuels — route `PUT /api/treasury/entries/:id` + bouton crayon + modal d'édition (libellé/montant/date/moyen/note). **Paniers admin** : suppression définitive d'une précommande non confirmée — route `DELETE /api/admin/carts/:userId` + `removePreorderThreadsFor()` (purge threads `pre:`) + bouton **SUPPRIMER** dans `/admin/carts`. **Partage produit** : popover multi-réseaux — WhatsApp, Facebook, Gmail (URLs web) ; Messenger & TikTok via Web Share API natif (mobile) ou copie du lien ; Copier le lien ; tracking `share()` élargi (`wa/fb/gmail/messenger/tiktok/copy`). **Like persistant** : `refreshCount` ne fige plus `liked=false` serveur sur un like local (merge `data.liked === true || likedSet.has(id)`) → le bouton reste allumé après refresh. **Highlight cartes** : `ProductCard` brille (fond/bordure rouge + badges « ❤️ J'aime » / « 💬 Commenté ») pour les produits likés/commentés par le visiteur, persisté en localStorage (`bm_likes_v1` + nouveau `bm_commented_v1` via `commentsStore.markCommented`). **Corbeille visible partout** : carte d'alerte rouge sur le Dashboard (`/admin`) avec compteur + boutons Restaurer/Gérer, lien **Corbeille** dans la sidebar admin avec badge du nombre (desktop + mobile), ancre `#corbeille` sur `/admin/orders` avec scroll auto, resync serveur si la liste locale est vide au moment du DELETE. **Like temps réel (comme le chat)** : `events.post.ts` publie `publishSiteUpdate('catalog')` sur like/unlike/comment (idem `comments.post.ts`) → le SSE `bm:site` rafraîchit les compteurs like/commentaire de la vitrine sans attendre le poll ; **idempotence serveur par user** (`pushEvent` ne ré-incrémente pas si le user a déjà liké — testé : 2× like → count=1, unlike → 0, re-like → 1) ; **réparation like perdu** : `refreshCount` re-poste le like si le local dit liké mais le serveur non (POST initial perdu au refresh) → le rouge persiste. Deploys `6a7650ab6a27aff983a22c0e`, `6a7651fd099a2b01744a7d77`, `6a765397c56797b024e8e272`, `6a76730e8c5929089bbea0d3`, `6a767555da82b49d57adbe7f`. Commits `cbef52f`, `b2249e6`. |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| ST-016 | Intégration PayUnit (paiement en ligne Mobile Money / carte) | 4 — Implémentation | 🚧 En cours | Hosted checkout PayUnit : `server/utils/payunit.ts` (init + status + `payment_country` selon pays du client — OM/MTN MoMo/Moov locaux + CB), routes `/api/payments/initialize` + `/api/payments/status` + webhook `/api/payments/webhook`, blob `bm-payments`, page `/paiement/retour`, **CONFIRMER lance le checkout PayUnit** (+ option WhatsApp secondaire, labels dynamiques). App PayUnit DEEPROOTS créée (SANDBOX, PAYMENTS_COLLECTION) ; clés sandbox fournies ; en attente des **API USER / API PASSWORD** (validation en cours côté PayUnit) pour le test e2e sandbox. Deploys `6a76a74593cb36869edd8f6e`, `6a76ffc5e6d60f3fcd772d03`, `6a7700f8327b4f6d11fca6c8`, `6a77027493cb36f5e7dd8f86`. |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| ST-017 | Pipeline d'import Xianyu / Goofish (~150 produits/semaine) | 4 — Implémentation | 🚧 En cours | Client JustOneAPI (`server/utils/justone.ts`) : search + détail Xianyu & 1688, téléchargement images → blob local, conversion CNY→XOF (**1 ¥ = 95 FCFA modifiable**, marge par défaut supprimée). **Import par lien produit** : coller une URL Xianyu/1688/Taobao/TikTok Shop/Amazon/Douyin → détection auto plateforme+ID (`urlParser.ts`), même pipeline draft que clic résultat via `draftBuilder.ts` partagé (route `/api/admin/import/from-url`), hints Pinduoduo/Shopee/Temu non supportés. **Taux de conversion persistants modifiables** : blob `bm-rates` + routes `/api/admin/rates` + carte 💱 Réglages admin (CFA/¥, CFA/€, CFA/$) — unifie 95 (import) vs 85 (compta), toutes les conversions justone + accounting les lisent. **Fix upload vidéo** : `.click()` programmatique au lieu du `<label for>`+display:none. **Historique/cache des recherches** : chaque recherche (plateforme+mot-clé+tri+page) persistée (blob `bm-import-history`, cap 200) ; une recherche répétée retourne le cache SANS appel API payant (`cached:true`), bouton « Nouveautés depuis l'API » force `fresh=1` ; historique rechargeable + vidable (`/api/admin/import/history`). **3 prix** : ¥ yuan + conversion CFA (×95) + **marché local** (table admin blob `bm-local-prices`, affiché seulement si correspondance sur titre/mot-clé ; routes CRUD `/api/admin/import/local-prices`). **Estimation transport transitaire** (emballage inclus) : aérien 10 000 FCFA/kg + maritime 320 000 FCFA/m³ par défaut (recherche marché 2026 : aérien 3–9,5 $/kg, LCL 50–250 $/m³), configurable par catégorie (blob `bm-transport`), affichée dans le brouillon. Routes admin `/api/admin/import/search|draft|publish|history|local-prices|transport` (auth admin). UI `/admin/import` : historique (recharger/vider), badge cache, recherche fresh, 3 prix, sélecteur catégorie + estimation transport, gestion prix locaux + config transport. ⚠️ **Solde JustOne API insuffisant pour le détail 1688 (code 601)** — recherche 1688 OK, détail Xianyu OK. **Étude multi-plateforme (cycle 2, 2026-08-08) — endpoints JustOneAPI confirmés + structures réponse décryptées par appels réels** : TikTok Shop (`/api/tiktok-shop/search-products/v1` region US/GB/FR/SG/MY/PH/TH/VN/ID — réponse `data.data.products[]` : product_id, title, image.url_list, product_price_info.sale_price_decimal/currency_name, sold_info.sold_count, rate_info, seller_info.shop_name, seo_url.canonical_url, load_more_params.offset/page_token ; détail `/api/tiktok-shop/get-product-detail/v1` productId+region), Amazon (`/api/amazon/search-products/v1` keyword|ASIN, country (24 places : US/FR/GB/DE/IT/ES/JP…), sortBy RELEVANCE|LOWEST_PRICE|HIGHEST_PRICE|REVIEWS|NEWEST|BEST_SELLERS, productCondition, isPrime, dealsAndDiscounts, page — réponse `data.products[]` : asin, product_title, product_price "949,00 €", product_original_price, currency, product_star_rating, product_num_ratings, product_url, product_photo, is_best_seller, is_amazon_choice, is_prime, sales_volume, delivery, has_variations), Douyin E-commerce (`/api/douyin-ec/search-item-list/v1` keyword+page+searchId (search_id de la réponse pour paginer) — réponse `data.summary_promotions[]` : product_id, base_model.product_info.name/main_img.url_list/detail_url/month_sale.origin/good_ratio.origin, **prix** marketing_info.price_desc.price.origin (centimes ¥, 1590=15,90 ¥) + regular_price, shop_info.shop_name), **Taobao/Tmall** (`/api/taobao/search-item-list/v1` keyword+sort `_sale`|`_bid`|`bid`|`_coefp`+tmall bool+startPrice+endPrice+page — réponse `data.model.itemList[]` : itemId, itemName, discntPriceYuan/priceYuanDouble, picUrlFull/picUrlList, shopId/shopName, orderPayUV (ventes), itemLoc ; détails `/api/taobao/get-item-detail/v1|v3|v4|v5|v6|v9` itemId ; shop list `/api/taobao/get-shop-item-list/v1` userId). **TikTok 301 intermittent (COLLECT FAILED, réessayer)** ; codes : 0 OK, 301 collect failed, 302 TOO FAST (rate limit), 303 quota, 601 solde, 602 budget. **Implémentation multi-plateforme livrée (2026-08-08, cycle 2, build OK + deploy)** : `justone.ts` réécrit — client 6 plateformes `xianyu|1688|taobao|tiktok-shop|amazon|douyin-ec`, interfaces `JoSearchItem`/`JoDetail` normalisées + 6 flatteners, retry ×2 sur 301/302 (backoff 1,5 s) ; `search.get.ts`/`draft.post.ts`/`publish.post.ts` étendus — param `region` (US par défaut, FR au choix pour tiktok-shop/amazon), **fallback TikTok FR→US sur 301 répété**, conversion prix `priceToXof()` (CNY×95, EUR×655,957 fixe — peg officiel, USD×700 configurable `NUXT_PUBLIC_USD_TO_XOF_RATE`) ; `storage.ts` : `region` dans `ImportSearchEntry` + clé `importHistoryKey` ; UI `/admin/import` : 6 boutons plateformes (XY/1688/TB/TT/AMZ/DY), toggle région, tris par plateforme (dont BEST_SELLERS Amazon), métriques trending (🛒 ventes / ⭐ note / badge BEST), prix source selon devise. **Validation flatteners sur JSON réels** : Amazon 949 EUR (48 items), Douyin 15,9 ¥ (30), Taobao 8999 ¥ (10), TikTok 5,98 USD (5). **Lot suivant (2026-08-08, deploy `6a7772e6dc70690ae2e772f2`)** : **MOQ + barème de prix 1688** (`shopAddition.quantityPrices` → `moq` + `priceTiers`, ex. 1~29个=6,44¥) affichés carte + brouillon ; **stock Taobao** (`frontStock` → `stock`) affiché seulement si présent (1688 expose `bookedCount`=commandes, pas de stock ; aucune plateforme n'expose de limite d'achat/personne → rien affiché) ; **contacts fournisseurs (option 3)** — champs manuels WeChat/WhatsApp/Email/Téléphone/Site dans l'aperçu produit, sauvegarde serveur blob `bm-supplier-contacts` (route `contact.post.ts`, réutilisée aux prochains imports), stockés sur le produit publié (`supplierContact`) ; **bouton « Fiche vendeur »** (Taobao `shop{shopId}.taobao.com`, 1688 `detail.1688.com/offer/{id}`, autres sourceUrl) sur carte + brouillon ; **suppression individuelle** de l'historique (bouton ✕ par entrée, `deleteImportSearch`, DELETE avec body `{key}`) ; **réordonnancement accessoires** (search 1688/Taobao/Xianyu triés « pertinence » → les coques/films « 适用于 » passent en fin, jamais supprimés, désactivé si le mot-clé est un accessoire). ⚠️ Détails Amazon/Douyin/Taobao/TikTok non testés par appels réels (endpoints documentés, solde 601 pour 1688). Deploy `6a7772e6dc70690ae2e772f2`. |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| ID | Objet | Priorité | Notes |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).|----|-------|----------|-------|
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| BL-001 | ~~Sélecteur de devise configurable~~ | — | ✅ **Fait** (ST-006). |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| BL-002 | ~~Suppression complète des références legacy `src/` (React)~~ | — | ✅ **Fait** (ST-011) : `src/`, `client-site/`, `server.ts`, `admin.html`, scripts legacy supprimés. Seed produits migré `server/data/products-seed.ts` (byte-exact, import updaté) ; constantes `server/utils/constants.ts` ; README/tsconfig/package.json nettoyés ; deps React/Express/Leaflet/Recharts/dotenv retirées. |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| BL-003 | ~~Nettoyage `client-site/` (ancien domaine + ancien branding)~~ | — | ✅ **Fait** (ST-011) : dossier entier supprimé du repo. |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| BL-004 | ~~Admin : voir les paniers non confirmés~~ | — | ✅ **Fait** (ST-008). |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| BL-005 | **Solde JustOne API insuffisant** (code 601) | 🚧 Contournement testé | Le solde est épuisé (search + détail → 601 INSUFFICIENT BALANCE). **Solution headless TESTÉE (2026-08-09)** : Playwright + Edge headless (gratuit, open source, --disable-blink-features=AutomationControlled) → **goofish détail fonctionne** : API interne mtop.taobao.idle.pc.detail répond SUCCESS avec JSON structuré complet (titre, soldPrice 5300, originalPrice 6000, desc, categoryId, sellerDO) + extraction DOM directe (133 images alicdn). **Couverture multi-sites testée** : Amazon ❌ (anti-bot 404 volontaire) ; Taobao ❌ (redirection login) ; 1688 ⚠️ (redirection home, API mtop = token requis) ; goofish ✅ détail + search intermittent (parfois RGV587_ERROR temporaire). **Poids** : client playwright-core 12,8 Mo (sans navigateur) ; Chromium complet ~170 Mo (proche limite 250 Mo Netlify) ; option chromium-headless-shell (~110 Mo) à valider. **Question 150 produits** : une page goofish ≈ 20-30 résultats (pagination par pageNum/scroll) → 150 produits = multi-pages ou requêtes successives, pas en un seul appel (identique à JustOneAPI qui pagine aussi). **Décision** : source toggleable JustOneAPI ↔ headless par plateforme. Fix UX 601 prêt, non déployé. |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| BL-006 | **Scrapabilité de DeepRoots** (constat, non bloquant) | ℹ️ Info | Testé 2026-08-09 : DeepRoots est **SSR** — le HTML brut de l'accueil (203 Ko) contient **tout le catalogue** (`__NUXT_DATA__` + JSON-LD ItemList) → un scraper peut tout copier sans JS (inverse de goofish qui est SPA CSR vide). ⚠️ Si la protection du catalogue devient un enjeu : mesures possibles (rate-limiting, protection de `catalog.json`, obfuscation des prix), mais attention au SEO (les moteurs exigent du SSR). Décision à prendre avec l'utilisateur ; pas de ticket ouvert tant que le besoin n'est pas explicite. |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| BL-007 | **Headless goofish (browserless)** (ST-017) | ✅ **LIVE** — testé en prod | **Fonctionne en production** : import par lien goofish via **browserless.io Free** (clé API active, GOOFISH_BROWSER_WS_ENDPOINT en env prod). E2E prod : HTTP 200 en 15 s, engine: headless, iPhone 16 Pro Max 银色 256G, vendeur 小南科技数码 (深圳), 5300 ¥ → 503 500 FCFA, 5 images locales, transport, condition 在线. **Toggle par plateforme** (Réglages admin → SOURCE D'IMPORT, headless|justone, défaut xianyu=headless) + **fallback auto JustOneAPI** si headless échoue. Volume Free ≈ 500-800 extractions/mois (besoin ≈ 600). ⚠️ Si dépassement → Plan B Background Function. Commits 2e1e3aa, 29dd454, e914058 ; deploys 6a78170d, 6a781ab2. |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).## Historique des deploys
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| Date | Deploy URL | Contenu |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-09 | 6a781ab2821d4e591ff2b19f | ST-017/BL-007 : **headless goofish EN PROD via browserless** — clé API browserless configurée (GOOFISH_BROWSER_WS_ENDPOINT en prod, scope all) ; fix chemin endpoint /chromium/playwright (le /playwright-chromium du v2 renvoyait 404). **Test e2e prod RÉUSSI** : POST /api/admin/import/from-url avec le lien goofish iPhone → HTTP 200 en 15 s, engine: headless, titre « iPhone 16 Pro Max银色 256G », vendeur 小南科技数码 (深圳), 5300 ¥ → 503 500 FCFA, 5 images locales, transport estimé, condition 在线 (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-09 | 6a78170d5f6cf15b623e3e77 | ST-017/BL-007 : **headless v2** — mode navigateur distant browserless (WSS via GOOFISH_BROWSER_WS_ENDPOINT, token masqué) + **toggle source par plateforme** (server/utils/sources.ts blob m-sources, routes GET/PUT /api/admin/import/sources, carte SOURCE D'IMPORT dans Réglages) + engine.ts fetchProductDetail (headless d'abord pour xianyu, **fallback auto JustOneAPI**, contrat JoDetail inchangé) + badge moteur headless|justone dans l'aperçu import ; fix build leaflet (déployé) ; fix UX erreur 601 sous le champ URL ; message 601 sans adresse TRC (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-09 | 6a77fcbd1a77aa05a2a192bf | ST-017 : **importer depuis un lien produit** — coller une URL Xianyu/1688/Taobao/TikTok Shop/Amazon/Douyin → détection auto plateforme+ID (`server/utils/urlParser.ts`), même pipeline que clic résultat (détail, images, conversion FCFA, transport, catégorie auto, contact fournisseur) via `draftBuilder.ts` partagé + route `/api/admin/import/from-url` ; hints clairs Pinduoduo/Shopee/Temu non supportés + **taux de conversion persistants et modifiables** (blob `bm-rates`, routes `/api/admin/rates`, carte 💱 dans Réglages admin — unifie l'incohérence 95 import vs 85 comptabilité, toutes les conversions justone + accounting lisent les mêmes taux) + **fix upload vidéo** (le pattern `<label for>` + input display:none n'ouvrait pas le file manager sur certains navigateurs → bouton + `.click()` programmatique, appliqué aussi aux uploads image/galerie) (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-08 | 6a77908003f222a3008f75d4 | Import : **fix images Taobao en recherche** — l'API renvoie des URLs `g.search[N].alicdn.com/img/bao/uploaded/` (bloquées, timeout) ; `taobaoImageUrl()` les réécrit vers `img.alicdn.com/imgextra/<bucket>/` (vérifié 200 webp sur 5 URLs), appliqué aux flatteners search + detail (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-08 | 6a778b4d43195056ebc77567 | Vitrine : **barre de recherche produit** au-dessus des onglets catégorie (recherche sur titre/chinois/description/catégorie, combinée avec le filtre catégorie actif, bouton effacer, message vide adapté) (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-08 | 6a7789332187baadc65f4dbe | Admin : **infos fournisseur visibles et éditables dans le catalogue admin** — fix critique (le contact fournisseur était silencieusement perdu à chaque édition d'un produit importé : `supplierContact` absent du modal) ; section « 📇 Contact fournisseur » éditable dans l'éditeur produit, badge « 📇 Fournisseur » sur les cards + « Fiche fournisseur » dans le modal détail (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-08 | 6a7786a7b8374abde18e079e | Vitrine : **badge « ❤️ J'aime » retiré des cards produit** (recouvrait la photo/vidéo en haut de carte) — le badge « 💬 Commenté » et le glow de bordure restent (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-08 | 6a7782992187ba912b5f4db0 | ST-017 : **fix filtres catégorie vitrine** (resetAndSlice/loadMore/refresh filtrent par catégorie — ne faisaient rien avant) + **catégories auto à l'import** : détection par mots-clés FR/EN/CN (`detectCategory`), draft → `suggestedCategory`, UI pré-remplie + input libre avec datalist (transport + produits existants + seed) ; toute nouvelle catégorie devient un filtre vitrine automatiquement (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-08 | 6a777f78bb09f7875a55c5f9 | ST-017 : **fiche vendeur sur toutes les fiches produit** (pays + téléphone + WhatsApp/WeChat/email/site/note, champs `country`/`sellerName` ajoutés au contact, affichée seulement si renseignée) + **filtres prix source ¥/$/€** + **🔥 BEST uniquement** (is_best_seller Amazon) (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-08 | 6a777991db3b906e53abdb56 | ST-017 : **nombre de résultats configurable (10/20/30/50/custom, 1-100)** — pagination multi-pages côté serveur (10 pages max, pageToken TikTok, dédup par sourceId, max dispo si solde/limite API insuffisant) + **filtres prix min/max FCFA, ventes min, note min** appliqués avant la troncature (cache réutilisable, `extra` retiré des résultats → cache allégé) (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-08 | 6a77769f1830de2889e19acd | ST-017 : tris universels prix ↑/↓ + 🔥 Produits du moment (ventes) + ⭐ Top note pour TikTok Shop / Douyin / 1688 (tri client-side, l'API n'expose pas de tri), libellés SORTS harmonisés Taobao/Amazon (valeurs API inchangées) (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-08 | 6a7772e6dc70690ae2e772f2 | ST-017 : MOQ + barème 1688, stock Taobao, contacts fournisseurs (blob bm-supplier-contacts, option 3), bouton fiche vendeur, suppression individuelle historique, réordonnancement accessoires (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-08 | 6a776dcdb2499cde21e8bf73 | ST-017 : fix images CDN anti-hotlink (referrerpolicy no-referrer) + fix inputs transport débordants (w-full min-w-0) (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-08 | 6a776a86ced1266aa4f8cd67 | ST-017 : impl multi-plateforme (cycle 2) — justone.ts 6 plateformes (Xianyu/1688/Taobao/TikTok/Amazon/Douyin), région US/FR + fallback TikTok FR→US, taux EUR 655,957 fixe + USD 700 configurable, tris + métriques trending UI (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-08 | 6a77626ac56797f450e8e330 | ST-017 : historique/cache recherches (blob, cache sans appel API + fresh), 3 prix (yuan/CFA/marché local via table admin), estimation transport transitaire configurable (aérien/maritime, emballage inclus) (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-08 | 6a775a80eeb48ffff222cc3d | ST-017 : traduction auto titres (batch Gemini au search) + prix ¥/CFA (1¥=95F) + fix modal Aperçu (erreur visible) + taux 95 (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-08 | 6a77574dff6f042f164ebbac | ST-017 : fix 401 import — headers `Authorization` (Bearer token) ajoutés aux appels search/draft/publish dans /admin/import (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-08 | 6a771a61f45a1a8b520bfad6 | ST-017 : import Xianyu/1688 — client JustOneAPI + routes admin import + UI /admin/import (build Nuxt, token JUSTONE_API_KEY en prod) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-08 | 6a7719f076ec248dc93898e1 | ST-017 : import Xianyu/1688 — premières routes + page (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).|------|-----------|---------|
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-08 | 6a767555da82b49d57adbe7f | ST-015 : like temps réel (publishSiteUpdate like/unlike/comment) + idempotence par user + réparation like perdu au refresh (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-08 | 6a76730e8c5929089bbea0d3 | ST-015 : corbeille visible partout — carte alerte Dashboard + lien sidebar avec badge + ancre `#corbeille` + resync store (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-07 | 6a765397c56797b024e8e272 | ST-015 : loadTreasury en consistance forte — fix 404 édition trésorerie (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-07 | 6a7651fd099a2b01744a7d77 | ST-015 : mutateOrders (verrou distribué) réécrit toutes les écritures orders (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-07 | 6a7650ab6a27aff983a22c0e | ST-015 : corbeille commandes + retrait admins + édition trésorerie + suppression panier + partage multi-réseaux + like persistant + highlight cartes (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-07 | 6a7640ca49ba94bd44e2538a | ST-014 : fix suppression commandes + suppression comptes + UI dashboard client + sécurité admin 9 routes + fix light mode bulles chat (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-07 | 6a763bb6821d4e73c8f2b3a2 | ST-013 : fallbacks poll catalogue (accueil 30 s, fiche produit 60 s) — limite push intra-instance Netlify (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-07 | 6a7639a013f8270ecd94957e | ST-013 : SSE site-wide (catalog/orders/stats) + anti-flash `/compte` + brouillon chat + anti-FOUC thème (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-07 | 6a76321eda82b423bfadd203 | Chat par article + général + lock livraison (ST-012) — accordéons, threads `pre:<userId>:<productId>` / `general:<userId>`, migration multi-fils (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-07 | 6a762e1c327b4f22a3fca706 | Chat temps réel ST-012 : SSE push instantané + fallback poll 2 s (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-07 | 6a76231a6a27afd09fa22933 | Chat commandes/précommandes (ST-012) — threads client↔admin, badges, migration, email admin (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-07 | 6a761db4dad05aab57c58cc1 | Template email percutant + fix cooldown (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-07 | 6a761bae8e00e00d2bf33e26 | RESEND_API_KEY activée (redeploy) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-07 | 6a761965b8374a89a48e06d7 | Nettoyage legacy + export CSV + rappel auto (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-07 | 6a7617b11a77aa7cf5a192cd | Secret NUXT_TASK_SECRET appliqué (redeploy) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-07 | 6a761739dd545d5e2ead75a2 | Endpoint rappel + scheduled function (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-07 | 6a76168ddd545d57c5ad77b7 | Export CSV + rappel auto (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-07 | 6a76131cb2499c5d0de8bfe1 | Admin Paniers non confirmés + consistance forte (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-07 | 6a76105d5973314cddb374ce | Panier de précommandes + confirmation WhatsApp (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-07 | 6a75df55d31e83f0d26d1b | Devise configurable XOF/EUR/USD (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-07 | 6a75c245706fad2ea22fd4af | Rebrand + promo (build Nuxt) |
+
+## Ressources IA mémorisées (2026-08-09)
+
+| Source | URL | Usage |
+|---|---|---|
+| OpenRouter | https://github.com/OpenRouterTeam | Agrégateur multi-modèles IA (LLM) — API unifiée, à considérer pour traduction/vision si GEMINI_API_KEY limite |
+| Paperclip AI | https://github.com/paperclipai | Dépend de la découverte ; à évaluer |
+| Reverse Skill | https://github.com/zhaoxuya520/reverse-skill | À évaluer (scraping/reverse engineering ?) |
+| free-ai-models | https://github.com/ClawLabsAI/free-ai-models | Liste quotidienne de modèles IA/LLM sans barrière payante |
+| no-cost-ai | https://github.com/zebbern/no-cost-ai | 80+ services IA gratuits (chat, image, vidéo, voix, API) |
+| ai-collection | https://github.com/ai-collection | Outils IA pratiques + générateurs visuels open source |
+
+> À piocher au besoin (traduction auto, enrichissement IA, vision). Priorité : traduction FR des descriptions produit via Gemini (GEMINI_API_KEY déjà configurée).| 2026-08-07 | 6a75b9f09487b322ce4ca3b3 | Domaine renommé |

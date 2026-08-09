@@ -5,6 +5,7 @@ import { loadProducts, saveProducts } from '~~/server/utils/storage'
 import { sanitizeProduct } from '~~/server/utils/product'
 import { publishSiteUpdate } from '~~/server/utils/realtime'
 import { getAI, geminiModel, geminiFallbackModel, generateContentWithRetry } from '~~/server/utils/ai'
+import { hasCjk } from '~~/server/utils/draftBuilder'
 import { priceToXof, type JoPlatform } from '~~/server/utils/justone'
 
 // Admin import pipeline (ST-017) — publish step.
@@ -76,17 +77,22 @@ export default defineEventHandler(async (event) => {
 
   // Optional AI enrichment: translate to FR, craft a sales pitch and a
   // suggested price. Runs only when explicitly requested + key configured.
+  // ST-017 v3 : le draft d'import est déjà traduit en FR automatiquement
+  // (description sans CJK) → on l'indique au modèle pour éviter une double
+  // traduction : il affine/polish la copie FR au lieu de retraduire depuis
+  // le chinois. Le chinois original reste fourni en contexte de fidélité.
   let enriched: any = null
   if (aiEnrich) {
     const ai = getAI()
     if (!ai) throw createError({ statusCode: 503, statusMessage: "Le service d'IA n'est pas configuré (GEMINI_API_KEY manquante)." })
+    const alreadyFrenchTitle = Boolean(title) && !hasCjk(title)
+    const alreadyFrenchDesc = Boolean(description) && !hasCjk(description)
     const prompt = `
 Produit importé de ${platformLabel(platform)} — titre source : "${chineseTitle || title}".
 Description source : "${chineseDescription || description}".
 Prix d'achat : ${price || 'inconnu'} ${currency}.
-Fais le travail suivant :
-1. Traduis le titre en français (titre commercial accrocheur, marché francophone/africain).
-2. Traduis/adapte la description en français de manière claire et fidèle.
+${alreadyFrenchDesc ? '1. La description fournie est DÉJÀ en français (traduction auto à l\'import). NE LA RETRADUIS PAS depuis le chinois : garde-la telle quelle, ou améliore-la légèrement si le style le mérite.' : '1. Traduis/adapte la description en français de manière claire et fidèle.'}
+${alreadyFrenchTitle ? '2. Le titre fourni est DÉJÀ en français : conserve-le tel quel (améliorations de style mineures acceptées).' : '2. Traduis le titre en français (titre commercial accrocheur, marché francophone/africain).'}
 3. Rédige un argumentaire de vente premium en français (bénéfices clients, crédible).
 4. Extrais 3 à 5 caractéristiques techniques clés.
 5. Suggère un prix de vente EUR et XOF. Convertis le prix d'achat (1 RMB ≈ 95 XOF, 1 EUR = 655.957 XOF, 1 USD ≈ 700 XOF) et applique une marge d'importation réaliste (frais d'envoi 5-10 € / 3000-6000 XOF inclus).

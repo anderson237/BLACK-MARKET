@@ -828,29 +828,45 @@ onMounted(() => {
             </div>
             <div class="flex-1 min-w-0 space-y-3">
               <div>
-                <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Titre FR</p>
+                <div class="flex items-center justify-between gap-2 mb-1">
+                  <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Titre FR</p>
+                  <span v-if="draft.translationStatus === 'translated'" class="text-[9px] font-mono text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 rounded">✓ Traduit automatiquement</span>
+                  <span v-else-if="draft.translationStatus === 'failed'" class="text-[9px] font-mono text-amber-400 border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 rounded">⚠ Traduction FR indisponible</span>
+                </div>
                 <input v-model="publishTitle" class="w-full bg-black/40 border border-zinc-800 rounded-lg px-3 py-2 text-[13px] text-white focus:outline-none focus:border-[#ff2a2a]/60" />
               </div>
               <div>
-                <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Description</p>
+                <div class="flex items-center justify-between gap-2 mb-1">
+                  <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Description</p>
+                  <span v-if="draft.translationStatus === 'translated'" class="text-[9px] font-mono text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 rounded">✓ Traduit automatiquement</span>
+                  <span v-else-if="draft.translationStatus === 'failed'" class="text-[9px] font-mono text-amber-400 border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 rounded">⚠ Traduction FR indisponible — source conservée</span>
+                </div>
                 <textarea v-model="publishDesc" rows="3" class="w-full bg-black/40 border border-zinc-800 rounded-lg px-3 py-2 text-[12px] text-white focus:outline-none focus:border-[#ff2a2a]/60 resize-y"></textarea>
               </div>
-              <div class="grid grid-cols-2 gap-2">
-                <div>
-                  <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Prix source ({{ currencySymbol(draft.currency) }})</p>
-                  <input type="number" :value="draft.price" disabled class="w-full bg-black/20 border border-zinc-800 rounded-lg px-3 py-2 text-[12px] text-zinc-400" />
-                  <p class="text-[9px] font-mono text-zinc-600 mt-1">
-                    {{ draft.currency === 'EUR' ? '1 € = 655,957 FCFA' : draft.currency === 'USD' ? '1 $ ≈ 700 FCFA' : '1 ¥ = 95 FCFA' }}
+              <div class="space-y-2">
+                <!-- ST-017 v3 : les 2 prix côte à côte (source ¥ + ≈ FCFA) -->
+                <div class="flex items-center justify-between gap-2 rounded-lg border border-[#ff2a2a]/30 bg-[#ff2a2a]/5 px-3 py-2.5">
+                  <p class="text-[12px] font-mono text-zinc-300">
+                    Prix source : <span class="text-zinc-100 font-semibold">{{ draft.price }}</span>
+                    <span class="text-zinc-500">{{ currencySymbol(draft.currency) }}</span>
                   </p>
-                  <p v-if="draft.moq" class="text-[9px] font-mono text-sky-400 mt-1">📦 MOQ : {{ draft.moq }} pièce(s)</p>
-                  <p v-if="draft.priceTiers?.length" class="text-[9px] font-mono text-zinc-500 mt-1">
-                    Barème : <span v-for="(t, ti) in draft.priceTiers" :key="ti" class="mr-1.5">{{ t.quantity }} → {{ t.value }} ¥</span>
-                  </p>
-                  <p v-if="draft.stock" class="text-[9px] font-mono text-emerald-400 mt-1">✔ Stock restant : {{ draft.stock }}</p>
+                  <p class="text-[15px] font-mono font-extrabold text-[#ff2a2a]">≈ {{ fmtXof(draft.priceXof) }} FCFA</p>
                 </div>
-                <div>
-                  <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Prix vente (XOF)</p>
-                  <input v-model.number="publishPriceXof" type="number" class="w-full bg-black/40 border border-zinc-800 rounded-lg px-3 py-2 text-[12px] text-white focus:outline-none focus:border-[#ff2a2a]/60" />
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Prix vente (XOF)</p>
+                    <input v-model.number="publishPriceXof" type="number" class="w-full bg-black/40 border border-zinc-800 rounded-lg px-3 py-2 text-[12px] text-white focus:outline-none focus:border-[#ff2a2a]/60" />
+                    <p class="text-[9px] font-mono text-zinc-600 mt-1">
+                      {{ draft.currency === 'EUR' ? '1 € = 655,957 FCFA' : draft.currency === 'USD' ? '1 $ ≈ 700 FCFA' : '1 ¥ = 95 FCFA' }}
+                    </p>
+                  </div>
+                  <div>
+                    <p class="text-[9px] font-mono text-sky-400 mt-1" v-if="draft.moq">📦 MOQ : {{ draft.moq }} pièce(s)</p>
+                    <p v-if="draft.priceTiers?.length" class="text-[9px] font-mono text-zinc-500 mt-1">
+                      Barème : <span v-for="(t, ti) in draft.priceTiers" :key="ti" class="mr-1.5">{{ t.quantity }} → {{ t.value }} ¥</span>
+                    </p>
+                    <p v-if="draft.stock" class="text-[9px] font-mono text-emerald-400 mt-1">✔ Stock restant : {{ draft.stock }}</p>
+                  </div>
                 </div>
               </div>
               <div v-if="draft.localPriceXof" class="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2">
@@ -969,7 +985,7 @@ onMounted(() => {
             </div>
             <label class="flex items-center gap-2 text-[11px] font-mono text-zinc-300 cursor-pointer">
               <input v-model="aiEnrich" type="checkbox" class="accent-[#ff2a2a]" />
-              Enrichissement IA (traduction FR + copywriting + suggestion de prix)
+              Enrichissement IA (polish FR + copywriting + suggestion de prix)
             </label>
           </div>
 

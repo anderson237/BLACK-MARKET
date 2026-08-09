@@ -13,6 +13,15 @@ export function getAI(): GoogleGenAI | null {
   return ai
 }
 
+/**
+ * Test-only : force la recréation du client Gemini au prochain getAI().
+ * Utilisé par scripts/test-import-translate.ts pour simuler une clé invalide
+ * puis revenir à la clé réelle dans le même processus. Aucun usage en prod.
+ */
+export function resetAI(): void {
+  ai = undefined
+}
+
 export const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
 export const geminiFallbackModel = process.env.GEMINI_FALLBACK_MODEL || 'gemini-2.5-flash-lite'
 
