@@ -23,7 +23,7 @@ export function resetAI(): void {
 }
 
 export const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
-export const geminiFallbackModel = process.env.GEMINI_FALLBACK_MODEL || 'gemini-2.5-flash-lite'
+export const geminiFallbackModel = process.env.GEMINI_FALLBACK_MODEL || 'gemini-2.5-flash'
 
 export async function generateContentWithRetry(
   ai: GoogleGenAI,
@@ -48,7 +48,10 @@ export async function generateContentWithRetry(
           errorString.includes('503') ||
           errorString.includes('UNAVAILABLE') ||
           errorString.includes('demand') ||
-          error.status === 503
+          errorString.includes('429') ||
+          errorString.includes('RESOURCE_EXHAUSTED') ||
+          error.status === 503 ||
+          error.status === 429
         if (isTemporary && attempt < retries - 1) {
           await new Promise((resolve) => setTimeout(resolve, currentDelay))
           currentDelay *= 2

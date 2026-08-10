@@ -5,6 +5,11 @@
 [functions]
   directory = ".netlify/functions-internal"
 
+# ST-020 v3 : la traduction IA (Gemini) peut prendre ~15-20 s → timeout porté au
+# max synchrone Netlify (26 s) pour la fonction Nuxt `server`.
+[functions.server]
+  timeout = 26
+
 # ---------------------------------------------------------------------------
 # REDIRECTS
 # ---------------------------------------------------------------------------
