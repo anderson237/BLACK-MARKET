@@ -66,7 +66,7 @@ async function blobGet(store: string, key: string, type: 'text' | 'arrayBuffer',
 
 async function blobSet(store: string, key: string, value: string | Buffer): Promise<void> {
   const s = getStore({ name: store })
-  await s.set(key, value)
+  await s.set(key, value as any)
 }
 
 // ---- products ----
@@ -588,7 +588,7 @@ export async function withBlobLock<T>(storeName: string, key: string, fn: () => 
     // Lock held by someone else. If the holder crashed, its timestamp goes stale
     // -> break the lock and retry immediately.
     try {
-      const holder = await s.get(lockKey, { type: 'json' } as any)
+      const holder: any = await s.get(lockKey, { type: 'json' } as any)
       if (holder && typeof holder.ts === 'number' && Date.now() - holder.ts > LOCK_TTL_MS) {
         try {
           await s.delete(lockKey)
@@ -977,7 +977,7 @@ export async function toggleCommentReaction(id: string, userId: string, kind: 'l
 // Any logged-in user may report a comment once; reports surface in the admin
 // analytics so a moderator can review them.
 export async function reportComment(id: string, userId: string): Promise<{ comment: Comment | null; alreadyReported: boolean }> {
-  return mutateSocial((social) => {
+  return mutateSocial<{ comment: Comment | null; alreadyReported: boolean }>((social) => {
     const idx = social.comments.findIndex((c) => c.id === id)
     if (idx < 0) return { next: null, value: { comment: null, alreadyReported: false } }
     const c = withCommentDefaults(social.comments[idx])
@@ -1478,7 +1478,10 @@ export function mergeSupplierInfo(supplier: Supplier, product: any, now: string)
     new Set([...(supplier.productIds || []), String(product?.id || '')].filter(Boolean)),
   )
 
-  const fill = (key: string) => supplier[key as keyof Supplier] || String(contact[key] || '').trim() || undefined
+  const fill = (key: string): string | undefined => {
+    const v: unknown = supplier[key as keyof Supplier] ?? String((contact as Record<string, any>)[key] ?? '').trim()
+    return v == null || v === '' ? undefined : String(v)
+  }
 
   const stats = {
     soldCount: Number(seller.soldCount) > 0 ? Math.round(Number(seller.soldCount)) : supplier.stats?.soldCount,

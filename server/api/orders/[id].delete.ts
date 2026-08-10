@@ -27,7 +27,7 @@ export default defineEventHandler(async (event) => {
   if (outcome === 'not-found') throw createError({ statusCode: 404, statusMessage: 'Commande introuvable.' })
   if (outcome === 'already') throw createError({ statusCode: 400, statusMessage: 'Commande déjà dans la corbeille.' })
 
-  await removeChatThreadForOrder(id)
+  if (id) await removeChatThreadForOrder(id)
   publishSiteUpdate('orders')
   return { success: true, trashed: true }
 })

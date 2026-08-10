@@ -37,7 +37,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const data = await getPayunitCheckoutStatus(rec.checkoutId)
-  const payStatus: PaymentStatus = String(data?.status || 'PENDING').toUpperCase()
+  const payStatus = String(data?.status || 'PENDING').toUpperCase()
   const finalStatus = payStatus === 'SUCCESS' || payStatus === 'FAILED' || payStatus === 'CANCELLED' ? payStatus : 'PENDING'
 
   // Idempotent: only touch orders on the first confirmed SUCCESS.

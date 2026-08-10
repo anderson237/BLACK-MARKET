@@ -1,0 +1,405 @@
+// ---------------------------------------------------------------------------
+// DeepRoots Import — content-isolated.js (MONDE ISOLÉ, ST-020)
+//
+// Injecté à `document_start` en `world: "ISOLATED"` sur les marketplaces.
+// Rôles :
+//   1. Recevoir les captures réseau de content-main.js (world MAIN) via
+//      `window.postMessage` et les garder dans un pool borne (Map url→objet).
+//   2. Répondre aux messages du popup/background :
+//        { type: 'DR_PING' }    → présence content script + host supporté
+//        { type: 'DR_CAPTURE' } → extrait un payload produit (heuristique JSON,
+//                                 sinon fallback DOM) → sendResponse({payload})
+//
+// Seul CE script parle à l'extension (chrome.runtime). Le script MAIN ne fait
+// que postMessage — il ne touche jamais aux API Chrome.
+//
+// HOSTS supportés (miroir du manifest) :
+//   taobao/tmall, 1688, amazon.*, goofish (xianyu), douyin/jinritemai (douyin-ec), tiktok
+// ---------------------------------------------------------------------------
+(() => {
+  if (window.__DR_ISOLATED__) return
+  window.__DR_ISOLATED__ = true
+
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+  function hasCjk(s) {
+    return /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/.test(String(s || ''))
+  }
+
+  function detectPlatform(host) {
+    const h = String(host || '')
+    if (/(^|\.)taobao\.com$/i.test(h) || /(^|\.)tmall\.com$/i.test(h)) return 'taobao'
+    if (/(^|\.)1688\.com$/i.test(h)) return '1688'
+    if (/(\.amazon\.)/i.test(h)) return 'amazon'
+    if (/(^|\.)goofish\.com$/i.test(h)) return 'xianyu'
+    if (/(^|\.)douyin\.com$/i.test(h) || /(^|\.)jinritemai\.com$/i.test(h)) return 'douyin-ec'
+    if (/(^|\.)tiktok\.com$/i.test(h)) return 'tiktok-shop'
+    return null
+  }
+
+  function currencyFor(platform, url) {
+    if (platform === 'amazon') {
+      try {
+        const u = new URL(String(url || ''))
+        if (/\.amazon\.(fr|de|it|es|nl|se|pl)$|\.amazon\.co\.uk$/i.test(u.hostname)) return 'EUR'
+      } catch (_) {}
+      return 'USD'
+    }
+    if (platform === 'tiktok-shop') return 'USD'
+    return 'CNY'
+  }
+
+  // ----- Deep find: premier primitive sous l'un des `keys` (préférence d'ordre) -----
+  const INNER_OBJ_KEYS = ['amount', 'value', 'displayAmount', 'rawPrice', 'price', 'priceText', 'text', 'display', 'displayTitle', 'title', 'stringValue']
+  function findByKeys(node, keys, depth) {
+    if (node == null || typeof node !== 'object') return undefined
+    if (depth > 20) return undefined
+    if (Array.isArray(node)) {
+      for (let i = 0; i < node.length; i++) {
+        const v = findByKeys(node[i], keys, depth + 1)
+        if (v !== undefined && String(v).trim()) return v
+      }
+      return undefined
+    }
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i]
+      if (!Object.prototype.hasOwnProperty.call(node, k)) continue
+      const val = node[k]
+      if (val == null) continue
+      if (typeof val !== 'object') {
+        const s = String(val).trim()
+        if (s) return s
+      } else {
+        const inner = findByKeys(val, INNER_OBJ_KEYS, depth + 1)
+        if (inner !== undefined && String(inner).trim()) return inner
+      }
+    }
+    for (const k of Object.keys(node)) {
+      const v = findByKeys(node[k], keys, depth + 1)
+      if (v !== undefined && String(v).trim()) return v
+    }
+    return undefined
+  }
+
+  // ----- Collecte d'URLs image depuis un objet JSON -----
+  const IMG_KEYS = ['images', 'imgs', 'pics', 'pic', 'gallery', 'imageList', 'itemImages', 'mainImages', 'thumbs', 'imgList', 'galleryImages', 'photos', 'photo']
+  function seemsImage(url) {
+    return /\.(jpe?g|png|webp|gif|bmp)(\?|$)/i.test(url) || /image|img|pic|photo|thumb|gallery|cdn|alicdn|oss|aliyuncs|cloudfront|amazon/.test(String(url).toLowerCase())
+  }
+  function findImages(node, out, depth) {
+    if (!node || typeof node !== 'object' || depth > 18 || out.length >= 12) return out
+    if (Array.isArray(node)) {
+      for (let i = 0; i < node.length; i++) findImages(node[i], out, depth + 1)
+      return out
+    }
+    if (typeof node === 'string') {
+      if (/^https?:\/\//i.test(node) && seemsImage(node) && out.indexOf(node) === -1) out.push(node)
+      return out
+    }
+    for (const k of Object.keys(node)) {
+      if (IMG_KEYS.includes(k)) findImages(node[k], out, depth + 1)
+    }
+    for (const k of ['url', 'src', 'img', 'thumb', 'main', 'middle', 'picUrl']) {
+      if (node[k] != null) findImages(node[k], out, depth + 1)
+    }
+    return out
+  }
+
+  function stripHtml(s) {
+    return String(s || '')
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&')
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
+
+  // ----- parse nombre depuis un texte de prix diversifié (¥129, 1,299.00, EUR 12,99) -----
+  function toNumber(text) {
+    if (typeof text === 'number') return Number.isFinite(text) ? text : null
+    const s = String(text == null ? '' : text)
+    if (!s.trim()) return null
+    const cleaned = s.replace(/[^0-9.,]/g, ' ').trim()
+    const m = cleaned.match(/\d[\d.,]*/)
+    if (!m) return null
+    const raw = m[0]
+    // 1.299,00 ou 1,299.00 → séparateurs mélangés
+    if (raw.indexOf(',') !== -1 && raw.indexOf('.') !== -1) {
+      const lastComma = raw.lastIndexOf(',')
+      const lastDot = raw.lastIndexOf('.')
+      if (Math.abs(lastComma - lastDot) === 3) {
+        const n = parseFloat(raw.replace(/[,.]/g, '').replace(/(\d+)(\d{2})$/, '$1.$2'))
+        if (Number.isFinite(n)) return n
+      }
+      const n2 = parseFloat(raw.replace(/,/g, ''))
+      if (Number.isFinite(n2)) return n2
+    }
+    if (raw.indexOf(',') !== -1 && raw.indexOf('.') === -1) {
+      // "129,00" (virgule décimale européenne) vs "1,299" (milliers)
+      if (/,\d{2}$/.test(raw)) return parseFloat(raw.replace(',', '.'))
+      return parseFloat(raw.replace(/,/g, ''))
+    }
+    return parseFloat(raw.replace(/,/g, ''))
+  }
+
+  function sourceIdFromUrl(url, platform) {
+    try {
+      const u = new URL(String(url || ''))
+      if (platform === '1688') {
+        const m = u.pathname.match(/offer[\/-](\d+)/i)
+        if (m) return m[1]
+      }
+      if (platform === 'amazon') {
+        const m = u.pathname.match(/\/dp\/([A-Z0-9]{8,})/i) || u.pathname.match(/\/gp\/product\/([A-Z0-9]{8,})/i)
+        if (m) return m[1]
+        for (const p of ['asins', 'asin', 'follow']) if (u.searchParams.get(p)) return u.searchParams.get(p)
+      }
+      for (const p of ['id', 'itemId', 'item_id', 'auctionId', 'offerId', 'productId', 'goodsId', 'item']) {
+        const v = u.searchParams.get(p)
+        if (v && /^\d+$/.test(v)) return v
+      }
+      const m = u.pathname.match(/(\d{6,})/)
+      if (m) return m[1]
+    } catch (_) {}
+    return ''
+  }
+
+  // ---------------------------------------------------------------------------
+  // Pool de captures réseau (depuis content-main.js en world MAIN)
+  // ---------------------------------------------------------------------------
+  const pool = new Map() // url → { status, obj }
+  const MAX_POOL = 60
+  window.addEventListener('message', (e) => {
+    try {
+      const d = e.data
+      if (!d || d.source !== 'dr-ext' || d.type !== 'network') return
+      if (!d.body || typeof d.body !== 'string') return
+      let obj
+      try {
+        obj = JSON.parse(d.body)
+      } catch (_) {
+        return // on ne garde que du JSON (les pages produit exposent le JSON brut)
+      }
+      if (!obj || typeof obj !== 'object') return
+      pool.set(String(d.url).slice(0, 1200), { status: Number(d.status) || 0, obj })
+      if (pool.size > MAX_POOL) {
+        const oldest = pool.keys().next().value
+        if (oldest !== undefined) pool.delete(oldest)
+      }
+    } catch (_) {
+      /* best-effort */
+    }
+  })
+
+  // ---------------------------------------------------------------------------
+  // Sélection du meilleur objet capturé (score produit)
+  // ---------------------------------------------------------------------------
+  function scoreObj(o) {
+    const list = JSON.stringify(o).toLowerCase()
+    let s = 0
+    if (/title/.test(list)) s += 4
+    if (/price/.test(list)) s += 4
+    if (/image|pic|img|gallery|thumb/.test(list)) s += 3
+    if (/seller|shop|store|nick/.test(list)) s += 2
+    if (/desc|subtitle|detail/.test(list)) s += 1
+    if (/condition|used|new/.test(list)) s += 1
+    return s
+  }
+  function pickBest() {
+    let best = null
+    let bestScore = -1
+    for (const entry of pool.values()) {
+      if (entry.status >= 400) continue
+      if (!entry.obj || typeof entry.obj !== 'object') continue
+      const s = scoreObj(entry.obj)
+      if (s > bestScore) {
+        bestScore = s
+        best = entry.obj
+      }
+    }
+    return best
+  }
+
+  // ---------------------------------------------------------------------------
+  // Fallback DOM (par plateforme) — quand aucune API n'est capturée
+  // ---------------------------------------------------------------------------
+  const DOM = {
+    taobao: {
+      title: ['h1', '[class*="mainTitle"]', '[class*="title"]'],
+      price: ['[class*="currentPrice"]', '[class*="price"]'],
+      images: ['[class*="Gallery"] img', '#J_UlThumb img', 'img[data-src]', '[class*="pics"] img'],
+      condition: ['[class*="condition"]'],
+    },
+    1688: {
+      title: ['h1', '[class*="title-text"]', '[class*="title"]'],
+      price: ['[class*="price-text"]', '[class*="ladder-price"]', '[class*="price"]'],
+      images: ['[class*="gallery"] img', '[class*="preview"] img', 'img[data-src]'],
+      condition: ['[class*="condition"]'],
+    },
+    amazon: {
+      title: ['#productTitle'],
+      price: ['.a-price-whole'],
+      images: ['#landingImage', '#imgTagWrapperId img'],
+      condition: ['#productTitle'],
+    },
+    xianyu: {
+      title: ['[class*="item-title"]', 'h1', '[class*="Title"]'],
+      price: ['[class*="price"]', '[class*="Price"]'],
+      images: ['[class*="swiper"] img', '[class*="carousel"] img', '[class*="picture"] img'],
+      condition: ['[class*="condition"]'],
+    },
+    'douyin-ec': {
+      title: ['[class*="title"]', 'h1'],
+      price: ['[class*="price"]', '[class*="Price"]'],
+      images: ['[class*="gallery"] img', '[class*="image"] img'],
+      condition: ['[class*="condition"]'],
+    },
+    'tiktok-shop': {
+      title: ['h1', '[class*="title"]'],
+      price: ['[class*="price"]', '[class*="Price"]'],
+      images: ['img[class*="product"]', '[class*="gallery"] img'],
+      condition: ['[class*="condition"]'],
+    },
+  }
+
+  function domText(platform, selectors) {
+    for (const sel of selectors) {
+      try {
+        const el = document.body.querySelector(sel)
+        if (el) {
+          const t = blockText(el)
+          if (t) return t
+        }
+      } catch (_) {}
+    }
+    return ''
+  }
+
+  // Texte direct d'un noeud (sans ses enfants éventuels trop bruités).
+  function blockText(el) {
+    if (!el) return ''
+    let t = ''
+    for (const node of el.childNodes) {
+      if (node.nodeType === 3) t += node.textContent || ''
+    }
+    t = t.replace(/\s+/g, ' ').trim()
+    return t || String(el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 400)
+  }
+
+  function domImages(platform) {
+    const out = []
+    const root = document
+    for (const sel of DOM[platform].images) {
+      try {
+        for (const img of root.querySelectorAll(sel)) {
+          const src = (img && (img.currentSrc || img.src || img.getAttribute('data-src') || img.getAttribute('data-lazyload'))) || ''
+          if (/^https?:\/\//i.test(src) && out.indexOf(src) === -1) out.push(src)
+          const srcset = (img && img.getAttribute('srcset')) || ''
+          if (srcset) {
+            const first = srcset.split(',')[0].trim().split(' ')[0]
+            if (/^https?:\/\//i.test(first) && out.indexOf(first) === -1) out.push(first)
+          }
+          if (out.length >= 8) break
+        }
+      } catch (_) {}
+      if (out.length >= 8) break
+    }
+    // dé-dup + cap
+    const seen = []
+    for (const u of out) {
+      if (seemsImage(u) && seen.length < 5 && seen.indexOf(u) === -1) seen.push(u)
+    }
+    return seen
+  }
+
+  // ---------------------------------------------------------------------------
+  // Construction du payload produit
+  // ---------------------------------------------------------------------------
+  const TITLE_KEYS = ['itemTitle', 'productTitle', 'goodsTitle', 'subject', 'titleText', 'title', 'name', 'goodsName', 'itemInfo']
+  const DESC_KEYS = ['itemDesc', 'goodsDesc', 'desc', 'description', 'detailText', 'subtitle', 'longDesc']
+  const PRICE_KEYS = ['priceText', 'salePrice', 'currentPrice', 'priceNow', 'finalPrice', 'price', 'itemPrice', 'lowestPrice', 'priceValue', 'amount', 'priceInfo']
+  const COND_KEYS = ['condition', 'tradeCondition', 'useStatus', 'itemCondition', 'tradeStatus', 'goodsStatus', 'itemStatus']
+  const CAT_KEYS = ['categoryName', 'category', 'leafCategory', 'storeCategory', 'mainCategory', 'cateName']
+  const SELLER_KEYS = ['sellerInfo', 'seller', 'shopInfo', 'shop', 'storeInfo', 'sellerNick', 'nick']
+
+  function buildPayload(platform) {
+    const url = location.href
+    const raw = pickBest() || {}
+    const srcTitle = stripHtml(findByKeys(raw, TITLE_KEYS) || domText(platform, DOM[platform].title)) || ''
+    const desc = stripHtml(findByKeys(raw, DESC_KEYS) || '')
+    const priceNum = toNumber(findByKeys(raw, PRICE_KEYS) || domText(platform, DOM[platform].price))
+    let images = findImages(raw, [], 0)
+    if (!images.length) images = domImages(platform)
+
+    // seller (capture JSON ou DOM)
+    const sellerObj = findByKeys(raw, SELLER_KEYS)
+    const seller = (() => {
+      const nick = typeof sellerObj === 'object' && sellerObj !== null && typeof sellerObj !== 'string'
+        ? findByKeys(sellerObj, ['nickV2', 'sellerNick', 'nick', 'name', 'sellerName', 'shopName']) || findByKeys(raw, ['sellerNick', 'nick'])
+        : findByKeys(raw, ['sellerNick', 'nick'])
+      const city = (typeof sellerObj === 'object' && sellerObj !== null)
+        ? findByKeys(sellerObj, ['city', 'province', 'location', 'area'])
+        : undefined
+      const soldCount = toNumber((typeof sellerObj === 'object' && sellerObj !== null) ? findByKeys(sellerObj, ['soldCount', 'sales', 'sold']) : '')
+      if (nick || city || soldCount !== null) {
+        const s = {}
+        if (nick) s.nick = String(nick).slice(0, 200)
+        if (city) s.city = String(city).slice(0, 200)
+        if (soldCount !== null && soldCount > 0) s.soldCount = soldCount
+        return s
+      }
+      return undefined
+    })()
+
+    const condition = stripHtml(findByKeys(raw, COND_KEYS)).slice(0, 300) || domText(platform, DOM[platform].condition || []) || undefined
+    const category = stripHtml(findByKeys(raw, CAT_KEYS)).slice(0, 120) || undefined
+    const sourceId = sourceIdFromUrl(url, platform) || findByKeys(raw, ['itemId', 'id', 'offerId', 'goodsId', 'productId']) || ''
+
+    const payload = {
+      platform,
+      sourceId: sourceId.slice(0, 120),
+      url,
+      title: srcTitle.slice(0, 500),
+      chineseTitle: hasCjk(srcTitle) ? srcTitle.slice(0, 500) : undefined,
+      description: desc.slice(0, 10000) || undefined,
+      price: typeof priceNum === 'number' && Number.isFinite(priceNum) ? priceNum : 0,
+      currency: currencyFor(platform, url),
+      images: images.slice(0, 5),
+    }
+    if (seller) payload.seller = seller
+    if (condition) payload.condition = condition
+    if (category) payload.category = category
+
+    return payload
+  }
+
+  // ---------------------------------------------------------------------------
+  // Messagerie extension
+  // ---------------------------------------------------------------------------
+  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+    if (!msg || typeof msg !== 'object') return
+    if (msg.type === 'DR_PING') {
+      sendResponse({ ok: true, url: location.href, host: location.hostname, platform: detectPlatform(location.hostname) })
+      return
+    }
+    if (msg.type === 'DR_CAPTURE') {
+      const platform = detectPlatform(location.hostname)
+      if (!platform) {
+        sendResponse({ ok: false, error: `Host non supporté : ${location.hostname}` })
+        return
+      }
+      const payload = buildPayload(platform)
+      if (!payload.sourceId && !payload.title && payload.price <= 0) {
+        sendResponse({ ok: false, error: "Impossible d'extraire le produit de cette page (rechargez la page puis réessayez)." })
+        return
+      }
+      sendResponse({ ok: true, platform, payload, url: location.href })
+      return
+    }
+  })
+})()

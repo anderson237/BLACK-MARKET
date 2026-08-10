@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DeepRoots Import</title>
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      width: 380px;
+      background: #0d1622;
+      color: #e7eef7;
+      font-size: 13px;
+    }
+    .head {
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px 14px;
+      background: linear-gradient(135deg, #0b1c14, #123c29);
+      border-bottom: 1px solid #1f4a34;
+    }
+    .head .logo { font-size: 17px; }
+    .head h1 { font-size: 14px; margin: 0; font-weight: 600; }
+    .head small { display: block; color: #7fc8a4; font-weight: 400; }
+    .body { padding: 12px 14px 14px; }
+    .row { display: flex; gap: 8px; margin-top: 8px; }
+    .row.space { justify-content: space-between; align-items: center; }
+    label { display: block; color: #9fb3c8; margin: 2px 0 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+    input[type="text"] {
+      width: 100%; padding: 7px 9px; border-radius: 6px;
+      border: 1px solid #2a4254; background: #101f2e; color: #e7eef7;
+      font-size: 12px; outline: none;
+    }
+    input[type="text"]:focus { border-color: #3fd77f; }
+    button {
+      border: none; border-radius: 7px; cursor: pointer;
+      font-weight: 600; font-size: 12px; padding: 9px 12px;
+    }
+    .btn-main {
+      width: 100%; background: #2ecc71; color: #04240f;
+    }
+    .btn-main:hover { background: #3fd77f; }
+    .btn-ghost { background: #132534; color: #9fc0e0; }
+    .btn-ghost:hover { background: #1a3045; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .status { margin-top: 10px; font-size: 12px; line-height: 1.45; }
+    .status.err { color: #ff8a80; }
+    .status.ok { color: #7fd88f; }
+    .drop { margin-top: 10px; border-top: 1px solid #1c3142; padding-top: 10px; }
+    .drop[hidden] { display: none; }
+    .draft { background: #0f1d2a; border: 1px solid #234359; border-radius: 8px; padding: 10px; margin-top: 8px; }
+    .draft h3 { margin: 0 0 4px; font-size: 13px; line-height: 1.35; }
+    .draft .meta { color: #8fb6d3; font-size: 11px; margin: 2px 0 6px; }
+    .draft .price { color: #ffd166; font-weight: 700; font-size: 15px; }
+    .thumbs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+    .thumbs img { width: 52px; height: 52px; object-fit: cover; border-radius: 6px; border: 1px solid #1c3142; background: #0b141f; }
+    .link { color: #6ec6ff; text-decoration: none; font-weight: 600; }
+    a:focus-visible { outline: 2px solid #3fd77f; outline-offset: 2px; }
+    .hint { color: #7c93a8; font-size: 11px; margin-top: 8px; line-height: 1.5; }
+    .spin { display: none; float: right; }
+  </style>
+</head>
+<body>
+  <div class="head">
+    <span class="logo">📦</span>
+    <h1>DeepRoots Import <small>Scraper fournisseurs · ST-020</small></h1>
+  </div>
+
+  <div class="body">
+    <button id="btn-import" class="btn btn-main" type="button" disabled>
+      <span class="spin" id="spinner">⏳ </span><span id="btn-label">Importer ce produit</span>
+    </button>
+
+    <div class="status" id="status">…</div>
+
+    <div class="drop" id="draft-box" hidden>
+      <div class="draft" id="draft"></div>
+      <div class="row space">
+        <button id="btn-details" class="btn btn-ghost" type="button" hidden>Ouvrir l'aperçu import</button>
+        <button id="btn-copy" class="btn btn-ghost" type="button" hidden>Copier le JSON</button>
+      </div>
+    </div>
+
+    <div class="drop">
+      <details>
+        <summary style="color:#7fc8a4; cursor:pointer; font-size:11px;">⚙️ Réglages (clé + serveur)</summary>
+        <div style="margin-top:8px;">
+          <label for="key">Clé d'extension (x-ext-key)</label>
+          <input id="key" type="text" autocomplete="off" spellcheck="false" placeholder="bm-ext-import-…" />
+          <label for="base">Serveur DeepRoots (base URL)</label>
+          <input id="base" type="text" autocomplete="off" spellcheck="false" placeholder="https://deeproots-importexport.netlify.app" />
+          <div class="row">
+            <button id="btn-save" class="btn btn-ghost" type="button">Enregistrer</button>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <div class="hint" id="hint"></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

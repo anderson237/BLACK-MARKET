@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
   }
 
   return withLock('cart:' + session.userId, async () => {
-    const cart = await loadCart(session.userId)
+    const cart = await loadCart(session.userId!)
     const existing = cart.find((c) => c.productId === productId)
     if (existing) {
       existing.quantity += quantity
@@ -34,7 +34,7 @@ export default defineEventHandler(async (event) => {
     } else {
       cart.unshift(item)
     }
-    await saveCart(session.userId, cart)
+    await saveCart(session.userId!, cart)
     return { success: true, cart }
   })
 })

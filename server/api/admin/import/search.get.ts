@@ -205,7 +205,7 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  const out = []
+  const out: any[] = []
   for (let idx = 0; idx < items.length; idx++) {
     const item = items[idx]
     const lp = await findLocalPrice(String(frMap[idx] || item.title || ''), keyword)

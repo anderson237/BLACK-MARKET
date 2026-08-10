@@ -68,7 +68,7 @@ function seriesType(s: SeriesDef): string {
 // ---- grid ----
 const GRID_LINES = 4
 const gridLines = computed(() => {
-  const lines = []
+  const lines: Array<{ y: number; v: number }> = []
   for (let i = 0; i <= GRID_LINES; i++) {
     const v = minVal.value + (range.value * i) / GRID_LINES
     lines.push({ y: yAt(v), v })

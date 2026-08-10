@@ -205,7 +205,7 @@ export default defineEventHandler(async (event) => {
   for (const p of products) {
     potentialMargin += Math.max(0, (await sellingPriceXof(Number(p.purchaseRmb) || 0, Number(p.shippingRmb) || 0, Number(p.marginPercent) || 0)) - (await productCostXof(p)))
   }
-  const lowMargin = []
+  const lowMargin: Array<{ id: any; title: any; priceXof: number; costXof: number; marginPct: number; stockQuantity: number }> = []
   for (const p of products) {
     const price = Number(p.priceXof) || 0
     const cost = await productCostXof(p)

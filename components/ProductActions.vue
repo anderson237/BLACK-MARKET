@@ -174,7 +174,7 @@ function onComment() {
         : 'bg-black/30 border-zinc-800 text-zinc-400 hover:border-[#ff2a2a]/40 hover:text-slate-100'"
       :aria-label="liked ? 'Retirer le like' : 'J\'aime'"
     >
-      <AppIcon name="heart" :size="15" :class="like ? 'fill-[#ff2a2a] text-[#ff2a2a]' : ''" />
+      <AppIcon name="heart" :size="15" :class="liked ? 'fill-[#ff2a2a] text-[#ff2a2a]' : ''" />
       <span class="hidden sm:inline">{{ likeCount }}</span>
     </button>
 

@@ -154,8 +154,8 @@ async function connectRemoteBrowser(opts: ScraperGoofishOptions): Promise<Browse
     return await chromium.connect(ws, { timeout: connectTimeout })
   } catch (err) {
     throw new Error(
-      `scraperGoofish: impossible de se connecter au navigateur distant ${masked} ` +
-        `(${String(err?.message || err).slice(0, 180)}). Vérifiez GOOFISH_BROWSER_WS_ENDPOINT (token valide, quota browserless).`,
+`scraperGoofish: impossible de se connecter au navigateur distant ${masked} ` +
+        `(${String((err as any)?.message || err).slice(0, 180)}). Vérifiez GOOFISH_BROWSER_WS_ENDPOINT (token valide, quota browserless).`,
     )
   }
 }
@@ -179,7 +179,7 @@ async function launchHeadless(opts: ScraperGoofishOptions): Promise<Browser> {
     })
   } catch (err) {
     throw new Error(
-      `scraperGoofish: impossible de lancer le navigateur headless (${String(err?.message || err).slice(0, 180)}). ` +
+      `scraperGoofish: impossible de lancer le navigateur headless (${String((err as any)?.message || err).slice(0, 180)}). ` +
         'En dev, Edge doit être installé. En prod, définissez GOOFISH_BROWSER_WS_ENDPOINT (browserless) ' +
         'ou GOOFISH_BROWSER_PATH vers chromium-headless-shell.',
     )
@@ -417,8 +417,8 @@ async function scrapeOnce(
     // Petite stabilisation : laisse les dernières imageInfos se poser.
     await page.waitForTimeout(2_000)
 
-    const isRgv =
-      Array.isArray(payloadRet) && payloadRet.some((x) => String(x).includes('RGV587'))
+const isRgv =
+      (payloadRet ?? []).some((x) => String(x).includes('RGV587'))
 
     if (payload?.data?.itemDO && !isRgv) {
       const detail = flattenMtopDetail(payload, sourceId)
@@ -497,7 +497,7 @@ export async function scrapeGoofishDetail(
       lastErr = new Error('aucun détail utilisable (payload MTOP absent et fallback DOM vide)')
     } catch (err) {
       lastErr = err
-      console.warn(`[scraper-goofish] tentative ${attempt}/${options.maxAttempts} échouée: ${String(err?.message || err).slice(0, 160)}`)
+      console.warn(`[scraper-goofish] tentative ${attempt}/${options.maxAttempts} échouée: ${String((err as any)?.message || err).slice(0, 160)}`)
     } finally {
       if (browser) await browser.close().catch(() => {})
     }

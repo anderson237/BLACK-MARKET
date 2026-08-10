@@ -57,7 +57,7 @@ export default defineEventHandler(async (event) => {
   const timeline = mine.slice(0, MAX)
   const seenProducts = new Set(timeline.map((e) => e.productId))
   for (const e of mine) {
-    if (e.type === 'like' && likedSet.has(e.productId) && !seenProducts.has(e.productId)) {
+    if (e.type === 'like' && likedSet.has(String(e.productId)) && !seenProducts.has(e.productId)) {
       timeline.push(e)
       seenProducts.add(e.productId)
     }

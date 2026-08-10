@@ -155,7 +155,7 @@ export interface DraftSource {
    */
   detail?: JoDetail
   /** Moteur ayant produit `detail` — journalisation / réponse API. */
-  detailSource?: 'justone' | 'headless'
+  detailSource?: 'justone' | 'headless' | 'extension'
 }
 
 function sourceUrlFor(platform: JoPlatform, sourceId: string): string {

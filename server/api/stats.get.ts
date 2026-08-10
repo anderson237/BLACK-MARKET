@@ -69,8 +69,8 @@ export default defineEventHandler(async (event) => {
       case 'share': c.shares += 1; break
       case 'copy': c.copies += 1; break
       case 'comment': c.comments += 1; break
-      case 'like': c.likes += 1; c.liked.add(e.productId); break
-      case 'unlike': c.unlikes += 1; c.liked.delete(e.productId); break
+      case 'like': c.likes += 1; if (e.productId) c.liked.add(e.productId); break
+      case 'unlike': c.unlikes += 1; if (e.productId) c.liked.delete(e.productId); break
     }
   }
   // comments stored separately -> merge into user counters

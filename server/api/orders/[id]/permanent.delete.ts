@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
   })
 
   if (!removed) throw createError({ statusCode: 404, statusMessage: 'Commande introuvable.' })
-  await removeChatThreadForOrder(id)
+  if (id) await removeChatThreadForOrder(id)
   publishSiteUpdate('orders')
   return { success: true, permanentlyDeleted: id }
 })

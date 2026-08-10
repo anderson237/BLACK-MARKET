@@ -33,7 +33,7 @@ export async function fetchCatalog(): Promise<Product[]> {
  */
 export async function fetchProduct(id: string): Promise<Product | null> {
   try {
-    const json = await $fetch(`/api/products/${encodeURIComponent(id)}`, { headers: { Accept: 'application/json' } })
+const json: any = await $fetch(`/api/products/${encodeURIComponent(id)}`, { headers: { Accept: 'application/json' } })
     return json?.product || json || null
   } catch (err: any) {
     // 404 -> product genuinely not found.

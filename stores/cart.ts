@@ -103,7 +103,7 @@ export const useCartStore = defineStore('cart', () => {
     items.value = []
     try {
       await Promise.all(ids.map((id) =>
-        fetch(`/api/cart/${encodeURIComponent(id)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${auth.token}` } }),
+        fetch(`/api/cart/${encodeURIComponent(String(id))}`, { method: 'DELETE', headers: { Authorization: `Bearer ${auth.token}` } }),
       ))
     } catch {
       /* ignore */

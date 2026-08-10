@@ -13,7 +13,7 @@ export default defineEventHandler(async (event) => {
   const userId = String(session.userId || body?.userId || '')
   const comment = await addComment({
     id: `cm_${crypto.randomBytes(8).toString('hex')}`,
-    productId: id,
+    productId: String(id || ''),
     userId,
     name: String(body?.name || 'Utilisateur').slice(0, 80),
     picture: body?.picture ? String(body.picture).slice(0, 8000) : undefined,

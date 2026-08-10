@@ -70,6 +70,7 @@ Voir `.env.example` pour la liste exhaustive et les commentaires.
 | `APP_URL` | — | URL publique (liens produits) |
 | `RESEND_API_KEY` | — | **Optionnel** — active l'envoi réel des emails de rappel paniers abandonnés |
 | `NUXT_TASK_SECRET` | — | Secret partagé entre la scheduled function et l'endpoint de rappel |
+| `EXTENSION_IMPORT_KEY` | `bm-ext-import-dev-key` (local) | Clé `x-ext-key` de l'extension Chrome scraper (ST-020) — **requise en production** |
 
 ## Flux business (précommande WhatsApp + sourcing Chine)
 
@@ -130,7 +131,7 @@ netlify.toml
 ## Tests / validation
 
 ```bash
-npm run lint   # TypeScript strict (nuxi typecheck)
+npm run lint   # TypeScript (vue-tsc via .nuxt/tsconfig.json — noImplicitAny désactivé)
 npm run build  # build complet de bout en bout
 ```
 

@@ -149,7 +149,7 @@ async function main() {
     check('note éditée', edited?.note === 'contact privilégié', edited?.note)
     check('wechat existant conservé', edited?.wechat === 'fr_99', edited?.wechat)
     check('manual conservé à true', edited?.manual === true, `manual=${edited?.manual}`)
-    check('updatedAt rafraîchi', edited && edited.updatedAt > manual.updatedAt)
+    check('updatedAt rafraîchi', Boolean(edited && edited.updatedAt > manual.updatedAt))
 
     // Édition d'un fournisseur inconnu -> null (404 côté route)
     const missing = await updateSupplier('does-not-exist', { name: 'X' })
@@ -192,7 +192,7 @@ async function main() {
     check('mergeSupplierInfo conserve l\'existant', merged.name === 'Old' && merged.manual === false)
   } finally {
     console.log('\n[ST-019] Restauration du data/suppliers.json')
-    if (hadOriginal) fs.writeFileSync(SUPPLIERS_FILE, originalRaw, 'utf-8')
+    if (hadOriginal && originalRaw !== null) fs.writeFileSync(SUPPLIERS_FILE, originalRaw, 'utf-8')
     else if (fs.existsSync(SUPPLIERS_FILE)) fs.unlinkSync(SUPPLIERS_FILE)
   }
 

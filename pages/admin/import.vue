@@ -540,6 +540,10 @@ function transportFor(cat: string) {
   }
 }
 
+// Transport du brouillon courrant (computed : évite les appels répétés dans le
+// template et les erreurs « Object is possibly null » de vue-tsc).
+const publishTransport = computed(() => transportFor(publishCategory.value))
+
 onMounted(() => {
   loadHistory()
   loadLocalPrices()
@@ -884,15 +888,15 @@ onMounted(() => {
               <div v-if="draft.localPriceXof" class="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2">
                 <p class="text-[11px] font-mono text-amber-400">🏷️ Marché local : {{ fmtXof(draft.localPriceXof) }} FCFA <span v-if="draft.localPriceLabel" class="text-amber-500/70">({{ draft.localPriceLabel }})</span></p>
               </div>
-              <div v-if="transportFor(publishCategory)" class="rounded-lg border border-sky-500/30 bg-sky-500/5 px-3 py-2 space-y-1">
+              <div v-if="publishTransport" class="rounded-lg border border-sky-500/30 bg-sky-500/5 px-3 py-2 space-y-1">
                 <p class="text-[10px] font-mono text-sky-400 uppercase tracking-widest">🚚 Transport estimé (emballage inclus)</p>
                 <p class="text-[11px] font-mono text-zinc-300">
-                  ✈️ Aérien : <span class="text-sky-300">{{ fmtXof(transportFor(publishCategory).airXof) }} FCFA</span>
-                  <span class="text-zinc-600">({{ transportFor(publishCategory).weightKg }} kg)</span>
+                  ✈️ Aérien : <span class="text-sky-300">{{ fmtXof(publishTransport.airXof) }} FCFA</span>
+                  <span class="text-zinc-600">({{ publishTransport.weightKg }} kg)</span>
                 </p>
                 <p class="text-[11px] font-mono text-zinc-300">
-                  🚢 Maritime : <span class="text-sky-300">{{ fmtXof(transportFor(publishCategory).seaXof) }} FCFA</span>
-                  <span class="text-zinc-600">({{ transportFor(publishCategory).volumeCbm }} m³)</span>
+                  🚢 Maritime : <span class="text-sky-300">{{ fmtXof(publishTransport.seaXof) }} FCFA</span>
+                  <span class="text-zinc-600">({{ publishTransport.volumeCbm }} m³)</span>
                 </p>
               </div>
             </div>

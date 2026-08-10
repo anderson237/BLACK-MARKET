@@ -8,9 +8,9 @@ export default defineEventHandler(async (event) => {
   if (!productId) throw createError({ statusCode: 400, statusMessage: 'Produit manquant.' })
 
   return withLock('cart:' + session.userId, async () => {
-    const cart = await loadCart(session.userId)
+    const cart = await loadCart(session.userId!)
     const next = cart.filter((c) => c.productId !== productId)
-    await saveCart(session.userId, next)
+    await saveCart(session.userId!, next)
     return { success: true, cart: next }
   })
 })
