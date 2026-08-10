@@ -1330,6 +1330,78 @@ export async function deleteImportSearch(key: string): Promise<ImportSearchEntry
 }
 
 // ---------------------------------------------------------------------------
+// Extension drafts (ST-020) — blob bm-extension-drafts / drafts.json
+//
+// Le scraper Chrome renvoie un draft complet (buildDraft) au popup, mais ce
+// draft n'existait QUE côté popup : rien n'apparaissait dans le site. Ici on
+// persiste chaque draft reçu par /api/admin/import/extension pour que l'admin
+// le retrouve dans la page Import (« Imports via extension »), le prévisualise
+// et le publie sans ressaisir quoi que ce soit. Cap : 100 entrées (FIFO).
+// ---------------------------------------------------------------------------
+export interface ExtensionDraftEntry {
+  id: string // ex. 'ext_<ts36>_<rand>'
+  platform: string
+  sourceId: string
+  draft: any // draft buildDraft complet (titre FR, priceXof, gallery…)
+  createdAt: string
+}
+
+const EXT_DRAFTS_FILE = path.join(DATA_DIR, 'extension-drafts.json')
+const EXT_DRAFTS_MAX = 100
+
+async function loadExtensionDraftsFile(): Promise<ExtensionDraftEntry[]> {
+  if (isNetlifyRuntime()) {
+    const raw = await blobGet('bm-extension-drafts', 'drafts.json', 'text', 'strong')
+    if (raw != null) {
+      try {
+        const p = JSON.parse(raw)
+        if (Array.isArray(p)) return p
+      } catch {
+        /* corrupted -> start fresh */
+      }
+    }
+    return []
+  }
+  const p = await readJSON(EXT_DRAFTS_FILE)
+  return Array.isArray(p) ? p : []
+}
+
+export async function loadExtensionDrafts(): Promise<ExtensionDraftEntry[]> {
+  return loadExtensionDraftsFile()
+}
+
+/** Ajoute (ou remplace) un draft extension, le plus récent en tête (cap FIFO). */
+export async function upsertExtensionDraft(entry: ExtensionDraftEntry): Promise<ExtensionDraftEntry[]> {
+  return mutateGeneric('bm-extension-drafts', 'drafts.json', EXT_DRAFTS_FILE, (list: ExtensionDraftEntry[]) => {
+    const idx = list.findIndex((e) => e.id === entry.id)
+    const next = [...list]
+    if (idx >= 0) next.splice(idx, 1)
+    next.unshift({ ...entry, createdAt: new Date().toISOString() })
+    return next.slice(0, EXT_DRAFTS_MAX)
+  })
+}
+
+/** Supprime un draft extension précis (par id). */
+export async function deleteExtensionDraft(id: string): Promise<ExtensionDraftEntry[]> {
+  return mutateGeneric('bm-extension-drafts', 'drafts.json', EXT_DRAFTS_FILE, (list: ExtensionDraftEntry[]) => {
+    return list.filter((e) => e.id !== id)
+  })
+}
+
+/** Vide la liste des drafts extension. */
+export async function clearExtensionDrafts(): Promise<void> {
+  if (isNetlifyRuntime()) {
+    try {
+      await blobSet('bm-extension-drafts', 'drafts.json', JSON.stringify([]))
+    } catch (err) {
+      console.error('[BLOBS] extension drafts clear failed:', err)
+    }
+    return
+  }
+  await writeJSON(EXT_DRAFTS_FILE, [])
+}
+
+// ---------------------------------------------------------------------------
 // Supplier contacts (ST-017) — blob bm-supplier-contacts / contacts.json
 //
 // Admin-captured supplier contact (WeChat / WhatsApp / email / phone / site)

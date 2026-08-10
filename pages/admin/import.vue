@@ -13,6 +13,7 @@ import { useAdminStore } from '~/stores/admin'
 
 const config = useRuntimeConfig()
 const justoneEnabled = computed(() => Boolean(config.public.justoneEnabled))
+const route = useRoute()
 
 const PLATFORMS = [
   { id: 'xianyu', label: 'Xianyu (occase)', short: 'XY', color: 'text-[#ff2a2a]' },
@@ -138,6 +139,14 @@ const aiEnrich = ref(true)
 const publishing = ref(false)
 const publishError = ref('')
 const successMsg = ref('')
+
+// ST-020 — drafts capturés par l'extension Chrome (persistés serveur, blob
+// bm-extension-drafts). L'admin les retrouve ici, les prévisualise et les
+// publie sans ressaisie. `currentExtDraftId` = draft en cours d'aperçu, retiré
+// de la liste une fois publié.
+const extDrafts = ref<any[]>([])
+const extDraftLoading = ref(false)
+const currentExtDraftId = ref('')
 
 // Paste-a-link flow: same draft pipeline as a search-result click, but the
 // platform + source id are detected from a product URL.
@@ -384,6 +393,79 @@ function closeDraft() {
   draft.value = null
 }
 
+// ---- ST-020 : drafts capturés par l'extension Chrome ----
+async function loadExtDrafts() {
+  extDraftLoading.value = true
+  try {
+    const res = await $fetch('/api/admin/import/extension-drafts', { headers: authHeaders() })
+    extDrafts.value = (res as any).drafts || []
+  } catch {
+    /* non-blocking */
+  } finally {
+    extDraftLoading.value = false
+  }
+}
+
+/** Ouvre l'aperçu produit directement depuis un draft extension persisté
+ *  (aucun re-fetch : le draft complet est déjà côté serveur). */
+function openExtDraft(entry: any) {
+  const d = entry?.draft || entry
+  draftMode.value = true
+  drafting.value = false
+  draft.value = d
+  lastEngine.value = 'extension'
+  publishTitle.value = d.title || ''
+  publishDesc.value = d.description || ''
+  publishPriceXof.value = d.priceXof || 0
+  publishFeatures.value = Array.isArray(d.features) ? d.features.map((f: any) => f.value || f) : []
+  publishCategory.value = d.suggestedCategory || d.category || ''
+  // Mention explicite envoyée par l'extension (si présente), sinon la suggestion auto.
+  publishMention.value = d.mention || d.suggestedMention || ''
+  supplierContact.value = d.supplierContact || { sellerName: '', country: '', wechat: '', email: '', whatsapp: '', phone: '', website: '', note: '' }
+  supplierSaved.value = false
+  currentExtDraftId.value = entry?.id || ''
+  // Nettoie le deep link : l'aperçu est ouvert, le lien n'est plus « frais ».
+  if (route.query.ext) window.history.replaceState(null, '', window.location.pathname)
+}
+
+/** Deep link `?ext=<draftId>` (bouton « Ouvrir l'aperçu import » du popup) :
+ *  charge les drafts puis ouvre directement celui demandé. */
+async function openExtDraftById(id: string) {
+  extDraftLoading.value = true
+  try {
+    const res = await $fetch('/api/admin/import/extension-drafts', { headers: authHeaders() })
+    extDrafts.value = (res as any).drafts || []
+    const entry = extDrafts.value.find((e: any) => e.id === id)
+    if (entry) openExtDraft(entry)
+  } catch {
+    /* non-blocking */
+  } finally {
+    extDraftLoading.value = false
+  }
+}
+
+async function removeExtDraft(id: string) {
+  try {
+    const res = await $fetch('/api/admin/import/extension-drafts', {
+      method: 'DELETE',
+      headers: authHeaders(),
+      body: { id },
+    })
+    extDrafts.value = (res as any).drafts || []
+  } catch {
+    /* non-blocking */
+  }
+}
+
+async function clearExtDrafts() {
+  try {
+    const res = await $fetch('/api/admin/import/extension-drafts', { method: 'DELETE', headers: authHeaders() })
+    extDrafts.value = (res as any).drafts || []
+  } catch {
+    /* non-blocking */
+  }
+}
+
 function addFeature() {
   publishFeatures.value.push('')
 }
@@ -429,6 +511,11 @@ async function doPublish() {
     const store = useAdminStore()
     store.loadProducts()
     closeDraft()
+    // ST-020 : le draft extension est consommé → retiré de la liste persistée.
+    if (currentExtDraftId.value) {
+      await removeExtDraft(currentExtDraftId.value)
+      currentExtDraftId.value = ''
+    }
   } catch (e: any) {
     publishError.value = e?.data?.statusMessage || e?.message || 'Erreur de publication'
   } finally {
@@ -548,6 +635,11 @@ onMounted(() => {
   loadHistory()
   loadLocalPrices()
   loadTransportConfig()
+  // ST-020 : deep link depuis le popup (« Ouvrir l'aperçu import ») →
+  // /admin/import?ext=<draftId> ouvre directement le draft capturé.
+  const extId = String(route.query.ext || '').trim()
+  if (extId) openExtDraftById(extId)
+  else loadExtDrafts()
 })
 </script>
 
@@ -562,6 +654,49 @@ onMounted(() => {
       <div class="flex items-center gap-2">
         <span v-if="justoneEnabled" class="text-[10px] font-mono text-emerald-400 border border-emerald-500/30 px-2.5 py-1.5 rounded-lg">API connectée</span>
         <span v-else class="text-[10px] font-mono text-zinc-500 border border-zinc-800 px-2.5 py-1.5 rounded-lg">API non configurée</span>
+      </div>
+    </div>
+
+    <!-- ST-020 : drafts capturés par l'extension Chrome (indépendant de JustOneAPI —
+         visible même quand l'API n'est pas configurée, car la capture vient du
+         navigateur connecté de l'admin). -->
+    <div v-if="extDrafts.length" class="border border-[#ff2a2a]/30 rounded-xl p-4 bg-[#0d0d14] space-y-3">
+      <div class="flex items-center justify-between gap-3">
+        <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
+          🧩 Imports via extension <span class="text-zinc-600">(capturés depuis votre navigateur — {{ extDrafts.length }})</span>
+        </p>
+        <button @click="clearExtDrafts" class="text-[10px] font-mono text-red-400 hover:text-red-300">Tout supprimer</button>
+      </div>
+      <div class="flex flex-col gap-2">
+        <div
+          v-for="e in extDrafts"
+          :key="e.id"
+          class="flex items-center gap-3 border border-zinc-800 rounded-xl p-2.5 bg-[#08080c]"
+        >
+          <div class="w-12 h-12 shrink-0 rounded-lg overflow-hidden bg-black/40">
+            <img
+              v-if="e.draft?.imageUrl"
+              :src="e.draft.imageUrl"
+              alt=""
+              referrerpolicy="no-referrer"
+              loading="lazy"
+              class="w-full h-full object-cover"
+              @error="($event.target as HTMLImageElement).style.display='none'"
+            />
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-[12px] text-zinc-200 line-clamp-1">{{ e.draft?.title || e.draft?.sourceTitle || '(sans titre)' }}</p>
+            <p class="text-[10px] font-mono text-zinc-500">
+              {{ PLATFORMS.find((p) => p.id === e.platform)?.short || e.platform }} · {{ e.sourceId }}
+              <span v-if="e.draft?.priceXof" class="text-emerald-400">≈ {{ fmtXof(e.draft.priceXof) }} FCFA</span>
+            </p>
+          </div>
+          <button
+            @click="openExtDraft(e)"
+            class="shrink-0 px-3 py-1.5 rounded-lg border border-[#ff2a2a]/30 text-[10px] font-mono font-bold uppercase tracking-wider text-[#ff2a2a] hover:bg-[#ff2a2a]/10 transition-all"
+          >Aperçu</button>
+          <button @click="removeExtDraft(e.id)" class="shrink-0 w-6 h-6 rounded-md border border-zinc-800 text-[10px] font-mono text-zinc-500 hover:text-red-400 transition-all">✕</button>
+        </div>
       </div>
     </div>
 
@@ -815,7 +950,7 @@ onMounted(() => {
             <div class="flex items-center gap-2">
               <span v-if="lastEngine" class="text-[9px] font-mono font-bold px-2 py-0.5 rounded border uppercase"
                 :class="lastEngine === 'headless' ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' : 'text-sky-400 border-sky-500/30 bg-sky-500/10'">
-                {{ lastEngine === 'headless' ? '🛰️ Headless' : '⚡ JustOneAPI' }}
+                {{ lastEngine === 'headless' ? '🛰️ Headless' : lastEngine === 'extension' ? '🧩 Extension' : '⚡ JustOneAPI' }}
               </span>
               <button @click="closeDraft" class="w-8 h-8 rounded-lg border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white">
                 <AppIcon name="close" :size="14" />

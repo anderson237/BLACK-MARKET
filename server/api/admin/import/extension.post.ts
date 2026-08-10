@@ -17,16 +17,24 @@
 // Réutilise `buildDraft` / `DraftSource` (server/utils/draftBuilder.ts) pour
 // TOUTE la logique existante : conversion prix (priceToXof/rates), transport,
 // catégorie auto, contact fournisseur (getSupplierContact), mention suggérée.
-// Retour : { success, source: { platform, sourceId, engine, url }, draft }
+// Retour : { success, source: { platform, sourceId, engine, url }, draft, draftId }
 // — format identique à /api/admin/import/from-url (UI import inchangée).
 //
 // Pas de publication directe : l'admin valide via l'aperçu import existant
 // (publish.post.ts reste INCHANGÉ).
+//
+// ST-020 : le draft est PERSISTÉ côté serveur (blob bm-extension-drafts) pour
+// qu'il apparaisse dans la page Import (« Imports via extension ») — le popup
+// reçoit `draftId` et ouvre `/admin/import?ext=<draftId>` qui pré-remplit
+// l'aperçu sans ressaisie. Best-effort : un échec de persistance ne bloque pas
+// l'import (le draft reste disponible dans le popup).
 // ---------------------------------------------------------------------------
 
+import crypto from 'node:crypto'
 import { buildDraft, hasCjk, type DraftSource } from '~~/server/utils/draftBuilder'
 import { rateLimit } from '~~/server/utils/auth'
 import type { JoPlatform } from '~~/server/utils/justone'
+import { upsertExtensionDraft } from '~~/server/utils/storage'
 import {
   authorizeExtension,
   buildDetailFromExtension,
@@ -81,6 +89,21 @@ export default defineEventHandler(async (event) => {
   draft.url = payload.url
   if (payload.mention) draft.mention = payload.mention
 
+  // ST-020 : persistance du draft pour la page Import (« Imports via
+  // extension »). Best-effort : ne bloque jamais l'import.
+  const draftId = `ext_${Date.now().toString(36)}_${crypto.randomBytes(3).toString('hex')}`
+  try {
+    await upsertExtensionDraft({
+      id: draftId,
+      platform: payload.platform,
+      sourceId: payload.sourceId,
+      draft,
+      createdAt: new Date().toISOString(),
+    })
+  } catch (err) {
+    console.error('[extension-import] persistance du draft échouée (import OK) :', err)
+  }
+
   console.log(
     `[extension-import] ${payload.platform} ${payload.sourceId} → draft (${payload.price} ${payload.currency} → ${draft.priceXof} FCFA, ${payload.images.length} image(s)) via ${auth.kind === 'ext' ? 'x-ext-key' : 'admin'}`,
   )
@@ -94,5 +117,6 @@ export default defineEventHandler(async (event) => {
       url: payload.url,
     },
     draft,
+    draftId,
   }
 })

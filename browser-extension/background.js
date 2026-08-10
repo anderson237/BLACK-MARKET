@@ -52,7 +52,7 @@ async function sendToServer(payload) {
     const msg = (data && (data.statusMessage || data.message)) || `HTTP ${res.status}`
     return { ok: false, status: res.status, error: msg }
   }
-  return { ok: true, draft: data && data.draft }
+  return { ok: true, draft: data && data.draft, draftId: data && data.draftId }
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {

@@ -7,13 +7,14 @@
 //   2. « Importer ce produit » : DR_CAPTURE → content-isolated renvoie un
 //      payload → DR_IMPORT_DRAFT → background POSTe au serveur et renvoie le
 //      draft complet (titre FR, prix FCFA, transport, catégorie, images).
-//   3. Boutons « Ouvrir l'aperçu import » (le draft est déjà présent sur la
-//      page /admin/import côté serveur ? non — ici on ouvre /admin/import pour
-//      que l'admin re-crée l'import) et « Copier le JSON ».
+//   3. Bouton « Ouvrir l'aperçu import » : le draft est PERSISTÉ côté serveur
+//      (POST /api/admin/import/extension → blob bm-extension-drafts) ; on ouvre
+//      /admin/import?ext=<draftId> qui charge l'aperçu pré-rempli pour publier.
+//      « Copier le JSON » recopie le draft brut.
 // ---------------------------------------------------------------------------
 const $ = (id) => document.getElementById(id)
 
-const state = { tab: null, payload: null, lastDraft: null }
+const state = { tab: null, payload: null, lastDraft: null, draftId: '' }
 
 function fmtInt(n) {
   try {
@@ -108,6 +109,7 @@ $('btn-import').addEventListener('click', async () => {
     setBusy(false)
     if (bg && bg.ok && bg.draft) {
       state.lastDraft = bg.draft
+      state.draftId = bg.draftId || ''
       renderDraft(bg.draft)
       setStatus('Draft reçu ✅ (consultez l\'aperçu).', 'ok')
     } else {
@@ -149,7 +151,10 @@ function escapeAttr(s) {
 
 $('btn-details').addEventListener('click', () => {
   const base = $('btn-details').dataset.base || 'https://deeproots-importexport.netlify.app'
-  chrome.tabs.create({ url: `${base.replace(/\/+$/, '')}/admin/import` })
+  // Deep link : ouvre la page Import avec le draft extension pré-chargé
+  // (persisté côté serveur) → aperçu pré-rempli, aucune ressaisie.
+  const q = state.draftId ? '?ext=' + encodeURIComponent(state.draftId) : ''
+  chrome.tabs.create({ url: `${base.replace(/\/+$/, '')}/admin/import${q}` })
 })
 
 $('btn-copy').addEventListener('click', async () => {
