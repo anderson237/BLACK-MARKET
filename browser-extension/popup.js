@@ -133,6 +133,11 @@ function renderDraft(d) {
     ${d.transport && d.transport.airXof ? '<div class="meta">Transport estimé : <b>' + fmtInt(Math.round(d.transport.airXof)) + ' FCFA</b>' + (d.transport.weightKg ? ' · poids ' + String(d.transport.weightKg).replace('.', ',') + ' kg' : '') + '</div>' : ''}
     ${d.suggestedCategory ? '<div class="meta">Catégorie suggérée : <b>' + escapeHtml(d.suggestedCategory) + '</b></div>' : ''}
     ${d.suggestedMention ? '<div class="meta">Mention : <b>' + escapeHtml(d.suggestedMention) + '</b></div>' : ''}
+    ${(d.colors && d.colors.length) || (d.sizes && d.sizes.length) ? '<div class="meta">Variantes : <b>' + (d.colors && d.colors.length ? d.colors.length + ' couleurs' : '') + (d.colors && d.colors.length && d.sizes && d.sizes.length ? ' · ' : '') + (d.sizes && d.sizes.length ? d.sizes.length + ' tailles' : '') + '</b></div>' : ''}
+    ${d.moq ? '<div class="meta">MOQ : <b>' + d.moq + ' pièce(s)</b></div>' : ''}
+    ${d.packaging && (d.packaging.weightGrams || d.packaging.volumeCm3) ? '<div class="meta">Colis : <b>' + (d.packaging.weightGrams ? d.packaging.weightGrams + ' g' : '') + (d.packaging.weightGrams && d.packaging.volumeCm3 ? ' · ' : '') + (d.packaging.volumeCm3 ? d.packaging.volumeCm3 + ' cm³' : '') + '</b></div>' : ''}
+    ${d.shipFrom ? '<div class="meta">Expédition : <b>' + escapeHtml(d.shipFrom) + '</b></div>' : ''}
+    ${d.attributes && d.attributes.length ? '<div class="meta">Attributs : <b>' + d.attributes.length + '</b> (voir aperçu import)</div>' : ''}
     <div class="thumbs">${(d.gallery || []).slice(0, 5).map((u) => '<img src="' + escapeAttr(u) + '" alt="" loading="lazy" />').join('')}</div>
   `
   $('btn-details').hidden = false

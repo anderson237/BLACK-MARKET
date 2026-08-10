@@ -89,6 +89,17 @@ export default defineEventHandler(async (event) => {
   draft.url = payload.url
   if (payload.mention) draft.mention = payload.mention
 
+  // ST-020 v2 : infos RICHES capturées par l'extension (attributs, couleurs,
+  // tailles, emballage, moq, expédition, ventes) → tracées dans le draft pour
+  // l'aperçu admin + la publication.
+  if (payload.attributes?.length) draft.attributes = payload.attributes
+  if (payload.colors?.length) draft.colors = payload.colors
+  if (payload.sizes?.length) draft.sizes = payload.sizes
+  if (payload.packaging) draft.packaging = payload.packaging
+  if (payload.moq) draft.moq = payload.moq
+  if (payload.shipFrom) draft.shipFrom = payload.shipFrom
+  if (payload.sales) draft.salesInfo = payload.sales
+
   // ST-020 : persistance du draft pour la page Import (« Imports via
   // extension »). Best-effort : ne bloque jamais l'import.
   const draftId = `ext_${Date.now().toString(36)}_${crypto.randomBytes(3).toString('hex')}`

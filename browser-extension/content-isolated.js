@@ -318,6 +318,152 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Extra DOM (ST-020 v2) — capture RICHE du produit : attributs (商品属性),
+  // couleurs / tailles, emballage (包装信息), quantité minimum (起批量),
+  // provenance expédition et compteurs de ventes. Le titre + les photos ne
+  // suffisent pas pour un bon import : on récupère TOUT ce que la page expose.
+  // Stratégie générique (fonctionne sur 1688 + fallback Taobao/Tmall) :
+  //   - attributs : paires dt→dd et tr→th/td (2 cellules seulement, pour éviter
+  //     de capter la table d'emballage à 7 colonnes)
+  //   - couleurs / tailles : dérivées de l'attribut nommé 颜色 / 尺码
+  //   - emballage : première ligne de la table dont l'en-tête contient 长/宽/高
+  //     /体积/重量
+  //   - moq : "≥2件", "2件混批", "起批量 N件"…
+  //   - shipFrom : "发货 浙江金华"
+  //   - sales : "50+人好评", "300+人已加购"
+  // ---------------------------------------------------------------------------
+  function textOf(el) {
+    return (el && String(el.textContent || '').replace(/\s+/g, ' ').trim()) || ''
+  }
+
+  function extractAttributes() {
+    const attrs = []
+    const seen = new Set()
+    const JUNK = /价格|划线|发布价|全网销量|内容声明|满.*包邮|晚发|退货|揽收|铺货|分销|达标率|留货率|发布时间|代发/
+    const push = (name, value) => {
+      name = String(name || '').replace(/\s+/g, ' ').trim().slice(0, 60)
+      value = String(value || '').replace(/\s+/g, ' ').trim().slice(0, 600)
+      if (!name || !value || JUNK.test(name)) return
+      const k = name + '|' + value
+      if (seen.has(k)) return
+      seen.add(k)
+      attrs.push({ name, value })
+    }
+    try {
+      for (const dl of document.querySelectorAll('dl')) {
+        for (const dt of dl.querySelectorAll(':scope > dt')) {
+          const dd = dt.nextElementSibling
+          if (dd && /^dd$/i.test(dd.tagName)) push(textOf(dt), textOf(dd))
+        }
+      }
+      for (const tr of document.querySelectorAll('table tr')) {
+        const cells = tr.querySelectorAll('th, td')
+        if (cells.length !== 2) continue
+        push(textOf(cells[0]), textOf(cells[1]))
+      }
+    } catch (_) {}
+    return attrs.slice(0, 30)
+  }
+
+  function splitList(value) {
+    return String(value || '')
+      .split(/[,，、\s]+/)
+      .map((s) => String(s).trim().replace(/^[\u4e00-\u9fff]{1,4}\s*[:：]\s*/, '').trim())
+      .filter(Boolean)
+  }
+
+  function extractPackaging() {
+    try {
+      for (const table of document.querySelectorAll('table')) {
+        const rows = table.querySelectorAll('tr')
+        if (rows.length < 2) continue
+        const header = Array.from(rows[0].querySelectorAll('th, td')).map(textOf)
+        if (!/(件重|长|宽|高|体积|重量|重量)/.test(header.join(' '))) continue
+        const cells = Array.from(rows[1].querySelectorAll('th, td')).map(textOf)
+        if (!cells.length) continue
+        const num = (i) => toNumber(cells[i])
+        const col = (re) => header.findIndex((h) => re.test(h))
+        const li = col(/长/), wi = col(/宽/), hi = col(/高/), vi = col(/体积/), wgi = col(/重量|克/)
+        const out = {}
+        const unit = (cells[0] || '').slice(0, 30)
+        if (unit) out.unit = unit
+        if (li >= 0 && num(li) != null) out.lengthCm = num(li)
+        if (wi >= 0 && num(wi) != null) out.widthCm = num(wi)
+        if (hi >= 0 && num(hi) != null) out.heightCm = num(hi)
+        if (vi >= 0 && num(vi) != null) out.volumeCm3 = num(vi)
+        if (wgi >= 0 && num(wgi) != null) out.weightGrams = num(wgi)
+        if (Object.keys(out).length > 1) return out
+      }
+    } catch (_) {}
+    return null
+  }
+
+  function extractMoq() {
+    try {
+      const t = document.body.innerText
+      let m = t.match(/≥\s*(\d{1,6})\s*(件|个|套|台|双|条|pcs)/)
+      if (m) return Math.max(1, parseInt(m[1], 10))
+      m = t.match(/(\d{1,6})\s*(件|个|套|台|双|条|pcs)\s*(混批|起批|起订)/)
+      if (m) return Math.max(1, parseInt(m[1], 10))
+      m = t.match(/(?:起批量|起订量|最低起订)\s*[:：]?\s*(\d{1,6})\s*(件|个|套|台|双|条|pcs)/)
+      if (m) return Math.max(1, parseInt(m[1], 10))
+    } catch (_) {}
+    return 0
+  }
+
+  function extractShipFrom() {
+    try {
+      const m = document.body.innerText.match(/发货\s*\n\s*([\u4e00-\u9fff]{2,12}?)(?:\n|至|选择)/)
+      return m ? String(m[1]).trim().slice(0, 200) : undefined
+    } catch (_) {}
+    return undefined
+  }
+
+  function extractSales() {
+    try {
+      const t = document.body.innerText
+      const out = {}
+      let m = t.match(/(\d{1,7})\+?\s*人\s*(?:好评|评价)/)
+      if (m) out.goodReviews = parseInt(m[1], 10)
+      m = t.match(/(\d{1,7})\+?\s*人\s*已加购/)
+      if (m) out.addedToCart = parseInt(m[1], 10)
+      return Object.keys(out).length ? out : undefined
+    } catch (_) {}
+    return undefined
+  }
+
+  /** Récupère TOUTES les infos structurelles de la page (attributs, variantes,
+   *  emballage, moq, expédition, ventes). Retourne un objet partiel de payload. */
+  function buildExtras() {
+    const attributes = extractAttributes()
+    const colors = []
+    const sizes = []
+    const rest = []
+    for (const a of attributes) {
+      if (/^(颜色|色彩|colour|color)/i.test(a.name)) colors.push(...splitList(a.value))
+      else if (/^(尺码|码数|size)/i.test(a.name)) sizes.push(...splitList(a.value))
+      else rest.push(a)
+    }
+    const uniq = (arr) => arr.filter((v, i) => v && arr.indexOf(v) === i)
+    const out = {}
+    const finalAttrs = rest.length ? rest : attributes
+    if (finalAttrs.length) out.attributes = finalAttrs.slice(0, 30)
+    const cs = uniq(colors).slice(0, 60)
+    const ss = uniq(sizes).slice(0, 20)
+    if (cs.length) out.colors = cs
+    if (ss.length) out.sizes = ss
+    const packaging = extractPackaging()
+    if (packaging) out.packaging = packaging
+    const moq = extractMoq()
+    if (moq) out.moq = moq
+    const shipFrom = extractShipFrom()
+    if (shipFrom) out.shipFrom = shipFrom
+    const sales = extractSales()
+    if (sales) out.sales = sales
+    return out
+  }
+
+  // ---------------------------------------------------------------------------
   // Construction du payload produit
   // ---------------------------------------------------------------------------
   const TITLE_KEYS = ['itemTitle', 'productTitle', 'goodsTitle', 'subject', 'titleText', 'title', 'name', 'goodsName', 'itemInfo']
@@ -374,6 +520,10 @@
     if (seller) payload.seller = seller
     if (condition) payload.condition = condition
     if (category) payload.category = category
+
+    // ST-020 v2 : attributs, variantes (couleurs/tailles), emballage, moq,
+    // expédition, compteurs de ventes — directement depuis le DOM.
+    Object.assign(payload, buildExtras())
 
     return payload
   }

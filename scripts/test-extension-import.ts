@@ -233,6 +233,38 @@ function scenarioPayloadInvalide(): void {
     const ok = parseExtensionPayload({ ...validBase, platform: p, url: sampleUrl[p], sourceId: 'sample' })
     check(`allowlist accepte ${p}`, ok.platform === p && ok.url === sampleUrl[p])
   }
+
+  // ST-020 v2 : infos RICHES acceptées (attributs, variantes, emballage, moq…).
+  const rich = parseExtensionPayload({
+    ...validBase,
+    platform: '1688',
+    url: 'https://detail.1688.com/offer/987654.html',
+    sourceId: '987654',
+    attributes: [
+      { name: '面料名称', value: '棉' },
+      { name: '厚薄', value: '普通' },
+      { name: '袖长', value: '短袖' },
+    ],
+    colors: ['白色', '黑色', '藏青色'],
+    sizes: ['S', 'M', 'L', 'XL'],
+    packaging: { unit: '白色 S', lengthCm: 40, widthCm: 28, heightCm: 0.5, volumeCm3: 560, weightGrams: 320 },
+    moq: 2,
+    shipFrom: '浙江金华',
+    sales: { goodReviews: 50, addedToCart: 300 },
+  })
+  check('rich : attributs (3 paires)', rich.attributes?.length === 3 && rich.attributes![0].name === '面料名称')
+  check('rich : couleurs (3) / tailles (4)', rich.colors?.length === 3 && rich.sizes?.length === 4)
+  check('rich : emballage 40×28×0.5 · 560cm³ · 320g', rich.packaging?.lengthCm === 40 && rich.packaging?.weightGrams === 320 && rich.packaging?.volumeCm3 === 560)
+  check('rich : moq=2 / shipFrom / sales', rich.moq === 2 && rich.shipFrom === '浙江金华' && rich.sales?.addedToCart === 300)
+
+  expect400('31 attributs (>30)', { ...validBase, attributes: Array.from({ length: 31 }, (_, i) => ({ name: `a${i}`, value: 'v' })) })
+  expect400('attribut sans name', { ...validBase, attributes: [{ value: 'v' }] })
+  expect400('attribut non-objet', { ...validBase, attributes: ['棉'] })
+  expect400('moq = 0', { ...validBase, moq: 0 })
+  expect400('moq non entier', { ...validBase, moq: 2.5 })
+  expect400('packaging non-objet', { ...validBase, packaging: 'carton' })
+  expect400('sales non-objet', { ...validBase, sales: 50 })
+  check('31 couleurs trop (>60) → ok si ≥', (() => { const p = parseExtensionPayload({ ...validBase, colors: Array.from({ length: 80 }, (_, i) => `c${i}`) }); return (p.colors || []).length <= 60 })())
 }
 
 // ---------------------------------------------------------------------------

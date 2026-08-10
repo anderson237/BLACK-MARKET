@@ -68,6 +68,40 @@ export default defineEventHandler(async (event) => {
   // compatibilité. Le seller brut est nettoyé par sanitizeProduct.
   const sourceUrl = String(body?.url || body?.sourceUrl || '').trim()
   const seller = body?.seller && typeof body.seller === 'object' ? body.seller : undefined
+  // ST-020 v2 : infos riches capturées par l'extension (1688…) — attributs,
+  // variantes, emballage, expédition. Persistées sur le produit (sanitizeProduct
+  // conserve les champs supplémentaires via son spread `...body`).
+  const attributes = Array.isArray(body?.attributes)
+    ? body.attributes
+        .slice(0, 30)
+        .map((a: any) => ({
+          name: String(a?.name || '').trim().slice(0, 60),
+          value: String(a?.value || '').trim().slice(0, 600),
+        }))
+        .filter((a: any) => a.name && a.value)
+    : undefined
+  const colors = Array.isArray(body?.colors)
+    ? body.colors.map((c: any) => String(c).trim().slice(0, 60)).filter(Boolean).slice(0, 60)
+    : undefined
+  const sizes = Array.isArray(body?.sizes)
+    ? body.sizes.map((s: any) => String(s).trim().slice(0, 20)).filter(Boolean).slice(0, 20)
+    : undefined
+  const pkgNum = (k: string): number | undefined => {
+    const n = Number((body?.packaging || {})[k])
+    return Number.isFinite(n) && n >= 0 && n < 1_000_000 ? n : undefined
+  }
+  const packaging =
+    body?.packaging && typeof body.packaging === 'object' && !Array.isArray(body.packaging)
+      ? {
+          unit: String(body.packaging.unit || '').trim().slice(0, 30) || undefined,
+          lengthCm: pkgNum('lengthCm'),
+          widthCm: pkgNum('widthCm'),
+          heightCm: pkgNum('heightCm'),
+          volumeCm3: pkgNum('volumeCm3'),
+          weightGrams: pkgNum('weightGrams'),
+        }
+      : undefined
+  const shipFrom = String(body?.shipFrom || '').trim().slice(0, 200) || undefined
   const scRaw = body?.supplierContact || {}
   const supplierContact =
     scRaw && typeof scRaw === 'object' && (scRaw.wechat || scRaw.email || scRaw.whatsapp || scRaw.phone || scRaw.website || scRaw.note)
@@ -177,6 +211,12 @@ Réponds strictement en JSON au schéma demandé.
     supplierContact,
     sourceUrl: sourceUrl || undefined,
     seller,
+    // ST-020 v2 : infos riches capturées par l'extension (persistées telles quelles).
+    attributes: attributes?.length ? attributes : undefined,
+    colors: colors?.length ? colors : undefined,
+    sizes: sizes?.length ? sizes : undefined,
+    packaging: packaging && Object.values(packaging).some(Boolean) ? packaging : undefined,
+    shipFrom: shipFrom || undefined,
     createdAt: new Date().toISOString(),
   })
 

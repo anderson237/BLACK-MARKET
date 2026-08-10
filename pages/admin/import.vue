@@ -505,6 +505,13 @@ async function doPublish() {
         url: draft.value.url || undefined,
         seller: draft.value.seller || undefined,
         supplierContact: supplierContact.value,
+        // ST-020 v2 : infos riches capturées par l'extension, persistées sur le produit.
+        attributes: draft.value.attributes || undefined,
+        colors: draft.value.colors || undefined,
+        sizes: draft.value.sizes || undefined,
+        packaging: draft.value.packaging || undefined,
+        shipFrom: draft.value.shipFrom || undefined,
+        salesInfo: draft.value.salesInfo || undefined,
       },
     })
     successMsg.value = `Produit publié ✓ (${(res as any).id})`
@@ -1060,6 +1067,43 @@ onMounted(() => {
             <p v-if="draft.features?.length" class="text-[11px] font-mono text-zinc-400 mt-1">
               Caractéristiques : <span v-for="(f, i) in draft.features" :key="i" class="mr-2">{{ f.name }} : {{ f.value }}</span>
             </p>
+          </div>
+
+          <!-- ST-020 v2 : infos riches capturées par l'extension (1688…) :
+               attributs, variantes, emballage, moq, expédition, ventes -->
+          <div v-if="draft.attributes?.length || draft.colors?.length || draft.sizes?.length || draft.packaging || draft.moq || draft.shipFrom || draft.salesInfo" class="border border-zinc-800 rounded-xl p-3 space-y-2 bg-[#08080c]">
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Infos produit capturées (extension)</p>
+              <span v-if="draft.shipFrom" class="text-[10px] font-mono text-zinc-400">📍 Expédition : {{ draft.shipFrom }}</span>
+            </div>
+            <div class="flex flex-wrap gap-2 text-[10px] font-mono">
+              <span v-if="draft.moq" class="text-sky-400">📦 MOQ : {{ draft.moq }} pièce(s)</span>
+              <span v-if="draft.salesInfo?.goodReviews" class="text-emerald-400">👍 {{ draft.salesInfo.goodReviews }}+ avis</span>
+              <span v-if="draft.salesInfo?.addedToCart" class="text-sky-400">🛒 {{ draft.salesInfo.addedToCart }}+ déjà ajoutés</span>
+            </div>
+            <div v-if="draft.colors?.length || draft.sizes?.length" class="flex flex-wrap items-center gap-3">
+              <span v-if="draft.colors?.length" class="flex flex-wrap gap-1 items-center">
+                <span class="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">Couleurs</span>
+                <span v-for="c in draft.colors" :key="c" class="px-1.5 py-0.5 rounded border border-zinc-800 text-[10px] font-mono text-zinc-300">{{ c }}</span>
+              </span>
+              <span v-if="draft.sizes?.length" class="flex flex-wrap gap-1 items-center">
+                <span class="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">Tailles</span>
+                <span v-for="s in draft.sizes" :key="s" class="px-1.5 py-0.5 rounded border border-zinc-800 text-[10px] font-mono text-zinc-300">{{ s }}</span>
+              </span>
+            </div>
+            <p v-if="draft.packaging" class="text-[10px] font-mono text-zinc-400">
+              📐 Emballage : <span class="text-zinc-200">{{ draft.packaging.unit || 'colis' }}</span>
+              <template v-if="draft.packaging.lengthCm || draft.packaging.widthCm || draft.packaging.heightCm">
+                · {{ draft.packaging.lengthCm }}×{{ draft.packaging.widthCm }}×{{ draft.packaging.heightCm }} cm
+              </template>
+              <template v-if="draft.packaging.volumeCm3">· {{ draft.packaging.volumeCm3 }} cm³</template>
+              <template v-if="draft.packaging.weightGrams">· {{ draft.packaging.weightGrams }} g/pièce</template>
+            </p>
+            <div v-if="draft.attributes?.length" class="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1">
+              <p v-for="(a, i) in draft.attributes" :key="i" class="text-[10px] font-mono text-zinc-400 break-words">
+                <span class="text-zinc-500">{{ a.name }}</span> : <span class="text-zinc-200">{{ a.value }}</span>
+              </p>
+            </div>
           </div>
 
           <!-- Supplier contact -->

@@ -70,6 +70,17 @@ function str(v: unknown, max = 500): string {
   return String(v ?? '').trim().slice(0, max)
 }
 
+/** Liste de chaînes dé-dupliquées, bornée (maxItems entrées de maxLen car. max). */
+function strList(v: unknown, maxLen: number, maxItems: number): string[] {
+  if (!Array.isArray(v)) return []
+  const out: string[] = []
+  for (const x of v) {
+    const s = str(x, maxLen)
+    if (s && out.length < maxItems && out.indexOf(s) === -1) out.push(s)
+  }
+  return out
+}
+
 function isHttpUrl(v: unknown): boolean {
   try {
     const u = new URL(String(v || ''))
@@ -105,6 +116,19 @@ export interface ExtensionPayload {
   condition?: string
   category?: string
   mention?: ProductMention
+  /** ST-020 v2 : attributs produit (商品属性) — paires nom→valeur, ≤30. */
+  attributes?: { name: string; value: string }[]
+  /** Variantes couleur (≤60) / taille (≤20), dérivées de la page. */
+  colors?: string[]
+  sizes?: string[]
+  /** Emballage/colis (包装信息) : dimensions cm + volume cm³ + poids g. */
+  packaging?: { unit?: string; lengthCm?: number; widthCm?: number; heightCm?: number; volumeCm3?: number; weightGrams?: number }
+  /** Quantité minimale de commande (起批量), entier > 0. */
+  moq?: number
+  /** Provenance d'expédition (ex. 浙江金华). */
+  shipFrom?: string
+  /** Compteurs de ventes extraits (50+人好评 / 300+人已加购). */
+  sales?: { goodReviews?: number; addedToCart?: number }
 }
 
 /** Validation STRICTE du body de l'extension. Lève `ExtensionImportError` (400)
@@ -191,6 +215,67 @@ export function parseExtensionPayload(body: any): ExtensionPayload {
     mention = m
   }
 
+  // --- attributes (paires nom→valeur, cap 30) ---
+  const rawAttrs = Array.isArray(body.attributes) ? body.attributes : []
+  const attributes: ExtensionPayload['attributes'] = []
+  if (rawAttrs.length) {
+    if (rawAttrs.length > 30) fail(`attributes: au maximum 30 entrées (reçu ${rawAttrs.length}).`)
+    for (const a of rawAttrs) {
+      if (!a || typeof a !== 'object' || Array.isArray(a)) {
+        fail('attributes: chaque entrée doit être un objet { name, value }.')
+      }
+      const name = str(a.name, 60)
+      const value = str(a.value, 600)
+      if (!name || !value) fail('attributes: name et value requis pour chaque entrée.')
+      attributes.push({ name, value })
+    }
+  }
+
+  // --- colors / sizes (listes bornées) ---
+  const colors = strList(body.colors, 60, 60)
+  const sizes = strList(body.sizes, 20, 20)
+
+  // --- packaging (objets optionnels, nombres bornés ≥ 0) ---
+  let packaging: ExtensionPayload['packaging'] = undefined
+  if (body.packaging != null) {
+    if (typeof body.packaging !== 'object' || Array.isArray(body.packaging)) {
+      fail('packaging: objet optionnel attendu (unit, lengthCm, widthCm, heightCm, volumeCm3, weightGrams).')
+    }
+    const p: Record<string, number | string> = {}
+    const unit = str(body.packaging.unit, 30)
+    if (unit) p.unit = unit
+    for (const k of ['lengthCm', 'widthCm', 'heightCm', 'volumeCm3', 'weightGrams']) {
+      const n = Number(body.packaging[k])
+      if (Number.isFinite(n) && n >= 0 && n < 1_000_000) p[k] = n
+    }
+    if (Object.keys(p).length) packaging = p
+  }
+
+  // --- moq (entier strictement positif) ---
+  let moq: number | undefined
+  if (body.moq != null) {
+    const n = Number(body.moq)
+    if (!Number.isInteger(n) || n <= 0 || n > 1_000_000) fail('moq invalide (entier strictement positif requis).')
+    moq = n
+  }
+
+  // --- shipFrom (texte court) ---
+  const shipFrom = body.shipFrom == null ? undefined : str(body.shipFrom, 200) || undefined
+
+  // --- sales (compteurs optionnels) ---
+  let sales: ExtensionPayload['sales'] = undefined
+  if (body.sales != null) {
+    if (typeof body.sales !== 'object' || Array.isArray(body.sales)) {
+      fail('sales: objet optionnel attendu (goodReviews, addedToCart).')
+    }
+    const s: Record<string, number> = {}
+    for (const k of ['goodReviews', 'addedToCart']) {
+      const n = Number(body.sales[k])
+      if (Number.isFinite(n) && n >= 0 && n < 1_000_000_000) s[k] = Math.round(n)
+    }
+    if (Object.keys(s).length) sales = s
+  }
+
   return {
     platform,
     sourceId,
@@ -206,6 +291,13 @@ export function parseExtensionPayload(body: any): ExtensionPayload {
     condition,
     category,
     mention,
+    attributes: attributes.length ? attributes : undefined,
+    colors: colors.length ? colors : undefined,
+    sizes: sizes.length ? sizes : undefined,
+    packaging,
+    moq,
+    shipFrom,
+    sales,
   }
 }
 
