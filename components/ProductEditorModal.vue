@@ -50,6 +50,13 @@ const draft = reactive({
   // Affichés en lecture seule et préservés à la sauvegarde.
   sourceUrl: props.product?.sourceUrl || '',
   seller: props.product?.seller ? { ...props.product.seller } : undefined,
+  // ST-020 v2/v3 : infos riches capturées par l'extension — affichées (fiche
+  // technique) et PRÉSERVÉES à la sauvegarde (sinon perdues à l'édition).
+  attributes: [...(props.product?.attributes || [])],
+  colors: [...(props.product?.colors || [])],
+  sizes: [...(props.product?.sizes || [])],
+  packaging: props.product?.packaging && typeof props.product.packaging === 'object' ? { ...props.product.packaging } : undefined,
+  shipFrom: props.product?.shipFrom || '',
 })
 
 const saving = ref(false)
@@ -88,6 +95,21 @@ function computeSellingXof(): number {
 }
 
 const sellingXof = computed(() => computeSellingXof())
+
+// ST-020 v2 : résumé texte de l'emballage capturé par l'extension (affichage).
+const packText = computed(() => {
+  const p = draft.packaging as any
+  if (!p || typeof p !== 'object') return ''
+  const dims = [p.lengthCm, p.widthCm, p.heightCm].filter(Boolean).join('×')
+  return [
+    p.unit,
+    dims && `${dims} cm`,
+    p.volumeCm3 && `${p.volumeCm3} cm³`,
+    p.weightGrams && `${p.weightGrams} g/pièce`,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+})
 
 function applySellingPrice() {
   if (Number(draft.purchaseRmb) > 0 || draft.shippingRmb > 0 || marginPercent.value > 0) {
@@ -840,6 +862,23 @@ async function handleVideoFile(e: Event) {
               <button @click="draft.features.splice(i, 1)" class="text-red-400 hover:text-red-300 text-[10px]">✕</button>
             </li>
           </ul>
+        </div>
+
+        <!-- ST-020 v2/v3 : attributs riches capturés par l'extension (fiche technique) -->
+        <div v-if="draft.attributes?.length" class="space-y-2">
+          <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Fiche technique (attributs capturés)</label>
+          <div class="border border-zinc-800 rounded-xl bg-black/20 divide-y divide-zinc-800/60 max-h-60 overflow-y-auto">
+            <div v-for="(a, i) in draft.attributes" :key="i" class="flex items-start gap-2 px-3 py-1.5 text-xs">
+              <span class="text-[#ff2a2a] font-bold mt-0.5">▪</span>
+              <span class="text-zinc-400 w-2/5 shrink-0">{{ a.name }}</span>
+              <span class="text-zinc-200 flex-1">{{ a.value }}</span>
+            </div>
+          </div>
+          <p v-if="draft.colors?.length" class="text-[10px] text-zinc-500"><b class="text-zinc-400">Couleurs :</b> {{ draft.colors.join(', ') }}</p>
+          <p v-if="draft.sizes?.length" class="text-[10px] text-zinc-500"><b class="text-zinc-400">Tailles :</b> {{ draft.sizes.join(', ') }}</p>
+          <p v-if="packText" class="text-[10px] text-zinc-500"><b class="text-zinc-400">Emballage :</b> {{ packText }}</p>
+          <p v-if="draft.shipFrom" class="text-[10px] text-zinc-500"><b class="text-zinc-400">Expédition depuis :</b> {{ draft.shipFrom }}</p>
+          <p v-if="draft.moq" class="text-[10px] text-zinc-500"><b class="text-zinc-400">MOQ :</b> {{ draft.moq }} pièce(s)</p>
         </div>
       </div>
 

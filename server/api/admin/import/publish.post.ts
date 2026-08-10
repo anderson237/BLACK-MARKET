@@ -100,6 +100,9 @@ export default defineEventHandler(async (event) => {
         }))
         .filter((a: any) => a.name && a.value)
     : undefined
+  // ST-020 v3 : attributs DÉJÀ traduits FR (capture extension / translate-draft)
+  // préférés au chinois brut pour le contexte IA et la fiche technique.
+  const contextAttrs = attributesTranslated?.length ? attributesTranslated : attributes
   const colors = Array.isArray(body?.colors)
     ? body.colors.map((c: any) => String(c).trim().slice(0, 60)).filter(Boolean).slice(0, 60)
     : undefined
@@ -151,89 +154,98 @@ export default defineEventHandler(async (event) => {
   let aiAttributes: { name: string; value: string }[] | undefined
   if (aiEnrich) {
     const ai = getAI()
-    if (!ai) throw createError({ statusCode: 503, statusMessage: "Le service d'IA n'est pas configuré (GEMINI_API_KEY manquante)." })
-    const alreadyFrenchTitle = Boolean(title) && !hasCjk(title)
-    const alreadyFrenchDesc = Boolean(description) && !hasCjk(description)
-    // ST-020 v3 : attributs capturés par l'extension (chinois bruts) fournis au
-    // modèle pour traduction FR + intégration à la description et à la fiche
-    // technique du produit.
-    const attrsSource = attributes?.length ? attributes.map((a) => `${a.name} : ${a.value}`).join(' | ') : ''
-    const specContext = [
-      attrsSource ? `Attributs : ${attrsSource}` : '',
-      colors?.length ? `Couleurs : ${colors.join(', ')}` : '',
-      sizes?.length ? `Tailles : ${sizes.join(', ')}` : '',
-      packaging && (packaging.lengthCm || packaging.widthCm || packaging.heightCm || packaging.weightGrams)
-        ? `Emballage : ${[packaging.lengthCm, packaging.widthCm, packaging.heightCm].filter(Boolean).join('×')}${packaging.lengthCm ? ' cm' : ''}${packaging.weightGrams ? ` · ${packaging.weightGrams} g/pièce` : ''}`
-        : '',
-      moq ? `MOQ : ${moq} pièce(s)` : '',
-      shipFrom ? `Expédition depuis : ${shipFrom}` : '',
-    ]
-      .filter(Boolean)
-      .join('\n')
-    const prompt = `
+    if (ai) {
+      try {
+        const alreadyFrenchTitle = Boolean(title) && !hasCjk(title)
+        const alreadyFrenchDesc = Boolean(description) && !hasCjk(description)
+        // ST-020 v3 : attributs (FR préférés, chinois en repli) fournis au modèle
+        // pour alimenter l'argumentaire ET la fiche technique du produit.
+        const attrsSource = contextAttrs?.length ? contextAttrs.map((a) => `${a.name} : ${a.value}`).join(' | ') : ''
+        const specContext = [
+          attrsSource ? `Attributs capturés : ${attrsSource}` : '',
+          colors?.length ? `Couleurs : ${colors.join(', ')}` : '',
+          sizes?.length ? `Tailles : ${sizes.join(', ')}` : '',
+          packaging && (packaging.lengthCm || packaging.widthCm || packaging.heightCm || packaging.weightGrams)
+            ? `Emballage : ${[packaging.lengthCm, packaging.widthCm, packaging.heightCm].filter(Boolean).join('×')}${packaging.lengthCm ? ' cm' : ''}${packaging.weightGrams ? ` · ${packaging.weightGrams} g/pièce` : ''}`
+            : '',
+          moq ? `MOQ : ${moq} pièce(s)` : '',
+          shipFrom ? `Expédition depuis : ${shipFrom}` : '',
+        ]
+          .filter(Boolean)
+          .join('\n')
+        const prompt = `
 Produit importé de ${platformLabel(platform)} — titre source : "${chineseTitle || title}".
 Description source : "${chineseDescription || description}".
 Prix d'achat : ${price || 'inconnu'} ${currency}.
-${specContext ? `Infos produit capturées (source chinoise) :
+${specContext ? `Infos produit capturées :
 ${specContext}
 ` : ''}${alreadyFrenchDesc ? '1. La description fournie est DÉJÀ en français (traduction auto à l\'import). NE LA RETRADUIS PAS depuis le chinois : garde-la telle quelle, ou améliore-la légèrement si le style le mérite.' : '1. Traduis/adapte la description en français de manière claire et fidèle.'}
 ${alreadyFrenchTitle ? '2. Le titre fourni est DÉJÀ en français : conserve-le tel quel (améliorations de style mineures acceptées).' : '2. Traduis le titre en français (titre commercial accrocheur, marché francophone/africain).'}
-3. Rédige un argumentaire de vente premium en français (bénéfices clients, crédible).
+3. Rédige un argumentaire de vente premium en français (bénéfices clients, crédible). À partir des attributs capturés ci-dessus : EXTRAIS et mets en valeur SEULEMENT les 3 à 5 arguments de vente les plus pertinents (matière, personnalisation, usages, MOQ, livraison…). NE RÉPÈTE PAS la liste brute des attributs dans l'argumentaire.
 4. Extrais 3 à 5 caractéristiques techniques clés.
 5. Suggère un prix de vente EUR et XOF. Convertis le prix d'achat (1 RMB ≈ 95 XOF, 1 EUR = 655.957 XOF, 1 USD ≈ 700 XOF) et applique une marge d'importation réaliste (frais d'envoi 5-10 € / 3000-6000 XOF inclus).
-6. Traduis les attributs capturés ci-dessus en français dans le champ "attributes" : chaque entrée { "name": nom de la propriété en FR, "value": valeur en FR }. Traduction technique exacte, conserve marques, chiffres, matières et tailles. Ne perds aucune propriété.
-7. Termine la description par une section "<h3>Fiche technique</h3>" suivie d'une liste "<ul>" listant les attributs traduits (ex. <li><b>Composition</b> : 100% coton</li>), plus des lignes Couleurs / Tailles / Emballage / MOQ si disponibles.
+6. Rédige la fiche technique dans le champ "attributes" : chaque entrée { "name": nom de la propriété en FR, "value": valeur en FR }. FILTRE les attributs capturés (termes techniques corrects, suppression des doublons/valeurs triviales, conservation des marques, chiffres, matières et tailles). Ne perds aucune caractéristique importante.
+7. Termine la description par une section "<h3>Fiche technique</h3>" suivie d'une liste "<ul>" reprenant TOUTES les caractéristiques traduites et bien formulées (ex. <li><b>Composition</b> : 100% coton</li>), plus des lignes Couleurs / Tailles / Emballage / MOQ si disponibles.
 Réponds strictement en JSON au schéma demandé.
 `
-    const response = await generateContentWithRetry(
-      ai,
-      {
-        model: geminiModel,
-        contents: [{ text: prompt }],
-        config: {
-          systemInstruction:
-            "Tu es un assistant de commerce international expert en sourcing (Taobao, 1688, Xianyu, TikTok Shop, Amazon, Douyin) et en copywriting e-commerce de précommande.",
-          temperature: 0.7,
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING, description: 'Titre commercial accrocheur en français.' },
-              description: { type: Type.STRING, description: 'Traduction claire et fidèle en français.' },
-              salesPitch: { type: Type.STRING, description: 'Argumentaire de vente premium en français.' },
-              features: { type: Type.ARRAY, items: { type: Type.STRING }, description: '3 à 5 caractéristiques clés.' },
-              attributes: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    name: { type: Type.STRING, description: 'Nom de la propriété en français.' },
-                    value: { type: Type.STRING, description: 'Valeur technique en français.' },
+        const response = await generateContentWithRetry(
+          ai,
+          {
+            model: geminiModel,
+            contents: [{ text: prompt }],
+            config: {
+              systemInstruction:
+                "Tu es un assistant de commerce international expert en sourcing (Taobao, 1688, Xianyu, TikTok Shop, Amazon, Douyin) et en copywriting e-commerce de précommande.",
+              temperature: 0.7,
+              responseMimeType: 'application/json',
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  title: { type: Type.STRING, description: 'Titre commercial accrocheur en français.' },
+                  description: { type: Type.STRING, description: 'Traduction claire et fidèle en français.' },
+                  salesPitch: { type: Type.STRING, description: 'Argumentaire de vente premium en français.' },
+                  features: { type: Type.ARRAY, items: { type: Type.STRING }, description: '3 à 5 caractéristiques clés.' },
+                  attributes: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        name: { type: Type.STRING, description: 'Nom de la propriété en français.' },
+                        value: { type: Type.STRING, description: 'Valeur technique en français.' },
+                      },
+                      required: ['name', 'value'],
+                    },
+                    description: 'Fiche technique : attributs capturés, filtrés et traduits en français.',
                   },
-                  required: ['name', 'value'],
+                  priceEur: { type: Type.NUMBER },
+                  priceXof: { type: Type.NUMBER },
                 },
-                description: 'Attributs techniques capturés, traduits en français (fiche technique).',
+                required: ['title', 'description', 'salesPitch', 'features', 'priceEur', 'priceXof'],
               },
-              priceEur: { type: Type.NUMBER },
-              priceXof: { type: Type.NUMBER },
             },
-            required: ['title', 'description', 'salesPitch', 'features', 'priceEur', 'priceXof'],
           },
-        },
-      },
-      geminiFallbackModel,
-    )
-    try {
-      enriched = JSON.parse(response.text || '{}')
-    } catch {
-      /* keep raw draft on AI parse failure */
+          geminiFallbackModel,
+        )
+        try {
+          enriched = JSON.parse(response.text || '{}')
+        } catch {
+          /* keep raw draft on AI parse failure */
+        }
+        aiAttributes = Array.isArray(enriched?.attributes)
+          ? enriched.attributes
+              .map((a: any) => ({ name: String(a?.name || '').trim().slice(0, 60), value: String(a?.value || '').trim().slice(0, 600) }))
+              .filter((a: any) => a.name && a.value)
+              .slice(0, 30)
+          : undefined
+      } catch (err) {
+        // Dégradation OBLIGATOIRE : quota IA épuisé (429) / indisponible → la
+        // publication NE DOIT JAMAIS échouer. Le draft FR est publié tel quel
+        // et la fiche technique utilise les attributs traduits à la capture.
+        console.error('[publish] Enrichissement IA indisponible → publication dégradée :', String((err as any)?.message || err).slice(0, 200))
+        enriched = null
+        aiAttributes = undefined
+      }
     }
-    aiAttributes = Array.isArray(enriched?.attributes)
-      ? enriched.attributes
-          .map((a: any) => ({ name: String(a?.name || '').trim().slice(0, 60), value: String(a?.value || '').trim().slice(0, 600) }))
-          .filter((a: any) => a.name && a.value)
-          .slice(0, 30)
-      : undefined
   }
 
   // ST-020 v3 : fiche technique traduite par l'IA (attributs FR) ; en repli,
