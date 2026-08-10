@@ -1,6 +1,7 @@
 import { joDetail, importRemoteImage, priceToXof, type JoPlatform, type JoDetail } from '~~/server/utils/justone'
 import { findLocalPrice, estimateTransport, getSupplierContact } from '~~/server/utils/storage'
 import { detectCategory } from '~~/server/utils/category'
+import type { ProductMention } from '~~/types'
 import { Type } from '@google/genai'
 import { getAI, geminiModel, geminiFallbackModel, generateContentWithRetry } from '~~/server/utils/ai'
 
@@ -24,6 +25,36 @@ const CJK_RE = /[\u3000-\u9FFF\u3400-\u4DBF\u3040-\u30FF\uF900-\uFAFF]/
 /** Détecte la présence de caractères CJK (chinois / japonais) dans un texte. */
 export function hasCjk(text: unknown): boolean {
   return CJK_RE.test(String(text ?? ''))
+}
+
+/**
+ * Suggestion AUTO de mention produit vitrine (ST-018) à l'import.
+ * Mappe les signaux SOURCE (bruts, non normalisés) vers une valeur normalisée FR :
+ *   - plateforme 1688 (gros / B2B wholesale) → `gros`
+ *   - texte (condition goofish itemStatusStr + titre + description) contenant
+ *     二手 / 旧 → `occasion` ; 全新 → `neuf` ; variantes EN `used` / `new` ;
+ *     signaux gros `批发` / `wholesale` → `gros`
+ *   - sinon → `undefined` (pas de suggestion, l'admin choisit librement).
+ * ⚠️ Ne modifie JAMAIS le champ `condition` (texte brut source) : la mention est
+ * un champ DISTINCT, normalisé FR. La suggestion reste éditable côté UI avant
+ * publication.
+ */
+export function suggestMention(opts: {
+  platform?: string
+  condition?: string
+  sourceTitle?: string
+  sourceDesc?: string
+}): ProductMention | undefined {
+  const platform = String(opts.platform || '')
+  // La nature B2B/wholesale de 1688 prime sur le texte (offre en gros).
+  if (platform === '1688') return 'gros'
+  const text = `${opts.condition || ''} ${opts.sourceTitle || ''} ${opts.sourceDesc || ''}`
+  if (/二手|旧/.test(text)) return 'occasion'
+  if (/全新/.test(text)) return 'neuf'
+  if (/\bused\b/i.test(text)) return 'occasion'
+  if (/\bnew\b/i.test(text)) return 'neuf'
+  if (/批发|wholesale/i.test(text)) return 'gros'
+  return undefined
 }
 
 interface TranslateResult {
@@ -216,6 +247,16 @@ export async function buildDraft(source: DraftSource): Promise<any> {
   // fonctionne sur le texte source (chinois) et traduit — pas de régression.
   const suggestedCategory = detectCategory(sourceTitle, sourceDesc)
 
+  // Mention produit normalisée FR (ST-018) : suggestion auto depuis la source
+  // (condition goofish 二手/全新, nature 1688, mots-clés wholesale). Champ
+  // DISTINCT de `condition` (texte brut source) — modifiable avant publication.
+  const suggestedMention = suggestMention({
+    platform,
+    condition: detail.condition,
+    sourceTitle,
+    sourceDesc,
+  })
+
   // Previously captured supplier contact — pre-fill the draft.
   const sc = await getSupplierContact(platform, sourceId)
 
@@ -236,6 +277,7 @@ export async function buildDraft(source: DraftSource): Promise<any> {
     localPriceLabel: lp ? lp.label : undefined,
     transport,
     suggestedCategory,
+    suggestedMention,
     imageUrl: mainImage,
     gallery,
     condition: detail.condition || undefined,

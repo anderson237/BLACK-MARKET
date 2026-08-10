@@ -1,7 +1,7 @@
 import crypto from 'node:crypto'
 import { Type } from '@google/genai'
 import { requireAuth } from '~~/server/utils/auth'
-import { loadProducts, saveProducts } from '~~/server/utils/storage'
+import { loadProducts, saveProducts, upsertSupplierFromProduct } from '~~/server/utils/storage'
 import { sanitizeProduct } from '~~/server/utils/product'
 import { publishSiteUpdate } from '~~/server/utils/realtime'
 import { getAI, geminiModel, geminiFallbackModel, generateContentWithRetry } from '~~/server/utils/ai'
@@ -12,6 +12,9 @@ import { priceToXof, type JoPlatform } from '~~/server/utils/justone'
 // Body: {
 //   platform, sourceId, title, description, chineseDescription, price?, currency?,
 //   imageUrl, gallery[], features[] (strings), category?
+//   mention?                     // mention normalisée FR (ST-018) : neuf|occasion|gros
+//   url?, seller?          // provenance scraping (sourceUrl + seller persistés)
+//   supplierContact?       // contact fournisseur éditable (persisté)
 // }
 // Optional AI enrichment (translate + sales pitch + price) runs when
 // `aiEnrich: true` and GEMINI_API_KEY is configured. Otherwise the payload
@@ -50,6 +53,9 @@ export default defineEventHandler(async (event) => {
     ? (body.features as unknown[]).map((f) => String(f).trim()).filter(Boolean).slice(0, 12)
     : []
   const category = String(body?.category || '').trim()
+  // Mention produit normalisée FR (ST-018) : valeur libre du draft import,
+  // validée par l'allowlist de sanitizeProduct (sinon undefined → backward compat).
+  const mention = String(body?.mention || '').trim()
   const price = Number(body?.price) || 0
   const currencyRaw = String(body?.currency || 'CNY').toUpperCase()
   const currency = currencyRaw === 'EUR' ? 'EUR' : currencyRaw === 'USD' ? 'USD' : 'CNY'
@@ -57,6 +63,11 @@ export default defineEventHandler(async (event) => {
   const moq = Number(body?.moq)
   const priceTiers = Array.isArray(body?.priceTiers) ? body.priceTiers.slice(0, 6) : undefined
   const stock = Number(body?.stock)
+  // Provenance scraping (ST-017) : URL source + seller du draft d'import.
+  // `url` est le champ du draftBuilder ; `sourceUrl` est accepté en alias pour
+  // compatibilité. Le seller brut est nettoyé par sanitizeProduct.
+  const sourceUrl = String(body?.url || body?.sourceUrl || '').trim()
+  const seller = body?.seller && typeof body.seller === 'object' ? body.seller : undefined
   const scRaw = body?.supplierContact || {}
   const supplierContact =
     scRaw && typeof scRaw === 'object' && (scRaw.wechat || scRaw.email || scRaw.whatsapp || scRaw.phone || scRaw.website || scRaw.note)
@@ -155,6 +166,7 @@ Réponds strictement en JSON au schéma demandé.
     gallery,
     videoUrl: undefined,
     category,
+    mention: mention || undefined,
     features: Array.isArray(enriched?.features) && enriched.features.length ? enriched.features : features,
     priceEur: Math.round(Number(enriched?.priceEur) || (computedXof / 655.957) * 100) / 100,
     priceXof: Math.round(aiXof || computedXof),
@@ -163,11 +175,25 @@ Réponds strictement en JSON au schéma demandé.
     sourcePriceTiers: priceTiers?.length ? priceTiers : undefined,
     sourceStock: Number.isFinite(stock) && stock > 0 ? stock : undefined,
     supplierContact,
+    sourceUrl: sourceUrl || undefined,
+    seller,
     createdAt: new Date().toISOString(),
   })
 
   products.unshift(product)
   await saveProducts(products)
+
+  // ST-019 — capture auto du fournisseur (dédup par nom + fusion contacts).
+  // Strictement best-effort : ne doit JAMAIS bloquer la publication du produit
+  // (une erreur du blob fournisseurs ne remonte pas à l'admin).
+  if (product.seller || product.supplierContact) {
+    try {
+      await upsertSupplierFromProduct(product)
+    } catch (err) {
+      console.error('[SUPPLIERS] upsert from publish failed (publication ok) :', err)
+    }
+  }
+
   publishSiteUpdate('catalog')
   return { success: true, id: product.id }
 })

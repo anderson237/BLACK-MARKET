@@ -124,7 +124,7 @@ onBeforeUnmount(() => {
       </div>
 
       <!-- Category tabs -->
-      <div class="flex flex-wrap gap-2 pb-4">
+      <div class="flex flex-wrap gap-2 pb-3">
         <button
           v-for="cat in store.categories"
           :key="cat"
@@ -135,6 +135,21 @@ onBeforeUnmount(() => {
             : 'bg-[#15151e] text-zinc-400 border-zinc-800 hover:border-[#ff2a2a]/40 hover:text-slate-100'"
         >
           {{ cat }}
+        </button>
+      </div>
+
+      <!-- Mention tabs (ST-018) : combinables avec catégorie + recherche -->
+      <div class="flex flex-wrap gap-2 pb-4">
+        <button
+          v-for="m in store.mentions"
+          :key="'mention-' + m"
+          @click="store.setMention(m)"
+          class="text-[9px] px-3 py-1 rounded-full font-extrabold font-mono transition-all uppercase tracking-widest border"
+          :class="store.activeMention === m
+            ? 'bg-violet-600 text-white border-violet-500'
+            : 'bg-[#15151e] text-zinc-500 border-zinc-800 hover:border-violet-500/40 hover:text-slate-100'"
+        >
+          {{ m }}
         </button>
       </div>
     </section>
@@ -149,8 +164,14 @@ onBeforeUnmount(() => {
         <template v-if="store.searchQuery.trim()">
           AUCUN RÉSULTAT POUR « {{ store.searchQuery.trim() }} »
         </template>
+        <template v-else-if="store.activeCategory !== 'Tous' && store.activeMention !== 'Tous'">
+          AUCUN DROP DANS « {{ store.activeCategory }} » EN « {{ store.activeMention }} »
+        </template>
         <template v-else-if="store.activeCategory !== 'Tous'">
           AUCUN DROP DANS « {{ store.activeCategory }} »
+        </template>
+        <template v-else-if="store.activeMention !== 'Tous'">
+          AUCUN DROP EN « {{ store.activeMention }} »
         </template>
         <template v-else>
           AUCUN DROP POUR LE MOMENT

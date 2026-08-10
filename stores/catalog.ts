@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import type { Product } from '~/types'
+import { PRODUCT_MENTIONS, type Product } from '~/types'
 import { fetchCatalog as _fetchCatalog } from '~/composables/useCatalog'
 
 const PAGE_SIZE = 12
@@ -10,21 +10,42 @@ export const useCatalogStore = defineStore('catalog', () => {
   const loading = ref(false)
   const done = ref(false)
   const activeCategory = ref('Tous')
+  // Mention active (ST-018) : 'Tous' = aucune mention sélectionnée, sinon un
+  // libellé FR ('Neuf' | 'Occasion' | 'Gros') ∈ `mentions`.
+  const activeMention = ref('Tous')
   const searchQuery = ref('')
 
   const categories = computed(() => ['Tous', ...new Set(all.value.map((p) => p.category).filter(Boolean))])
+  // Filtres vitrine mentions : « Tous / Neuf / Occasion / Gros » (libellés FR).
+  const mentions = computed(() => ['Tous', ...PRODUCT_MENTIONS.map((m) => m.label)])
   const total = computed(() => all.value.length)
 
   function masterIndex(id: string) {
     return all.value.findIndex((p) => p.id === id)
   }
 
-  /** Products filtered by the active category ('' = Tous) AND the search query. */
+  /**
+   * Products filtered by category ('' = Tous) × mention (ST-018) × search.
+   * Mention : `activeMention` est un libellé FR ('Neuf'…) converti en valeur
+   * normalisée ('neuf') via PRODUCT_MENTIONS. Les produits sans mention sont
+   * visiblement inclus quand aucune mention n'est sélectionnée (backward compat).
+   */
   function filtered() {
     const q = searchQuery.value.trim().toLowerCase()
-    let list = activeCategory.value === 'Tous'
-      ? all.value
-      : all.value.filter((p) => (p.category || '') === activeCategory.value)
+    // Valeur normalisée de la mention active (undefined si 'Tous').
+    const mentionValue =
+      activeMention.value === 'Tous'
+        ? undefined
+        : PRODUCT_MENTIONS.find((m) => m.label === activeMention.value)?.value
+    let list = all.value.filter((p) => {
+      const catOk = activeCategory.value === 'Tous' || (p.category || '') === activeCategory.value
+      const mentionOk = !mentionValue || p.mention === mentionValue
+      return catOk && mentionOk
+    })
+    if (mentionValue === undefined && activeMention.value !== 'Tous') {
+      // Défensif : mention inconnue → aucun résultat (ne doit pas arriver).
+      list = []
+    }
     if (q) {
       list = list.filter(
         (p) =>
@@ -65,6 +86,12 @@ export const useCatalogStore = defineStore('catalog', () => {
     resetAndSlice()
   }
 
+  /** Active un filtre mention vitrine (« Tous / Neuf / Occasion / Gros »). */
+  function setMention(mention: string) {
+    activeMention.value = mention
+    resetAndSlice()
+  }
+
   function loadMore() {
     if (done.value || loading.value) return
     loading.value = true
@@ -91,5 +118,5 @@ export const useCatalogStore = defineStore('catalog', () => {
     }
   }
 
-  return { all, items, loading, done, activeCategory, searchQuery, categories, total, masterIndex, init, setCategory, setSearch, loadMore, refresh }
+  return { all, items, loading, done, activeCategory, activeMention, searchQuery, categories, mentions, total, masterIndex, init, setCategory, setMention, setSearch, loadMore, refresh }
 })

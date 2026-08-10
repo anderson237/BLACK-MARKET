@@ -125,6 +125,7 @@ const navItems = [
   { label: 'Catégories', icon: 'tag', to: '/admin/categories' },
   { label: 'Génération IA', icon: 'sparkles', to: '/admin/ai' },
   { label: 'Import Chine', icon: 'download', to: '/admin/import' },
+  { label: 'Fournisseurs', icon: 'link', to: '/admin/suppliers' },
   { label: 'Réglages', icon: 'settings', to: '/admin/settings' },
 ]
 

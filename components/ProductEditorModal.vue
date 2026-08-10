@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Product } from '~/types'
+import { PRODUCT_MENTIONS, type Product } from '~/types'
 import { formatPriceXof, promoPrice, promoCountdown, saleBasePrice } from '~/composables/useCatalog'
 
 const props = defineProps<{ product: Product | null }>()
@@ -37,6 +37,8 @@ const draft = reactive({
   shippingRmb: props.product?.shippingRmb || 0,
   marginPercent: props.product?.marginPercent || 0,
   stockStatus: props.product?.stockStatus || 'preorder',
+  // Mention produit vitrine (ST-018) : optionnelle, '' = aucune.
+  mention: props.product?.mention || '',
   stockQuantity: props.product?.stockQuantity ?? 0,
   moq: props.product?.moq ?? 0,
   sourcePriceTiers: [...(props.product?.sourcePriceTiers || [])],
@@ -44,6 +46,10 @@ const draft = reactive({
   // Contact fournisseur (import ST-017) — édité ici pour ne PAS être perdu à
   // la sauvegarde d'un produit importé (la fiche vendeur publique le lit).
   supplierContact: props.product?.supplierContact ? { ...emptyContact(), ...props.product.supplierContact } : emptyContact(),
+  // Provenance scraping (import ST-017) : URL source + infos vendeur.
+  // Affichés en lecture seule et préservés à la sauvegarde.
+  sourceUrl: props.product?.sourceUrl || '',
+  seller: props.product?.seller ? { ...props.product.seller } : undefined,
 })
 
 const saving = ref(false)
@@ -56,6 +62,17 @@ const blocksModeDesc = ref(true)
 const blocksModeTech = ref(true)
 
 const categories = ['Techwear', 'Streetwear', 'Cyber Gadgets', 'Gaming Room', 'Accessoires', 'Exclusif', 'Nouveautés']
+
+// ---- Provenance scraping (ST-017) : seller en lecture seule ----
+// `null` si le produit n'a aucune info vendeur scrapée (produit manuel/ancien)
+// → la section « Vendeur (scraping) » ne s'affiche pas.
+const sellerInfo = computed(() => {
+  const s = draft.seller
+  if (!s || typeof s !== 'object') return null
+  const keys = ['nick', 'city', 'soldCount', 'replyRatio24h', 'newGoodRatioRate'] as const
+  const has = keys.some((k) => Boolean(String((s as any)[k] || '').trim())) || s.zhimaVerified === true
+  return has ? (s as any) : null
+})
 
 // ---- Prix : achat fournisseur + transport (F CFA) + marge -> prix de vente ----
 const marginPercent = computed(() => Number(draft.marginPercent) || 0)
@@ -96,6 +113,8 @@ async function save() {
       shippingRmb: Number(draft.shippingRmb) || 0,
       marginPercent: Number(draft.marginPercent) || 0,
       stockStatus: draft.stockStatus || 'preorder',
+      // Mention normalisée FR (ST-018) — undefined si « Aucune » → backward compat.
+      mention: draft.mention || undefined,
       stockQuantity: Math.max(0, Number(draft.stockQuantity) || 0),
       moq: Math.max(0, Number(draft.moq) || 0),
       sourcePriceTiers: Array.isArray(draft.sourcePriceTiers) && draft.sourcePriceTiers.length ? draft.sourcePriceTiers : undefined,
@@ -112,6 +131,9 @@ async function save() {
       featuredMedia: draft.videoUrl ? draft.featuredMedia || 'video' : 'image',
       discountPercent: Math.min(100, Math.max(0, Number(draft.discountPercent) || 0)),
       discountEndsAt: draft.discountEndsAt || undefined,
+      // Provenance scraping : préservée telle quelle (lecture seule dans l'UI).
+      sourceUrl: draft.sourceUrl || undefined,
+      seller: sellerInfo.value || undefined,
     }
     const saved = isNew ? await store.createProduct(body) : await store.updateProduct(body)
     emit('saved', saved)
@@ -496,12 +518,22 @@ async function handleVideoFile(e: Event) {
           </div>
         </div>
 
-        <!-- Catégorie -->
+<!-- Catégorie -->
         <div class="space-y-2">
           <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Catégorie</label>
           <select v-model="draft.category" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none">
             <option v-for="c in categories" :key="c" :value="c">{{ c }}</option>
           </select>
+        </div>
+
+        <!-- Mention produit (ST-018) : neuf / occasion / gros, optionnelle -->
+        <div class="space-y-2">
+          <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Mention produit (vitrine)</label>
+          <select v-model="draft.mention" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none">
+            <option value="">— Aucune —</option>
+            <option v-for="m in PRODUCT_MENTIONS" :key="m.value" :value="m.value">{{ m.label }}</option>
+          </select>
+          <p class="text-[9px] text-zinc-600 font-mono">Badge coloré en vitrine (Neuf = émeraude, Occasion = ambre, Gros = violet) + filtre « {{ PRODUCT_MENTIONS.map((m) => m.label).join(' / ') }} » sur la page d'accueil. Optionnel : les produits sans mention restent affichés.</p>
         </div>
 
 <!-- Prix & marge -->
@@ -579,6 +611,33 @@ async function handleVideoFile(e: Event) {
           <label class="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">WhatsApp (numéro du produit)</label>
           <input v-model="draft.waNumber" type="tel" inputmode="numeric" class="w-full bg-black/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-[#ff2a2a]/60 focus:outline-none" placeholder="ex: 237691234567 — vide = numéro du site" />
           <p class="text-[9px] text-zinc-600 font-mono">Si vide, la précommande part vers le numéro du site ({{ phoneNumberHint }}).</p>
+        </div>
+
+        <!-- URL source (import scraping) — lecture seule, lien cliquable -->
+        <div v-if="draft.sourceUrl" class="space-y-2 border border-zinc-800 rounded-2xl p-3 bg-[#101018]">
+          <label class="text-[10px] text-zinc-400 font-mono uppercase tracking-widest">🔗 Source du produit</label>
+          <div class="flex items-center gap-2 flex-wrap">
+            <p class="text-[11px] font-mono text-zinc-400 truncate min-w-0 flex-1 break-all">{{ draft.sourceUrl }}</p>
+            <a :href="draft.sourceUrl" target="_blank" rel="noopener"
+              class="shrink-0 inline-flex items-center gap-1 bg-sky-500/10 border border-sky-500/40 text-sky-300 hover:bg-sky-500/20 text-[10px] font-bold px-2.5 py-1.5 rounded-lg transition-all">Ouvrir la source ↗</a>
+          </div>
+          <p class="text-[9px] text-zinc-600 font-mono">URL du produit scrapé — non modifiable ici.</p>
+        </div>
+
+        <!-- Infos vendeur (scraping) — lecture seule -->
+        <div v-if="sellerInfo" class="space-y-2 border border-zinc-800 rounded-2xl p-3 bg-[#101018]">
+          <div class="flex items-center justify-between">
+            <label class="text-[10px] text-zinc-400 font-mono uppercase tracking-widest">🛍️ Vendeur (scraping)</label>
+            <span class="text-[9px] font-mono text-zinc-600">lecture seule</span>
+          </div>
+          <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-[11px] text-zinc-300">
+            <p v-if="sellerInfo.nick" class="text-slate-100 font-bold">{{ sellerInfo.nick }}</p>
+            <p v-if="sellerInfo.city"><span class="text-zinc-500 font-mono">📍</span> {{ sellerInfo.city }}</p>
+            <p v-if="sellerInfo.soldCount"><span class="text-zinc-500 font-mono">🛒</span> {{ Number(sellerInfo.soldCount).toLocaleString('fr-FR') }} ventes</p>
+            <p v-if="sellerInfo.replyRatio24h"><span class="text-zinc-500 font-mono">⚡</span> Rép. 24h : {{ sellerInfo.replyRatio24h }}</p>
+            <p v-if="sellerInfo.newGoodRatioRate"><span class="text-zinc-500 font-mono">🆕</span> Neuf : {{ sellerInfo.newGoodRatioRate }}</p>
+            <p v-if="sellerInfo.zhimaVerified" class="text-emerald-400 font-bold">✅ Vérifié Zhima</p>
+          </div>
         </div>
 
         <!-- Contact fournisseur (fiche vendeur publique) -->

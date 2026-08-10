@@ -8,7 +8,7 @@
 // 6. Trending signals: Amazon best-seller, Douyin ventes 30 j, Taobao ventes…
 definePageMeta({ layout: 'admin' })
 
-import { CATEGORIES } from '~/types'
+import { CATEGORIES, PRODUCT_MENTIONS } from '~/types'
 import { useAdminStore } from '~/stores/admin'
 
 const config = useRuntimeConfig()
@@ -131,6 +131,9 @@ const publishDesc = ref('')
 const publishPriceXof = ref(0)
 const publishFeatures = ref<string[]>([])
 const publishCategory = ref('')
+// Mention produit normalisée FR (ST-018) : pré-remplie par la suggestion auto
+// (suggestMention) mais TOUJOURS modifiable avant publication. '' = aucune.
+const publishMention = ref('')
 const aiEnrich = ref(true)
 const publishing = ref(false)
 const publishError = ref('')
@@ -168,6 +171,8 @@ async function importFromUrl() {
     publishPriceXof.value = d.priceXof || 0
     publishFeatures.value = Array.isArray(d.features) ? d.features.map((f: any) => f.value || f) : []
     publishCategory.value = d.suggestedCategory || ''
+    // ST-018 : suggestion auto de mention depuis la source (modifiable avant pub).
+    publishMention.value = d.suggestedMention || ''
     supplierContact.value = d.supplierContact || { sellerName: '', country: '', wechat: '', email: '', whatsapp: '', phone: '', website: '', note: '' }
     supplierSaved.value = false
     productUrl.value = ''
@@ -363,6 +368,8 @@ async function openDraft(item: any) {
     publishFeatures.value = Array.isArray(d.features) ? d.features.map((f: any) => f.value || f) : []
     // Automatic category suggestion from the source title (vitrine filter).
     publishCategory.value = d.suggestedCategory || ''
+    // ST-018 : suggestion auto de mention (nature 1688, condition goofish…).
+    publishMention.value = d.suggestedMention || ''
     supplierContact.value = d.supplierContact || { sellerName: '', country: '', wechat: '', email: '', whatsapp: '', phone: '', website: '', note: '' }
     supplierSaved.value = false
   } catch (e: any) {
@@ -406,10 +413,15 @@ async function doPublish() {
         gallery: draft.value.gallery || [],
         features: publishFeatures.value.filter(Boolean),
         category: publishCategory.value,
+        // ST-018 : mention normalisée FR choisie ('' → undefined, backward compat).
+        mention: publishMention.value || undefined,
         aiEnrich: aiEnrich.value,
         moq: draft.value.moq,
         priceTiers: draft.value.priceTiers,
         stock: draft.value.stock,
+        // Provenance scraping (ST-017) : URL source + infos vendeur du draft.
+        url: draft.value.url || undefined,
+        seller: draft.value.seller || undefined,
         supplierContact: supplierContact.value,
       },
     })
@@ -968,6 +980,22 @@ onMounted(() => {
                 <option v-for="c in categorySuggestions" :key="c" :value="c">{{ c }}</option>
               </datalist>
               <p class="text-[9px] font-mono text-zinc-600 mt-1">Nouvelle catégorie ? Tapez-la : elle apparaîtra automatiquement dans les filtres de la vitrine dès la publication.</p>
+            </div>
+            <!-- Mention produit normalisée FR (ST-018) : pré-remplie par la
+                 suggestion auto (suggestedMention) mais modifiable avant pub. -->
+            <div>
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Mention produit (badge vitrine + filtre)</p>
+                <span v-if="draft?.suggestedMention" class="text-[9px] font-mono text-emerald-400">⚡ Suggérée : {{ PRODUCT_MENTIONS.find((m) => m.value === draft.suggestedMention)?.label || draft.suggestedMention }}</span>
+              </div>
+              <select
+                v-model="publishMention"
+                class="w-full bg-black/40 border border-zinc-800 rounded-lg px-3 py-2 text-[12px] text-white focus:outline-none focus:border-[#ff2a2a]/60 cursor-pointer"
+              >
+                <option value="">— Aucune —</option>
+                <option v-for="m in PRODUCT_MENTIONS" :key="m.value" :value="m.value">{{ m.label }}</option>
+              </select>
+              <p class="text-[9px] font-mono text-zinc-600 mt-1">Badge coloré en vitrine (Neuf = émeraude, Occasion = ambre, Gros = violet) + filtre « Tous / Neuf / Occasion / Gros » combinable avec la catégorie. La suggestion vient de la source (1688 → Gros, 二手/旧 → Occasion, 全新 → Neuf).</p>
             </div>
             <div>
               <div class="flex items-center justify-between">

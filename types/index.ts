@@ -18,6 +18,11 @@ export interface Product {
   videoUrl?: string
   featuredMedia?: 'image' | 'video'
   category: string
+  /** Mention produit vitrine : neuf / occasion / gros (optionnelle, ST-018).
+   * Produits anciens sans mention → aucun badge, aucun filtre ne les exclut
+   * tant qu'aucune mention n'est sélectionnée. Valeur normalisée FR, distincte
+   * du champ brut source `condition` (texte source d'origine, IMPORTANT). */
+  mention?: ProductMention
   whatsappClicks: number
   likeCount?: number
   commentCount?: number
@@ -33,6 +38,21 @@ export interface Product {
    * produit publique quand au moins un champ est renseigné (optionnel). */
   sourcePriceTiers?: { quantity: string; value: string }[]
   sourceStock?: number
+  /** URL source du produit (import/scraping, ex. Goofish) — affichée en
+   * éditeur admin avec lien « Ouvrir la source ». Absente pour les produits
+   * manuels/anciens. */
+  sourceUrl?: string
+  /** Infos vendeur scrapées à l'import — LECTURE SEULE (donnée scraping).
+   * Objet court nettoyé par sanitizeProduct ; absent pour les produits
+   * manuels/anciens. */
+  seller?: {
+    nick?: string
+    city?: string
+    soldCount?: number
+    replyRatio24h?: string
+    newGoodRatioRate?: string
+    zhimaVerified?: boolean
+  }
   supplierContact?: {
     platform?: string
     sourceId?: string
@@ -87,3 +107,14 @@ export const CATEGORIES = [
   'Gaming Room',
   'Accessoires',
 ]
+
+/** Mentions produit vitrine (ST-018) — valeurs normalisées FR + libellés.
+ * `PRODUCT_MENTIONS[].value` est la valeur persistée sur `Product.mention` ;
+ * `label` est le libellé FR affiché (badges cartes, filtres vitrine, selects). */
+export const PRODUCT_MENTIONS = [
+  { value: 'neuf', label: 'Neuf' },
+  { value: 'occasion', label: 'Occasion' },
+  { value: 'gros', label: 'Gros' },
+] as const
+
+export type ProductMention = (typeof PRODUCT_MENTIONS)[number]['value']

@@ -128,6 +128,19 @@ const media = computed<{ type: 'image' | 'video'; src: string }[]>(() => {
 
 const current = ref(0)
 
+// ---- Mention produit (ST-018) : pastille colorée à côté de la catégorie.
+// Neuf = émeraude, Occasion = ambre, Gros = violet. Absente si pas de mention.
+const mentionInfo = computed(() => {
+  const m = product.value?.mention
+  if (!m) return null
+  const STYLES: Record<string, { label: string; cls: string }> = {
+    neuf: { label: 'Neuf', cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40' },
+    occasion: { label: 'Occasion', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/40' },
+    gros: { label: 'Gros', cls: 'bg-violet-500/15 text-violet-400 border-violet-500/40' },
+  }
+  return STYLES[m] || null
+})
+
 // ---- Fiche vendeur (optionnelle) : contacts fournisseur du produit importé.
 // Affichée uniquement si au moins un champ est renseigné.
 const supplierInfo = computed(() => {
@@ -136,6 +149,15 @@ const supplierInfo = computed(() => {
   const keys = ['sellerName', 'country', 'wechat', 'email', 'whatsapp', 'phone', 'website', 'note'] as const
   const has = keys.some((k) => String((c as any)[k] || '').trim())
   return has ? (c as any) : null
+})
+
+// ---- Infos vendeur scrapées (import ST-017) : pseudo + ville, si présentes.
+// Données scraping, lecture seule — s'ajoutent simplement à la FICHE VENDEUR.
+const sellerInfo = computed(() => {
+  const s = (product.value as Product | null)?.seller
+  if (!s || typeof s !== 'object') return null
+  const has = ['nick', 'city'].some((k) => Boolean(String((s as any)[k] || '').trim()))
+  return has ? (s as any) : null
 })
 
 function waLink(phone: string): string {
@@ -240,6 +262,13 @@ const techHtml = computed(() => sanitizeHtml(product.value?.originalDescription 
               {{ product.category }}
             </span>
             <span
+              v-if="mentionInfo"
+              class="inline-block text-[10px] font-bold tracking-widest uppercase px-2.5 py-0.5 rounded border"
+              :class="mentionInfo.cls"
+            >
+              {{ mentionInfo.label }}
+            </span>
+            <span
               v-if="isStock"
               class="inline-block bg-emerald-500/15 text-emerald-400 text-[10px] font-bold tracking-widest uppercase px-2.5 py-0.5 rounded border border-emerald-500/40"
             >
@@ -283,11 +312,14 @@ const techHtml = computed(() => sanitizeHtml(product.value?.originalDescription 
           </span>
         </div>
 
-        <!-- Fiche vendeur (optionnelle) : contacts fournisseur renseignés à l'import -->
-        <div v-if="supplierInfo" class="border border-zinc-800 rounded-xl p-4 bg-black/30 space-y-2">
+        <!-- Fiche vendeur (optionnelle) : seller scrapé + contacts fournisseur -->
+        <div v-if="supplierInfo || sellerInfo" class="border border-zinc-800 rounded-xl p-4 bg-black/30 space-y-2">
           <p class="text-[9px] text-[#ff2a2a] font-mono uppercase font-bold tracking-wider">FICHE VENDEUR</p>
-          <p v-if="supplierInfo.sellerName" class="text-sm font-bold text-slate-100">{{ supplierInfo.sellerName }}</p>
-          <div class="grid grid-cols-1 gap-1.5 text-xs text-zinc-300 [&_a]:text-sky-400 [&_a:hover]:underline">
+          <p v-if="sellerInfo?.nick" class="text-sm font-bold text-slate-100">
+            🛍️ {{ sellerInfo.nick }}<span v-if="sellerInfo?.city" class="text-zinc-400 font-normal"> · {{ sellerInfo.city }}</span>
+          </p>
+          <p v-if="supplierInfo?.sellerName" class="text-sm font-bold text-slate-100">{{ supplierInfo.sellerName }}</p>
+          <div v-if="supplierInfo" class="grid grid-cols-1 gap-1.5 text-xs text-zinc-300 [&_a]:text-sky-400 [&_a:hover]:underline">
             <p v-if="supplierInfo.country">📍 {{ supplierInfo.country }}</p>
             <a v-if="supplierInfo.phone" :href="`tel:${supplierInfo.phone}`">📞 {{ supplierInfo.phone }}</a>
             <a v-if="supplierInfo.whatsapp" :href="waLink(supplierInfo.whatsapp)" target="_blank" rel="noopener">💬 WhatsApp : {{ supplierInfo.whatsapp }}</a>

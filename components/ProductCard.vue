@@ -22,6 +22,16 @@ const isCommented = computed(() => comments.hasCommented(props.product.id))
 const isGlowing = computed(() => isLiked.value || isCommented.value)
 
 const pct = computed(() => promoPercent(props.product))
+
+// Badge mention produit (ST-018) : pastille colorée compacte, haut-gauche sous
+// le statut stock. Neuf = émeraude, Occasion = ambre, Gros = violet. Absente
+// pour les produits sans mention (anciens/manuels → backward compat).
+const MENTION_STYLES: Record<string, { label: string; cls: string }> = {
+  neuf: { label: 'Neuf', cls: 'bg-emerald-500 text-black border-emerald-300' },
+  occasion: { label: 'Occasion', cls: 'bg-amber-500 text-black border-amber-300' },
+  gros: { label: 'Gros', cls: 'bg-violet-600 text-white border-violet-400' },
+}
+const mentionInfo = computed(() => (props.product.mention ? MENTION_STYLES[props.product.mention] || null : null))
 const discountPrice = computed(() => promoPrice(props.product))
 const countdown = ref(promoCountdown(props.product.discountEndsAt))
 let cdTimer: ReturnType<typeof setInterval> | undefined
@@ -111,18 +121,30 @@ const truncatedTitle = computed(() => {
         >
           <AppIcon :name="videoMuted ? 'muted' : 'sound'" :size="14" />
         </button>
-        <span
-          v-if="isStock"
-          class="absolute top-3 left-3 bg-emerald-500 text-black text-[9px] uppercase font-bold tracking-widest px-2.5 py-1 rounded shadow-lg"
-        >
-          ✓ EN STOCK
-        </span>
-        <span
-          v-else
-          class="absolute top-3 left-3 bg-amber-500/95 text-black text-[9px] uppercase font-bold tracking-widest px-2.5 py-1 rounded shadow-lg"
-        >
+        <!-- Statut stock + mention produit (ST-018) : colonne top-gauche.
+             La mention est une pastille compacte NE recouvrant ni la photo ni
+             les badges droite (VIDEO / -% promo). -->
+        <div class="absolute top-3 left-3 flex flex-col items-start gap-1 z-[5]">
+          <span
+            v-if="isStock"
+            class="bg-emerald-500 text-black text-[9px] uppercase font-bold tracking-widest px-2.5 py-1 rounded shadow-lg"
+          >
+            ✓ EN STOCK
+          </span>
+          <span
+            v-else
+            class="bg-amber-500/95 text-black text-[9px] uppercase font-bold tracking-widest px-2.5 py-1 rounded shadow-lg"
+          >
 📦 PRÉCOMMANDE
-        </span>
+          </span>
+          <span
+            v-if="mentionInfo"
+            class="text-[8px] uppercase font-extrabold tracking-widest px-2 py-0.5 rounded-md border shadow-lg"
+            :class="mentionInfo.cls"
+          >
+            {{ mentionInfo.label }}
+          </span>
+        </div>
         <span v-if="pct > 0" class="absolute top-9 right-3 bg-[#ff2a2a] text-white text-[11px] font-black tracking-wider px-2.5 py-1 rounded-full shadow-lg shadow-[#ff2a2a]/30 animate-pulse">
           -{{ pct }}%
         </span>
@@ -131,7 +153,7 @@ const truncatedTitle = computed(() => {
         </span>
         <!-- Glow badge: commented by the current visitor (the "J'aime" badge
              was removed to keep photos/videos fully visible). -->
-        <div v-if="isGlowing" class="absolute top-12 left-3 flex flex-col gap-1">
+        <div v-if="isGlowing" class="absolute top-16 left-3 flex flex-col gap-1">
           <span v-if="isCommented" class="inline-flex items-center gap-1 text-[9px] font-mono font-bold text-sky-300 bg-black/70 border border-sky-400/50 backdrop-blur px-2 py-1 rounded-md">
             💬 Commenté
           </span>

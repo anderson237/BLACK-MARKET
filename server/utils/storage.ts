@@ -1386,6 +1386,276 @@ export async function upsertSupplierContact(c: SupplierContact): Promise<Supplie
 }
 
 // ---------------------------------------------------------------------------
+// Suppliers (ST-019) — blob bm-suppliers / suppliers.json
+//
+// Stratege de gestionnaire de fournisseurs unifie : un fournisseur = une
+// entree unique, de-dupliquee par NOM NORMALISE (casse + espaces ignores) et
+// enrichie a chaque rencontre (fusion des infos contact / plateformes /
+// sourceIds / stats seller). `manual: true` = ajoute manuellement via le
+// dashboard admin ; `manual: false` = capture auto a l'import (publish).
+// Ne remplace PAS le blob bm-supplier-contacts : il s'agit d'une vue
+// agregee par vendeur (un contact reste indexe plateforme+sourceId).
+// ---------------------------------------------------------------------------
+export interface Supplier {
+  id: string // slug unique (ex. 'xiao-nan-tech') ou sha1 du nom si non latin
+  name: string // sellerName || seller.nick || 'Fournisseur inconnu'
+  category?: string // principale (suggestion depuis les categories produits)
+  country?: string
+  platforms?: string[] // xianyu, 1688, taobao… rencontres
+  sourceIds?: string[]
+  wechat?: string
+  email?: string
+  whatsapp?: string
+  phone?: string
+  website?: string
+  note?: string
+  productIds?: string[] // produits associes (liens)
+  productCount: number
+  stats?: { soldCount?: number; replyRatio24h?: string; newGoodRatioRate?: string; zhimaVerified?: boolean; lastSeenAt?: string }
+  manual: boolean // true = ajout manuel, false = auto (scraping)
+  createdAt: string
+  updatedAt: string
+}
+
+const SUPPLIERS_BLOB = 'bm-suppliers'
+const SUPPLIERS_KEY = 'suppliers.json'
+const SUPPLIERS_FILE = path.join(DATA_DIR, 'suppliers.json')
+
+/** Nom normalise pour la de-duplication (casse + espaces multiples ignores). */
+export function normalizeSupplierName(name: string): string {
+  return String(name || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+}
+
+function slugifySupplier(name: string): string {
+  return normalizeSupplierName(name)
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60)
+}
+
+/**
+ * Id stable derive du nom. Pour un nom latin on obtient un slug lisible ;
+ * pour un nom CJK (chine) on retombe sur un sha1 court — les deux sont
+ * stables pour le MEME nom normalise, ce qui permet la de-duplication.
+ */
+export function buildSupplierId(name: string, list: Supplier[]): string {
+  const base = slugifySupplier(name) || `sup-${crypto.createHash('sha1').update(normalizeSupplierName(name) || 'inconnu').digest('hex').slice(0, 8)}`
+  let id = base
+  let n = 2
+  // Evite une collision d'id avec un fournisseur de NOM DIFFERENT (rare).
+  while (list.some((s) => s.id === id && normalizeSupplierName(s.name) !== normalizeSupplierName(name))) {
+    id = `${base}-${n++}`
+  }
+  return id
+}
+
+function parseStringArray(v: unknown): string[] {
+  if (Array.isArray(v)) return v.map((x) => String(x).trim()).filter(Boolean).slice(0, 20)
+  if (typeof v === 'string') return v.split(',').map((x) => x.trim()).filter(Boolean).slice(0, 20)
+  return []
+}
+
+/**
+ * Fusion des informations d'un produit (seller + supplierContact + platform +
+ * category + id) dans un fournisseur. Fonction PURE (testable sans I/O) :
+ * ne remplit un champ contact que s'il est vide (ne PASSE PAS par-dessus une
+ * valeur editee par l'admin); ajoute le productId (unique) et met a jour la
+ * stat lastSeenAt.
+ */
+export function mergeSupplierInfo(supplier: Supplier, product: any, now: string): Supplier {
+  const contact = product?.supplierContact && typeof product.supplierContact === 'object' ? product.supplierContact : {}
+  const seller = product?.seller && typeof product.seller === 'object' ? product.seller : {}
+  const name = String(contact.sellerName || seller.nick || '').trim() || 'Fournisseur inconnu'
+
+  const platforms = new Set([...(supplier.platforms || [])])
+  if (product?.platform) platforms.add(String(product.platform))
+  const sourceIds = new Set([...(supplier.sourceIds || [])])
+  if (String(contact.sourceId || '').trim()) sourceIds.add(String(contact.sourceId).trim())
+  const productIds = Array.from(
+    new Set([...(supplier.productIds || []), String(product?.id || '')].filter(Boolean)),
+  )
+
+  const fill = (key: string) => supplier[key as keyof Supplier] || String(contact[key] || '').trim() || undefined
+
+  const stats = {
+    soldCount: Number(seller.soldCount) > 0 ? Math.round(Number(seller.soldCount)) : supplier.stats?.soldCount,
+    replyRatio24h: String(seller.replyRatio24h || '').trim() || supplier.stats?.replyRatio24h,
+    newGoodRatioRate: String(seller.newGoodRatioRate || '').trim() || supplier.stats?.newGoodRatioRate,
+    zhimaVerified: seller.zhimaVerified === true ? true : supplier.stats?.zhimaVerified,
+    lastSeenAt: now,
+  }
+
+  return {
+    ...supplier,
+    name,
+    category: supplier.category || String(product?.category || '').trim() || undefined,
+    country: fill('country'),
+    platforms: Array.from(platforms),
+    sourceIds: Array.from(sourceIds),
+    wechat: fill('wechat'),
+    email: fill('email'),
+    whatsapp: fill('whatsapp'),
+    phone: fill('phone'),
+    website: fill('website'),
+    note: fill('note'),
+    productIds,
+    productCount: productIds.length,
+    stats,
+    updatedAt: now,
+  }
+}
+
+export async function listSuppliers(): Promise<Supplier[]> {
+  if (isNetlifyRuntime()) {
+    const raw = await blobGet(SUPPLIERS_BLOB, SUPPLIERS_KEY, 'text', 'strong')
+    if (raw != null) {
+      try {
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed)) return parsed
+      } catch {
+        /* corrupted -> start fresh */
+      }
+    }
+    return []
+  }
+  const p = await readJSON(SUPPLIERS_FILE)
+  return Array.isArray(p) ? p : []
+}
+
+export async function saveSuppliers(suppliers: Supplier[]): Promise<void> {
+  if (isNetlifyRuntime()) return blobSet(SUPPLIERS_BLOB, SUPPLIERS_KEY, JSON.stringify(suppliers, null, 2))
+  return writeJSON(SUPPLIERS_FILE, suppliers)
+}
+
+/**
+ * Capture auto d'un fournisseur depuis un produit importe (appele apres la
+ * publication dans publish.post.ts, en try/catch — ne doit jamais bloquer la
+ * publication). De-duplication par nom normalise (cas + espaces ignores) :
+ * 2 produits du meme vendeur -> 1 fournisseur avec productCount=2.
+ */
+export async function upsertSupplierFromProduct(product: any): Promise<Supplier | null> {
+  const contact = product?.supplierContact && typeof product.supplierContact === 'object' ? product.supplierContact : {}
+  const seller = product?.seller && typeof product.seller === 'object' ? product.seller : {}
+  const name = String(contact.sellerName || seller.nick || '').trim() || 'Fournisseur inconnu'
+  const norm = normalizeSupplierName(name)
+  const now = new Date().toISOString()
+  let result: Supplier | null = null
+  await mutateGeneric(SUPPLIERS_BLOB, SUPPLIERS_KEY, SUPPLIERS_FILE, (list: Supplier[]) => {
+    // De-duplication stricte par nom normalise : on garde la premiere entree,
+    // on ecarte les doublons eventuels (corruption / ancienne donnee).
+    const matches = list.filter((s) => normalizeSupplierName(s.name) === norm)
+    const rest = list.filter((s) => normalizeSupplierName(s.name) !== norm)
+    let base: Supplier | null = matches[0] || null
+    if (!base) {
+      base = {
+        id: buildSupplierId(name, rest),
+        name,
+        productIds: [],
+        productCount: 0,
+        manual: false,
+        createdAt: now,
+        updatedAt: now,
+      }
+    }
+    const merged = mergeSupplierInfo(base, product, now)
+    rest.unshift(merged)
+    result = merged
+    return rest
+  })
+  return result
+}
+
+/** Creation manuelle d'un fournisseur (formulaire dashboard admin). */
+export async function createSupplier(input: Partial<Supplier> & { name: string }): Promise<Supplier> {
+  const norm = normalizeSupplierName(input.name)
+  const now = new Date().toISOString()
+  let created: Supplier | null = null
+  await mutateGeneric(SUPPLIERS_BLOB, SUPPLIERS_KEY, SUPPLIERS_FILE, (list: Supplier[]) => {
+    const existing = list.find((s) => normalizeSupplierName(s.name) === norm)
+    if (existing) {
+      throw new Error('Un fournisseur de ce nom existe déjà (casse/espaces ignorés).')
+    }
+    const supplier: Supplier = {
+      id: buildSupplierId(String(input.name || '').trim(), list),
+      name: String(input.name || '').trim(),
+      category: String(input.category || '').trim() || undefined,
+      country: String(input.country || '').trim() || undefined,
+      platforms: parseStringArray(input.platforms),
+      sourceIds: [],
+      wechat: String(input.wechat || '').trim() || undefined,
+      email: String(input.email || '').trim() || undefined,
+      whatsapp: String(input.whatsapp || '').trim() || undefined,
+      phone: String(input.phone || '').trim() || undefined,
+      website: String(input.website || '').trim() || undefined,
+      note: String(input.note || '').trim() || undefined,
+      productIds: [],
+      productCount: 0,
+      manual: true,
+      createdAt: now,
+      updatedAt: now,
+    }
+    created = supplier
+    return [supplier, ...list]
+  })
+  return created!
+}
+
+/** Edition d'un fournisseur (nom, contacts, categorie, note, manual). */
+export async function updateSupplier(id: string, patch: any): Promise<Supplier | null> {
+  let updated: Supplier | null = null
+  await mutateGeneric(SUPPLIERS_BLOB, SUPPLIERS_KEY, SUPPLIERS_FILE, (list: Supplier[]) => {
+    const idx = list.findIndex((s) => s.id === id)
+    if (idx < 0) return list
+    const current = list[idx]
+    if ('name' in patch && patch.name !== undefined) {
+      const newName = String(patch.name || '').trim()
+      if (!newName) throw new Error('Le nom du fournisseur ne peut pas être vide.')
+      const coll = list.find((s) => s.id !== id && normalizeSupplierName(s.name) === normalizeSupplierName(newName))
+      if (coll) throw new Error('Un fournisseur de ce nom existe déjà (casse/espaces ignorés).')
+      current.name = newName
+    }
+    const set = (k: string, v: any) => {
+      const clean = String(v ?? '').trim()
+      if (clean) (current as any)[k] = clean
+      else delete (current as any)[k]
+    }
+    if ('category' in patch) set('category', patch.category)
+    if ('country' in patch) set('country', patch.country)
+    if ('wechat' in patch) set('wechat', patch.wechat)
+    if ('email' in patch) set('email', patch.email)
+    if ('whatsapp' in patch) set('whatsapp', patch.whatsapp)
+    if ('phone' in patch) set('phone', patch.phone)
+    if ('website' in patch) set('website', patch.website)
+    if ('note' in patch) set('note', patch.note)
+    if ('platforms' in patch) {
+      const arr = parseStringArray(patch.platforms)
+      if (arr.length) current.platforms = arr
+      else delete current.platforms
+    }
+    if (typeof patch.manual === 'boolean') current.manual = patch.manual
+    current.updatedAt = new Date().toISOString()
+    updated = current
+    return list
+  })
+  return updated
+}
+
+/** Suppression definitive d'un fournisseur (lien produits->fournisseur perdu). */
+export async function deleteSupplier(id: string): Promise<boolean> {
+  let removed = false
+  await mutateGeneric(SUPPLIERS_BLOB, SUPPLIERS_KEY, SUPPLIERS_FILE, (list: Supplier[]) => {
+    const before = list.length
+    const next = list.filter((s) => s.id !== id)
+    removed = next.length < before
+    return next.length === before ? list : next
+  })
+  return removed
+}
+
+// ---------------------------------------------------------------------------
 // Local market price table (ST-017) — blob bm-local-prices / prices.json
 //
 // Admin-maintained approximate price of a product on the LOCAL market (in CFA).
