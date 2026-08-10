@@ -15,7 +15,7 @@
 import { Type } from '@google/genai'
 import { requireAuth } from '~~/server/utils/auth'
 import { getAI, geminiModel, geminiFallbackModel, generateContentWithRetry } from '~~/server/utils/ai'
-import { translateAttributes } from '~~/server/utils/draftBuilder'
+import { translateAttributes, googleGtxTranslate } from '~~/server/utils/draftBuilder'
 import { loadExtensionDrafts, saveExtensionDrafts } from '~~/server/utils/storage'
 
 export default defineEventHandler(async (event) => {
@@ -41,11 +41,8 @@ export default defineEventHandler(async (event) => {
   }
 
   const ai = getAI()
-  if (!ai) {
-    throw createError({ statusCode: 503, statusMessage: "Le service d'IA n'est pas configuré (GEMINI_API_KEY manquante)." })
-  }
 
-  // --- 1/2 Attributs : réutilise translateAttributes (schéma ARRAY, rapide) ---
+  // --- 1/2 Attributs : réutilise translateAttributes (Gemini puis repli gtx) ---
   let attributes: { name: string; value: string }[] | undefined
   if (rawAttributes?.length) {
     attributes = (await translateAttributes(rawAttributes)) || undefined
@@ -55,17 +52,18 @@ export default defineEventHandler(async (event) => {
   let title: string | undefined
   let description: string | undefined
   if (rawTitle || rawDescription) {
-    const properties: any = {}
-    const required: string[] = []
-    if (rawTitle) {
-      properties.title = { type: Type.STRING, description: 'Titre du produit traduit en français.' }
-      required.push('title')
-    }
-    if (rawDescription) {
-      properties.description = { type: Type.STRING, description: 'Traduction complète et fidèle de la description en français.' }
-      required.push('description')
-    }
-    const prompt = `
+    if (ai) {
+      const properties: any = {}
+      const required: string[] = []
+      if (rawTitle) {
+        properties.title = { type: Type.STRING, description: 'Titre du produit traduit en français.' }
+        required.push('title')
+      }
+      if (rawDescription) {
+        properties.description = { type: Type.STRING, description: 'Traduction complète et fidèle de la description en français.' }
+        required.push('description')
+      }
+      const prompt = `
 Produit de e-commerce chinois (source) :
 ${rawTitle ? `Titre : "${rawTitle}"` : ''}
 ${rawDescription ? `Description : "${rawDescription}"` : ''}
@@ -74,27 +72,37 @@ Traduis en français, de manière fidèle et technique :
 2. La description : traduction complète, claire, SANS perte d'information (conserve marques, modèles, tailles, matières, quantités, prix, unités).
 Réponds strictement en JSON au schéma demandé.
 `
-    try {
-      const response = await generateContentWithRetry(
-        ai,
-        {
-          model: geminiModel,
-          contents: [{ text: prompt }],
-          config: {
-            systemInstruction:
-              'Tu es un expert en sourcing (1688, Taobao, Goofish) et en traduction e-commerce chinois → français, traduction technique exacte et complète.',
-            temperature: 0.3,
-            responseMimeType: 'application/json',
-            responseSchema: { type: Type.OBJECT, properties, required },
+      try {
+        const response = await generateContentWithRetry(
+          ai,
+          {
+            model: geminiModel,
+            contents: [{ text: prompt }],
+            config: {
+              systemInstruction:
+                'Tu es un expert en sourcing (1688, Taobao, Goofish) et en traduction e-commerce chinois → français, traduction technique exacte et complète.',
+              temperature: 0.3,
+              responseMimeType: 'application/json',
+              responseSchema: { type: Type.OBJECT, properties, required },
+            },
           },
-        },
-        geminiFallbackModel,
-      )
-      const out = JSON.parse(response.text || '{}')
-      title = rawTitle ? String(out?.title || '').trim().slice(0, 300) || undefined : undefined
-      description = rawDescription ? String(out?.description || '').trim().slice(0, 4000) || undefined : undefined
-    } catch (err) {
-      console.error('[translate-draft] échec titre/description :', String((err as any)?.message || err).slice(0, 200))
+          geminiFallbackModel,
+        )
+        const out = JSON.parse(response.text || '{}')
+        title = rawTitle ? String(out?.title || '').trim().slice(0, 300) || undefined : undefined
+        description = rawDescription ? String(out?.description || '').trim().slice(0, 4000) || undefined : undefined
+      } catch (err) {
+        console.error('[translate-draft] échec titre/description Gemini :', String((err as any)?.message || err).slice(0, 200))
+      }
+    }
+    // Repli gratuit sans clé : Google gtx (quota Gemini dépassé / clé absente).
+    if (!title && rawTitle) {
+      const t = await googleGtxTranslate(rawTitle)
+      if (t) title = t.slice(0, 300)
+    }
+    if (!description && rawDescription) {
+      const d = await googleGtxTranslate(rawDescription)
+      if (d) description = d.slice(0, 4000)
     }
   }
 

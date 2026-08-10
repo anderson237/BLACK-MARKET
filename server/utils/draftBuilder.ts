@@ -302,61 +302,114 @@ export async function buildDraft(source: DraftSource): Promise<any> {
 }
 
 /**
+ * Traduction gratuite SANS clé via l'endpoint Google Translate `gtx`
+ * (utilisé par de nombreux outils open-source). Repli quand Gemini est absent
+ * ou quota dépassé (429). Dégradé : null en cas d'erreur.
+ */
+export async function googleGtxTranslate(text: string): Promise<string | null> {
+  if (!text?.trim()) return null
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=zh-CN&tl=fr&dt=t&q=${encodeURIComponent(text)}`
+    const res = await fetch(url)
+    if (!res.ok) return null
+    const data = await res.json()
+    if (!Array.isArray(data) || !Array.isArray(data[0])) return null
+    const out = (data[0] as any[]).map((seg: any) => (Array.isArray(seg) && seg[0] != null ? String(seg[0]) : '')).join('')
+    return out || null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Traduit un lot d'attributs via Google `gtx` en une seule requête : les paires
+ * nom/valeur sont aplaties et séparées par `|||` (séparateur conservé par le
+ * traducteur) puis reconstruites par index. Renvoie null si l'alignement échoue
+ * (le jeton source d'origine est alors conservé).
+ */
+export async function translateAttributesGoogle(
+  attributes: { name: string; value: string }[],
+): Promise<{ name: string; value: string }[] | null> {
+  if (!attributes?.length) return null
+  const tokens: string[] = []
+  for (const a of attributes) {
+    tokens.push(a.name, a.value)
+  }
+  const out = await googleGtxTranslate(tokens.join('|||'))
+  if (!out) return null
+  const parts = out.split(/\s*\|\|+\s*/).map((s) => s.trim())
+  if (parts.length !== tokens.length) return null
+  const result: { name: string; value: string }[] = []
+  for (let i = 0; i < parts.length; i += 2) {
+    result.push({
+      name: (parts[i] || '').slice(0, 60),
+      value: (parts[i + 1] || '').slice(0, 600),
+    })
+  }
+  return result.length ? result : null
+}
+
+/**
  * ST-020 v3 : traduit les attributs techniques capturés par l'extension
  * (chinois bruts) en français. Appelée À L'IMPORT pour que l'aperçu admin et le
  * popup affichent DÉJÀ la traduction avant l'envoi vers le catalogue.
- * Dégradé OBLIGATOIRE : sans clé, timeout ou erreur → null (l'aperçu conserve
- * les attributs source) — l'import ne bloque jamais.
+ * Dégradé OBLIGATOIRE : Gemini d'abord, puis Google `gtx` (gratuit, sans clé)
+ * si Gemini est absent ou quota dépassé. Sinon null (source conservée).
  */
 export async function translateAttributes(
   attributes: { name: string; value: string }[],
 ): Promise<{ name: string; value: string }[] | null> {
   if (!attributes?.length) return null
   const ai = getAI()
-  if (!ai) return null
-  const source = attributes.map((a) => `${a.name} : ${a.value}`).join('\n')
-  try {
-    const response = await generateContentWithRetry(
-      ai,
-      {
-        model: geminiModel,
-        contents: [
-          {
-            text: `Traduis en français les attributs techniques d'un produit e-commerce chinois (source :\n${source}\n). Traduction technique exacte : conserve les marques, chiffres, matières, tailles et unités ; ne perds aucune propriété. Réponds strictement en JSON : un tableau d'objets {"name": nom de la propriété en FR, "value": valeur en FR}.`,
-          },
-        ],
-        config: {
-          systemInstruction:
-            'Tu es un assistant expert en sourcing (1688, Taobao) : tu traduis fidèlement les caractéristiques produit du chinois vers le français.',
-          temperature: 0.2,
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                name: { type: Type.STRING, description: 'Nom de la propriété en français.' },
-                value: { type: Type.STRING, description: 'Valeur technique en français.' },
+  if (ai) {
+    const source = attributes.map((a) => `${a.name} : ${a.value}`).join('\n')
+    try {
+      const response = await generateContentWithRetry(
+        ai,
+        {
+          model: geminiModel,
+          contents: [
+            {
+              text: `Traduis en français les attributs techniques d'un produit e-commerce chinois (source :\n${source}\n). Traduction technique exacte : conserve les marques, chiffres, matières, tailles et unités ; ne perds aucune propriété. Réponds strictement en JSON : un tableau d'objets {"name": nom de la propriété en FR, "value": valeur en FR}.`,
+            },
+          ],
+          config: {
+            systemInstruction:
+              'Tu es un assistant expert en sourcing (1688, Taobao) : tu traduis fidèlement les caractéristiques produit du chinois vers le français.',
+            temperature: 0.2,
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  name: { type: Type.STRING, description: 'Nom de la propriété en français.' },
+                  value: { type: Type.STRING, description: 'Valeur technique en français.' },
+                },
+                required: ['name', 'value'],
               },
-              required: ['name', 'value'],
             },
           },
         },
-      },
-      geminiFallbackModel,
-    )
-    const parsed = JSON.parse(response.text || '[]')
-    if (!Array.isArray(parsed)) return null
-    const out = parsed
-      .map((a: any) => ({
-        name: String(a?.name || '').trim().slice(0, 60),
-        value: String(a?.value || '').trim().slice(0, 600),
-      }))
-      .filter((a: any) => a.name && a.value)
-      .slice(0, 30)
-    return out.length ? out : null
-  } catch (err) {
-    console.warn(`[draftBuilder] Traduction des attributs échouée (source conservée) : ${String((err as any)?.message || err).slice(0, 160)}`)
-    return null
+        geminiFallbackModel,
+      )
+      const parsed = JSON.parse(response.text || '[]')
+      if (Array.isArray(parsed)) {
+        const out = parsed
+          .map((a: any) => ({
+            name: String(a?.name || '').trim().slice(0, 60),
+            value: String(a?.value || '').trim().slice(0, 600),
+          }))
+          .filter((a: any) => a.name && a.value)
+          .slice(0, 30)
+        if (out.length) return out
+      }
+    } catch (err) {
+      console.warn(`[draftBuilder] Traduction Gemini échouée → repli gtx : ${String((err as any)?.message || err).slice(0, 160)}`)
+    }
   }
+  // Repli gratuit (quota Gemini dépassé / clé absente).
+  const google = await translateAttributesGoogle(attributes)
+  if (google) return google
+  return null
 }
