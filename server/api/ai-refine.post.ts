@@ -13,12 +13,21 @@ export default defineEventHandler(async (event) => {
     })
   }
   const body = await readBody(event)
-  const { field, title, category, currentText } = body || {}
+  const { field, title, category, currentText, attributes } = body || {}
   const target = field === 'title' ? 'title' : field === 'technical' ? 'technical' : 'description'
   const isTitle = target === 'title'
   const cleanTitle = String(title || '').slice(0, 300)
   const cleanCategory = String(category || '').slice(0, 80)
   const cleanCurrent = String(currentText || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 4000)
+  // ST-020 v3 : attributs capturés (déjà traduits FR) fournis à l'IA pour
+  // alimenter l'argumentaire ET la fiche technique (jamais inventés).
+  const attrsContext = Array.isArray(attributes)
+    ? attributes
+        .slice(0, 30)
+        .map((a: any) => `- ${String(a?.name || '').trim()} : ${String(a?.value || '').trim()}`)
+        .filter((l) => l !== '-  : ')
+        .join('\n')
+    : ''
 
   const instructions = isTitle
     ? `Tu es un expert en nommage de produits e-commerce (import Chine, marché francophone).
@@ -33,6 +42,8 @@ Renvoie uniquement le texte du titre, sans ponctuation finale ni saut de ligne.`
       ? `Tu es un copywriter d'élite pour la marque de précommande DEEP ROOTS (import Chine, marché francophone).
 Rédige ou optimise l'ARGUMENTAIRE DE VENTE du produit « ${cleanTitle} » (catégorie : ${cleanCategory || 'non précisée'}).
 ${cleanCurrent ? `Reprends les informations utiles de l'argumentaire actuel et optimise-le pour le rendre plus percutant, plus structuré et plus orienté bénéfices clients : "${cleanCurrent}".` : 'Crée un argumentaire de vente premium de toutes pièces.'}
+${attrsContext ? `Caractéristiques produit capturées (EXTRAIS-en seulement les 3 à 5 arguments de vente les plus pertinents, ne répète pas la liste brute) :
+${attrsContext}` : ''}
 Exigences :
 - Utilise généreusement des émojis (🔥, ⚡, 👑, 💎, 🚚, 💯, ⭐...) pour dynamiser et scander le texte, avec des sections visuellement riches.
 - 2 à 4 paragraphes courts et percutants, ton enthousiaste mais crédible.
@@ -44,6 +55,8 @@ Renvoie du HTML propre : <h3>, <p>, <ul><li>. Sans balise <html>, <body> ni text
       : `Tu es un expert en fiches techniques e-commerce (import Chine, marché francophone).
 Présente la FICHE TECHNIQUE du produit « ${cleanTitle} » (catégorie : ${cleanCategory || 'non précisée'}).
 ${cleanCurrent ? `Reprends les informations actuelles, réorganise-les, corrige-les et complète intelligemment : "${cleanCurrent}".` : 'Crée une fiche technique structurée à partir du nom du produit.'}
+${attrsContext ? `Caractéristiques produit capturées (réorganise-les, corrige les termes techniques et mets-les en valeur ; ne perds aucune caractéristique importante) :
+${attrsContext}` : ''}
 Exigences :
 - Structure claire et riche : <h3> pour chaque bloc (par ex. "Caractéristiques", "Matériaux & Qualité", "Expédition & Livraison") avec émojis dans les titres (📦, 🔧, ⚙️, 📏, 🕐...).
 - Liste à puces <ul><li> pour les caractéristiques, concrètes et numérotées quand c'est possible.

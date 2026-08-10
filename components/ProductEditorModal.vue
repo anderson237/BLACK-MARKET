@@ -204,6 +204,9 @@ async function refine(field: 'title' | 'description' | 'technical') {
       title: draft.title,
       category: draft.category,
       currentText: field === 'title' ? draft.title : field === 'description' ? draft.description : draft.originalDescription,
+      // ST-020 v3 : attributs capturés (FR) transmis à l'IA pour qu'elle les
+      // utilise dans l'argumentaire (extraction) ET la fiche technique.
+      attributes: draft.attributes,
     })
     if (field === 'title') draft.title = text || draft.title
     else if (field === 'description') draft.description = html
@@ -215,6 +218,21 @@ async function refine(field: 'title' | 'description' | 'technical') {
     aiBusy.value = ''
   }
 }
+
+// ST-020 v3 : injecte les attributs capturés dans le container « Fiche
+// technique » (originalDescription) afin que l'IA puisse les traiter, sans
+// doublon si la section existe déjà (produit republié ou relu).
+function ensureAttributesInFiche() {
+  if (!draft.attributes?.length) return
+  if (/fiche technique/i.test(String(draft.originalDescription || ''))) return
+  const block = `<h3>Fiche technique</h3><ul>${draft.attributes
+    .map((a: any) => `<li><b>${String(a?.name || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</b> : ${String(a?.value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</li>`)
+    .join('')}</ul>`
+  draft.originalDescription = draft.originalDescription
+    ? `${String(draft.originalDescription).replace(/<p>\s*<\/p>$/i, '')}\n\n${block}`
+    : block
+}
+ensureAttributesInFiche()
 
 // ---- Dictée vocale (Web Speech API) ----
 // L'admin dicte le titre, l'argumentaire ou la fiche technique et le texte
