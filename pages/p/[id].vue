@@ -209,6 +209,11 @@ function preorder() {
 // Rich content: descriptions are AI-generated HTML -> render sanitized.
 const descriptionHtml = computed(() => sanitizeHtml(product.value?.description || ''))
 const techHtml = computed(() => sanitizeHtml(product.value?.originalDescription || ''))
+const specAttrs = computed(() =>
+  Array.isArray(product.value?.attributes)
+    ? product.value.attributes.filter((a: any) => a && a.name && a.value).slice(0, 30)
+    : [],
+)
 </script>
 
 <template>
@@ -342,9 +347,15 @@ const techHtml = computed(() => sanitizeHtml(product.value?.originalDescription 
 
         <ProductActions :product="product" />
 
-        <div v-if="techHtml" class="space-y-2">
+        <div v-if="techHtml || specAttrs.length" class="space-y-2">
           <p class="text-[9px] text-[#ff2a2a] font-mono uppercase font-bold tracking-wider">FICHE TECHNIQUE</p>
-          <div class="text-xs text-zinc-400 leading-relaxed bg-black/30 p-4 rounded-lg border border-zinc-900 break-words [overflow-wrap:anywhere] [&_p]:mb-2 [&_h3]:text-slate-100 [&_h3]:font-bold [&_h3]:mt-3 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:mb-1" v-html="techHtml" />
+          <dl v-if="specAttrs.length" class="text-xs text-zinc-300 bg-black/30 p-4 rounded-lg border border-zinc-900 space-y-1.5">
+            <div v-for="a in specAttrs" :key="a.name" class="grid grid-cols-[minmax(0,42%)_1fr] gap-3">
+              <dt class="font-bold text-slate-200">{{ a.name }}</dt>
+              <dd class="break-words [overflow-wrap:anywhere] text-zinc-400">{{ a.value }}</dd>
+            </div>
+          </dl>
+          <div v-if="techHtml" class="text-xs text-zinc-400 leading-relaxed bg-black/30 p-4 rounded-lg border border-zinc-900 break-words [overflow-wrap:anywhere] [&_p]:mb-2 [&_h3]:text-slate-100 [&_h3]:font-bold [&_h3]:mt-3 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:mb-1" v-html="techHtml" />
         </div>
 
         <div id="commentaires" class="border-t border-zinc-800 pt-5 scroll-mt-20">

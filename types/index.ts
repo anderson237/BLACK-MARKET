@@ -38,6 +38,20 @@ export interface Product {
    * produit publique quand au moins un champ est renseigné (optionnel). */
   sourcePriceTiers?: { quantity: string; value: string }[]
   sourceStock?: number
+  /** Fiche technique capturée par l'extension (1688…) et traduite en français
+   * par l'IA à la publication (ST-020 v3). Repli : attributs source chinois. */
+  attributes?: { name: string; value: string }[]
+  colors?: string[]
+  sizes?: string[]
+  packaging?: {
+    unit?: string
+    lengthCm?: number
+    widthCm?: number
+    heightCm?: number
+    volumeCm3?: number
+    weightGrams?: number
+  }
+  shipFrom?: string
   /** URL source du produit (import/scraping, ex. Goofish) — affichée en
    * éditeur admin avec lien « Ouvrir la source ». Absente pour les produits
    * manuels/anciens. */

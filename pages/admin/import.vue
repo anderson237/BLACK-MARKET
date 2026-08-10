@@ -507,6 +507,7 @@ async function doPublish() {
         supplierContact: supplierContact.value,
         // ST-020 v2 : infos riches capturées par l'extension, persistées sur le produit.
         attributes: draft.value.attributes || undefined,
+        attributesTranslated: draft.value.attributesTranslated || undefined,
         colors: draft.value.colors || undefined,
         sizes: draft.value.sizes || undefined,
         packaging: draft.value.packaging || undefined,
@@ -1111,7 +1112,14 @@ onMounted(() => {
             </p>
             <div v-if="draft.attributes?.length" class="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1">
               <p v-for="(a, i) in draft.attributes" :key="i" class="text-[10px] font-mono text-zinc-400 break-words">
-                <span class="text-zinc-500">{{ a.name }}</span> : <span class="text-zinc-200">{{ a.value }}</span>
+                <template v-if="draft.attributesTranslated?.[i]">
+                  <span class="text-zinc-300">{{ draft.attributesTranslated[i].name }}</span> :
+                  <span class="text-zinc-100">{{ draft.attributesTranslated[i].value }}</span>
+                  <span class="block text-zinc-600">〔{{ a.name }} : {{ a.value }}〕</span>
+                </template>
+                <template v-else>
+                  <span class="text-zinc-500">{{ a.name }}</span> : <span class="text-zinc-200">{{ a.value }}</span>
+                </template>
               </p>
             </div>
           </div>

@@ -300,3 +300,63 @@ export async function buildDraft(source: DraftSource): Promise<any> {
     date: new Date().toISOString(),
   }
 }
+
+/**
+ * ST-020 v3 : traduit les attributs techniques capturés par l'extension
+ * (chinois bruts) en français. Appelée À L'IMPORT pour que l'aperçu admin et le
+ * popup affichent DÉJÀ la traduction avant l'envoi vers le catalogue.
+ * Dégradé OBLIGATOIRE : sans clé, timeout ou erreur → null (l'aperçu conserve
+ * les attributs source) — l'import ne bloque jamais.
+ */
+export async function translateAttributes(
+  attributes: { name: string; value: string }[],
+): Promise<{ name: string; value: string }[] | null> {
+  if (!attributes?.length) return null
+  const ai = getAI()
+  if (!ai) return null
+  const source = attributes.map((a) => `${a.name} : ${a.value}`).join('\n')
+  try {
+    const response = await generateContentWithRetry(
+      ai,
+      {
+        model: geminiModel,
+        contents: [
+          {
+            text: `Traduis en français les attributs techniques d'un produit e-commerce chinois (source :\n${source}\n). Traduction technique exacte : conserve les marques, chiffres, matières, tailles et unités ; ne perds aucune propriété. Réponds strictement en JSON : un tableau d'objets {"name": nom de la propriété en FR, "value": valeur en FR}.`,
+          },
+        ],
+        config: {
+          systemInstruction:
+            'Tu es un assistant expert en sourcing (1688, Taobao) : tu traduis fidèlement les caractéristiques produit du chinois vers le français.',
+          temperature: 0.2,
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                name: { type: Type.STRING, description: 'Nom de la propriété en français.' },
+                value: { type: Type.STRING, description: 'Valeur technique en français.' },
+              },
+              required: ['name', 'value'],
+            },
+          },
+        },
+      },
+      geminiFallbackModel,
+    )
+    const parsed = JSON.parse(response.text || '[]')
+    if (!Array.isArray(parsed)) return null
+    const out = parsed
+      .map((a: any) => ({
+        name: String(a?.name || '').trim().slice(0, 60),
+        value: String(a?.value || '').trim().slice(0, 600),
+      }))
+      .filter((a: any) => a.name && a.value)
+      .slice(0, 30)
+    return out.length ? out : null
+  } catch (err) {
+    console.warn(`[draftBuilder] Traduction des attributs échouée (source conservée) : ${String((err as any)?.message || err).slice(0, 160)}`)
+    return null
+  }
+}

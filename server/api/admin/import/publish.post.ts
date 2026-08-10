@@ -33,6 +33,15 @@ function platformLabel(p: string): string {
   }
 }
 
+function escHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 export default defineEventHandler(async (event) => {
   const session = await requireAuth(event)
   if (session.role !== 'admin') throw createError({ statusCode: 403, statusMessage: 'Accès administrateur requis.' })
@@ -73,6 +82,17 @@ export default defineEventHandler(async (event) => {
   // conserve les champs supplémentaires via son spread `...body`).
   const attributes = Array.isArray(body?.attributes)
     ? body.attributes
+        .slice(0, 30)
+        .map((a: any) => ({
+          name: String(a?.name || '').trim().slice(0, 60),
+          value: String(a?.value || '').trim().slice(0, 600),
+        }))
+        .filter((a: any) => a.name && a.value)
+    : undefined
+  // ST-020 v3 : attributs déjà traduits en FR à la capture (extension) — utilisés
+  // comme fiche technique FR quand l'enrichissement IA de publication est désactivé.
+  const attributesTranslated = Array.isArray(body?.attributesTranslated)
+    ? body.attributesTranslated
         .slice(0, 30)
         .map((a: any) => ({
           name: String(a?.name || '').trim().slice(0, 60),
@@ -128,20 +148,41 @@ export default defineEventHandler(async (event) => {
   // traduction : il affine/polish la copie FR au lieu de retraduire depuis
   // le chinois. Le chinois original reste fourni en contexte de fidélité.
   let enriched: any = null
+  let aiAttributes: { name: string; value: string }[] | undefined
   if (aiEnrich) {
     const ai = getAI()
     if (!ai) throw createError({ statusCode: 503, statusMessage: "Le service d'IA n'est pas configuré (GEMINI_API_KEY manquante)." })
     const alreadyFrenchTitle = Boolean(title) && !hasCjk(title)
     const alreadyFrenchDesc = Boolean(description) && !hasCjk(description)
+    // ST-020 v3 : attributs capturés par l'extension (chinois bruts) fournis au
+    // modèle pour traduction FR + intégration à la description et à la fiche
+    // technique du produit.
+    const attrsSource = attributes?.length ? attributes.map((a) => `${a.name} : ${a.value}`).join(' | ') : ''
+    const specContext = [
+      attrsSource ? `Attributs : ${attrsSource}` : '',
+      colors?.length ? `Couleurs : ${colors.join(', ')}` : '',
+      sizes?.length ? `Tailles : ${sizes.join(', ')}` : '',
+      packaging && (packaging.lengthCm || packaging.widthCm || packaging.heightCm || packaging.weightGrams)
+        ? `Emballage : ${[packaging.lengthCm, packaging.widthCm, packaging.heightCm].filter(Boolean).join('×')}${packaging.lengthCm ? ' cm' : ''}${packaging.weightGrams ? ` · ${packaging.weightGrams} g/pièce` : ''}`
+        : '',
+      moq ? `MOQ : ${moq} pièce(s)` : '',
+      shipFrom ? `Expédition depuis : ${shipFrom}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n')
     const prompt = `
 Produit importé de ${platformLabel(platform)} — titre source : "${chineseTitle || title}".
 Description source : "${chineseDescription || description}".
 Prix d'achat : ${price || 'inconnu'} ${currency}.
-${alreadyFrenchDesc ? '1. La description fournie est DÉJÀ en français (traduction auto à l\'import). NE LA RETRADUIS PAS depuis le chinois : garde-la telle quelle, ou améliore-la légèrement si le style le mérite.' : '1. Traduis/adapte la description en français de manière claire et fidèle.'}
+${specContext ? `Infos produit capturées (source chinoise) :
+${specContext}
+` : ''}${alreadyFrenchDesc ? '1. La description fournie est DÉJÀ en français (traduction auto à l\'import). NE LA RETRADUIS PAS depuis le chinois : garde-la telle quelle, ou améliore-la légèrement si le style le mérite.' : '1. Traduis/adapte la description en français de manière claire et fidèle.'}
 ${alreadyFrenchTitle ? '2. Le titre fourni est DÉJÀ en français : conserve-le tel quel (améliorations de style mineures acceptées).' : '2. Traduis le titre en français (titre commercial accrocheur, marché francophone/africain).'}
 3. Rédige un argumentaire de vente premium en français (bénéfices clients, crédible).
 4. Extrais 3 à 5 caractéristiques techniques clés.
 5. Suggère un prix de vente EUR et XOF. Convertis le prix d'achat (1 RMB ≈ 95 XOF, 1 EUR = 655.957 XOF, 1 USD ≈ 700 XOF) et applique une marge d'importation réaliste (frais d'envoi 5-10 € / 3000-6000 XOF inclus).
+6. Traduis les attributs capturés ci-dessus en français dans le champ "attributes" : chaque entrée { "name": nom de la propriété en FR, "value": valeur en FR }. Traduction technique exacte, conserve marques, chiffres, matières et tailles. Ne perds aucune propriété.
+7. Termine la description par une section "<h3>Fiche technique</h3>" suivie d'une liste "<ul>" listant les attributs traduits (ex. <li><b>Composition</b> : 100% coton</li>), plus des lignes Couleurs / Tailles / Emballage / MOQ si disponibles.
 Réponds strictement en JSON au schéma demandé.
 `
     const response = await generateContentWithRetry(
@@ -161,6 +202,18 @@ Réponds strictement en JSON au schéma demandé.
               description: { type: Type.STRING, description: 'Traduction claire et fidèle en français.' },
               salesPitch: { type: Type.STRING, description: 'Argumentaire de vente premium en français.' },
               features: { type: Type.ARRAY, items: { type: Type.STRING }, description: '3 à 5 caractéristiques clés.' },
+              attributes: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    name: { type: Type.STRING, description: 'Nom de la propriété en français.' },
+                    value: { type: Type.STRING, description: 'Valeur technique en français.' },
+                  },
+                  required: ['name', 'value'],
+                },
+                description: 'Attributs techniques capturés, traduits en français (fiche technique).',
+              },
               priceEur: { type: Type.NUMBER },
               priceXof: { type: Type.NUMBER },
             },
@@ -175,6 +228,23 @@ Réponds strictement en JSON au schéma demandé.
     } catch {
       /* keep raw draft on AI parse failure */
     }
+    aiAttributes = Array.isArray(enriched?.attributes)
+      ? enriched.attributes
+          .map((a: any) => ({ name: String(a?.name || '').trim().slice(0, 60), value: String(a?.value || '').trim().slice(0, 600) }))
+          .filter((a: any) => a.name && a.value)
+          .slice(0, 30)
+      : undefined
+  }
+
+  // ST-020 v3 : fiche technique traduite par l'IA (attributs FR) ; en repli,
+  // les attributs traduits à la capture, puis les attributs source (chinois).
+  // La fiche est ajoutée en fin de description si le modèle ne l'a pas incluse.
+  const transAttrs = aiAttributes?.length ? aiAttributes : attributesTranslated?.length ? attributesTranslated : attributes
+  let finalDescription = String(enriched?.description || description).slice(0, 4000)
+  if (transAttrs?.length && !/fiche technique/i.test(finalDescription)) {
+    finalDescription = `${finalDescription}\n\n<h3>Fiche technique</h3>\n<ul>${transAttrs
+      .map((a) => `<li><b>${escHtml(a.name)}</b> : ${escHtml(a.value)}</li>`)
+      .join('')}</ul>`
   }
 
   const safeId = `xy_${sourceId}`.replace(/[^a-zA-Z0-9_-]/g, '')
@@ -193,7 +263,7 @@ Réponds strictement en JSON au schéma demandé.
   const product = sanitizeProduct({
     id: finalId,
     title: String(enriched?.title || title).slice(0, 300),
-    description: String(enriched?.description || description).slice(0, 4000),
+    description: finalDescription.slice(0, 4000),
     originalDescription: String(description).slice(0, 4000),
     chineseDescription: chineseDescription.slice(0, 4000),
     chineseTitle: chineseTitle.slice(0, 400),
@@ -212,8 +282,8 @@ Réponds strictement en JSON au schéma demandé.
     supplierContact,
     sourceUrl: sourceUrl || undefined,
     seller,
-    // ST-020 v2 : infos riches capturées par l'extension (persistées telles quelles).
-    attributes: attributes?.length ? attributes : undefined,
+    // ST-020 v3 : attributs traduits en FR (repli : source chinoise).
+    attributes: transAttrs?.length ? transAttrs : undefined,
     colors: colors?.length ? colors : undefined,
     sizes: sizes?.length ? sizes : undefined,
     packaging: packaging && Object.values(packaging).some(Boolean) ? packaging : undefined,

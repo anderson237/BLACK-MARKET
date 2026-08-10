@@ -31,7 +31,7 @@
 // ---------------------------------------------------------------------------
 
 import crypto from 'node:crypto'
-import { buildDraft, hasCjk, type DraftSource } from '~~/server/utils/draftBuilder'
+import { buildDraft, hasCjk, translateAttributes, type DraftSource } from '~~/server/utils/draftBuilder'
 import { rateLimit } from '~~/server/utils/auth'
 import type { JoPlatform } from '~~/server/utils/justone'
 import { upsertExtensionDraft } from '~~/server/utils/storage'
@@ -92,7 +92,12 @@ export default defineEventHandler(async (event) => {
   // ST-020 v2 : infos RICHES capturées par l'extension (attributs, couleurs,
   // tailles, emballage, moq, expédition, ventes) → tracées dans le draft pour
   // l'aperçu admin + la publication.
-  if (payload.attributes?.length) draft.attributes = payload.attributes
+  if (payload.attributes?.length) {
+    draft.attributes = payload.attributes
+    // ST-020 v3 : traduction FR des attributs à la capture → aperçu admin +
+    // popup affichent déjà la traduction avant l'envoi vers le catalogue.
+    draft.attributesTranslated = await translateAttributes(payload.attributes) || undefined
+  }
   if (payload.colors?.length) draft.colors = payload.colors
   if (payload.sizes?.length) draft.sizes = payload.sizes
   if (payload.packaging) draft.packaging = payload.packaging
