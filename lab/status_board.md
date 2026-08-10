@@ -1,6 +1,6 @@
 ﻿# Quant Lab — Status Board
 
-> Tenue par : Lab Director — Dernière mise à jour : 2026-08-09
+> Tenue par : Lab Director — Dernière mise à jour : 2026-08-10
 
 ## Stratégies / Produits
 
@@ -22,8 +22,8 @@
 | ST-015 | Corbeille commandes + admin (admins/trésorerie/paniers) + partage + like persistant + temps réel | 10 — LIVE | ✅ Déployé | Soft-delete commandes + corbeille + restore/permanent ; verrou distribué `mutateOrders` (withBlobLock) ; consistance forte (loadUsers/loadAllOrders/loadTreasury…) ; retrait droits admin ; édition trésorerie (PUT /api/treasury/entries/:id) ; suppression panier (DELETE /api/admin/carts/:userId + purge threads) ; partage multi-réseaux ; like persistant ; highlight cartes. |
 | ST-016 | Intégration PayUnit (paiement en ligne Mobile Money / carte) | 4 — Implémentation | 🚧 En cours | Hosted checkout PayUnit (`server/utils/payunit.ts`, `payment_country` selon pays) ; routes `/api/payments/initialize|status|webhook` ; blob `bm-payments` ; page `/paiement/retour` ; CONFIRMER lance le checkout (+ option WhatsApp). App DEEPROOTS créée (SANDBOX). **En attente API USER / API PASSWORD PayUnit** pour test e2e sandbox. Deploys `6a76a745…`, `6a76ffc5…`, `6a7700f8…`, `6a770274…`. |
 | ST-017 | Pipeline d'import multi-plateforme (Xianyu/Goofish, 1688, Taobao, TikTok Shop, Amazon, Douyin) | 4 — Implémentation | 🚧 En cours (headless goofish LIVE) | Client JustOneAPI (`server/utils/justone.ts`) ; import par lien (`urlParser.ts` + `/api/admin/import/from-url`) ; taux modifiables (blob `bm-rates`, carte 💱) ; historique/cache ; 3 prix (¥/CFA/marché local) ; transport transitaire configurable ; **headless goofish browserless LIVE en prod** (BL-007) ; **traduction FR auto à l'import** + 2 prix côte à côte (deploy `6a78278b`) ; **URL source + seller persistés** (livré Squad 4, non encore déployé). |
-| ST-018 | Mentions produit « Neuf / Occasion / Gros » + filtres vitrine | 1 — Hypothèse | 🚧 À ouvrir | Nouvelle demande utilisateur : mentions sélectionnables en édition ET en ajout (manuels et imports) ; affichées en vitrine (cartes + fiche) ; filtres vitrine comme les filtres de catégorie. |
-| ST-019 | Dashboard admin : gestionnaire de fournisseurs | 1 — Hypothèse | 🚧 À ouvrir | Nouvelle demande utilisateur : section fournisseurs dans le dashboard admin — liste des fournisseurs (catégorie, infos), ajout auto (via import/scraping) ou manuel. |
+| ST-018 | Mentions produit « Neuf / Occasion / Gros » + filtres vitrine | 10 — LIVE | ✅ Déployé `6a79a89b…` | Champ `mention?: 'neuf'\|'occasion'\|'gros'` sur Product ; constante `PRODUCT_MENTIONS` partagée ; allowlist stricte dans `sanitizeProduct` ; select en ajout manuel/import/édition ; **suggestion auto à l'import** (`suggestMention()` : 1688/B2B→gros, 二手/旧/used→occasion, 全新/brand new→neuf, sinon vide) — `condition` brut source inchangé et distinct ; badge coloré carte (Neuf=émeraude, Occasion=ambre, Gros=violet) ; pastille fiche produit ; **filtres vitrine combinables catégorie×mention×recherche** (`stores/catalog.ts` activeMention + `pages/index.vue`). Backward-compat produits anciens ✅ (aucune mention). Commit `0b056e6` ; test tsx 24/24 ✅. |
+| ST-019 | Dashboard admin : gestionnaire de fournisseurs | 10 — LIVE | ✅ Déployé `6a79a89b…` | Blob `bm-suppliers`/`suppliers.json` + `Server.ts` : `listSuppliers`, `createSupplier`, `updateSupplier`, `deleteSupplier`, `upsertSupplierFromProduct` (dédup nom normalisé + fusion additive, productIds, productCount, stats, `manual` flag). Routes admin GET/POST/PUT/DELETE (auth admin, doublon 409, inconnu 404). **Capture auto** hook dans `publish.post.ts` (try/catch non bloquant). Page `/admin/suppliers` (liste, recherche, filtre auto/manuel, KPI, modal création/édition, accordéon produits) + lien sidebar. Test tsx 6 scénarios ✅ ; e2e prod CRUD ✅ (PUT édition 200, doublon 409, DELETE 200). Commit `0b056e6`. |
 
 ## Tickets Lab (BL)
 
@@ -36,8 +36,8 @@
 | BL-005 | **Solde JustOne API insuffisant** (code 601) | 🚧 Contournement testé | Solde épuisé (search + détail → 601). **Solution headless TESTÉE (2026-08-09)** : Playwright + Edge headless → goofish détail ✅ (API interne mtop.taobao.idle.pc.detail + DOM), Amazon ❌, Taobao ❌, 1688 ⚠️. **Décision** : source toggleable JustOneAPI ↔ headless par plateforme. |
 | BL-006 | **Scrapabilité de DeepRoots** (constat, non bloquant) | ℹ️ Info | DeepRoots est SSR — le HTML brut contient tout le catalogue. Si protection requise : rate-limiting / protection `catalog.json` / obfuscation prix, en préservant le SEO. Décision utilisateur requise ; pas de ticket ouvert. |
 | BL-007 | **Headless goofish (browserless)** (ST-017) | ✅ **LIVE** — testé en prod | Import par lien goofish via **browserless.io Free** (GOOFISH_BROWSER_WS_ENDPOINT en env prod). E2E prod : HTTP 200 en 15 s, engine: headless, iPhone 16 Pro Max, vendeur 小南科技数码 (深圳), 5300 ¥ → 503 500 FCFA, 5 images locales. **Toggle par plateforme** (Réglages → SOURCE D'IMPORT) + **fallback auto JustOneAPI**. Volume Free ≈ 500-800 extractions/mois (besoin ≈ 600). Commits `2e1e3aa`, `29dd454`, `e914058` ; deploys `6a78170d`, `6a781ab2`. |
-| BL-008 | **Dashboard admin : gestionnaire de fournisseurs** | 🚧 À traiter | Ouverture du ticket ST-019 (liste fournisseurs, ajout auto/manuel, catégorie, infos). Données déjà disponibles : `seller` persisté sur produits importés, `supplierContact` éditable par produit, blob `bm-supplier-contacts`. |
-| BL-009 | **Mentions produit Neuf/Occasion/Gros** | 🚧 À traiter | Ouverture du ticket ST-018 (champ produit + affichage vitrine + filtres). Dépend du champ `condition` (draft import, ex: 在线) aujourd'hui non persisté — à mapper/normaliser. |
+| BL-008 | **Dashboard admin : gestionnaire de fournisseurs** | ✅ **Fait** (ST-019, deploy `6a79a89b…`) | Blob bm-suppliers + routes CRUD + capture auto à l'import + page /admin/suppliers. |
+| BL-009 | **Mentions produit Neuf/Occasion/Gros** | ✅ **Fait** (ST-018, deploy `6a79a89b…`) | Champ mention normalisé + suggestion auto import + badge vitrine + filtres combinables. |
 
 ## Ressources IA mémorisées (2026-08-09)
 
@@ -56,6 +56,7 @@
 
 | Date | Deploy URL | Contenu |
 |------|-----------|---------|
+| 2026-08-10 | 6a79a89b2a9fd0b6923ed9d6 | **ST-018 + ST-019** : mentions produit (neuf/occasion/gros) — champ édition/ajout/import avec suggestion auto, badge carte + fiche, filtres vitrine combinables ; + gestionnaire de fournisseurs dashboard — blob bm-suppliers, routes CRUD admin, capture auto à l'import, page /admin/suppliers. Commit `0b056e6`. |
 | 2026-08-09 | 6a78278b | ST-017 : **traduction FR auto à l'import** (Gemini, draftBuilder `hasCjk()`, dégradé si clé absente) + 2 prix côte à côte (¥ source + FCFA) + `aiEnrich` polish FR. |
 | 2026-08-09 | 6a781ab2821d4e591ff2b19f | ST-017/BL-007 : headless goofish EN PROD via browserless — clé configurée ; fix endpoint `/chromium/playwright`. **E2E prod RÉUSSI** (200 en 15 s, engine headless, 5300 ¥ → 503 500 FCFA). |
 | 2026-08-09 | 6a78170d5f6cf15b623e3e77 | ST-017/BL-007 : headless v2 — mode browserless WSS + toggle source par plateforme (`server/utils/sources.ts`, routes GET/PUT `/api/admin/import/sources`, carte SOURCE D'IMPORT) + engine.ts fallback auto JustOneAPI + badge moteur ; fix build leaflet ; fix UX 601. |
