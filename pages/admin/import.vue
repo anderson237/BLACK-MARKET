@@ -512,6 +512,7 @@ async function doPublish() {
         packaging: draft.value.packaging || undefined,
         shipFrom: draft.value.shipFrom || undefined,
         salesInfo: draft.value.salesInfo || undefined,
+        videoUrl: draft.value.videoUrl || undefined,
       },
     })
     successMsg.value = `Produit publié ✓ (${(res as any).id})`
@@ -983,6 +984,15 @@ onMounted(() => {
                 <img v-for="(g, i) in draft.gallery.slice(0, 5)" :key="i" :src="g" alt="" referrerpolicy="no-referrer" loading="lazy" class="aspect-square object-cover rounded border border-zinc-800"
                     @error="($event.target as HTMLImageElement).style.display='none'" />
               </div>
+              <video
+                v-if="draft.videoUrl"
+                :src="draft.videoUrl"
+                controls
+                preload="none"
+                class="w-full rounded-lg border border-zinc-800 bg-black/40"
+                @error="($event.target as HTMLVideoElement).style.display='none'"
+              />
+              <p v-if="draft.videoUrl" class="text-[9px] font-mono text-fuchsia-400">🎬 Vidéo produit capturée</p>
             </div>
             <div class="flex-1 min-w-0 space-y-3">
               <div>

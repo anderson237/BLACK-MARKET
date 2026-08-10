@@ -138,6 +138,7 @@ function renderDraft(d) {
     ${d.packaging && (d.packaging.weightGrams || d.packaging.volumeCm3) ? '<div class="meta">Colis : <b>' + (d.packaging.weightGrams ? d.packaging.weightGrams + ' g' : '') + (d.packaging.weightGrams && d.packaging.volumeCm3 ? ' · ' : '') + (d.packaging.volumeCm3 ? d.packaging.volumeCm3 + ' cm³' : '') + '</b></div>' : ''}
     ${d.shipFrom ? '<div class="meta">Expédition : <b>' + escapeHtml(d.shipFrom) + '</b></div>' : ''}
     ${d.attributes && d.attributes.length ? '<div class="meta">Attributs : <b>' + d.attributes.length + '</b> (voir aperçu import)</div>' : ''}
+    ${d.videoUrl ? '<div class="meta">🎬 <a href="' + escapeAttr(d.videoUrl) + '" target="_blank" rel="noopener" style="color:#e879f9">Vidéo produit</a></div>' : ''}
     <div class="thumbs">${(d.gallery || []).slice(0, 5).map((u) => '<img src="' + escapeAttr(u) + '" alt="" loading="lazy" />').join('')}</div>
   `
   $('btn-details').hidden = false

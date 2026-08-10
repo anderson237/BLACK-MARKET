@@ -102,6 +102,7 @@ export default defineEventHandler(async (event) => {
         }
       : undefined
   const shipFrom = String(body?.shipFrom || '').trim().slice(0, 200) || undefined
+  const videoUrl = String(body?.videoUrl || '').trim().slice(0, 2000) || undefined
   const scRaw = body?.supplierContact || {}
   const supplierContact =
     scRaw && typeof scRaw === 'object' && (scRaw.wechat || scRaw.email || scRaw.whatsapp || scRaw.phone || scRaw.website || scRaw.note)
@@ -198,7 +199,7 @@ Réponds strictement en JSON au schéma demandé.
     chineseTitle: chineseTitle.slice(0, 400),
     imageUrl,
     gallery,
-    videoUrl: undefined,
+    videoUrl: videoUrl || undefined,
     category,
     mention: mention || undefined,
     features: Array.isArray(enriched?.features) && enriched.features.length ? enriched.features : features,

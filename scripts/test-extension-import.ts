@@ -265,6 +265,13 @@ function scenarioPayloadInvalide(): void {
   expect400('packaging non-objet', { ...validBase, packaging: 'carton' })
   expect400('sales non-objet', { ...validBase, sales: 50 })
   check('31 couleurs trop (>60) → ok si ≥', (() => { const p = parseExtensionPayload({ ...validBase, colors: Array.from({ length: 80 }, (_, i) => `c${i}`) }); return (p.colors || []).length <= 60 })())
+
+  // ST-020 v2 : vidéo produit (valide acceptée, invalides rejetées).
+  const withVideo = parseExtensionPayload({ ...validBase, videoUrl: 'https://cloud.video.taobao.com/play/u/p/1/1.mp4' })
+  check('videoUrl valide acceptée', withVideo.videoUrl === 'https://cloud.video.taobao.com/play/u/p/1/1.mp4')
+  expect400('videoUrl non-URL', { ...validBase, videoUrl: 'pas-une-url' })
+  expect400('videoUrl ftp://', { ...validBase, videoUrl: 'ftp://x/y.mp4' })
+  expect400('videoUrl blob:', { ...validBase, videoUrl: 'blob:https://detail.1688.com/abc' })
 }
 
 // ---------------------------------------------------------------------------

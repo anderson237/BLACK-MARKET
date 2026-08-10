@@ -106,6 +106,55 @@
     return out
   }
 
+  // ----- Recherche d'une URL vidéo produit (mp4/webm/mov/m4v) dans un objet JSON -----
+  const VIDEO_KEYS = ['videoUrl', 'mainVideo', 'playUrl', 'videoInfo', 'previewVideo', 'videoList', 'video', 'mp4Url', 'hlsUrl', 'videoUrlList', 'mobileVideoUrl']
+  function looksVideo(url) {
+    return /\.(mp4|webm|mov|m4v)(\?|$)/i.test(String(url || ''))
+  }
+  function findVideo(node, depth) {
+    if (!node || typeof node !== 'object' || depth > 18) return ''
+    if (Array.isArray(node)) {
+      for (let i = 0; i < node.length; i++) {
+        const v = findVideo(node[i], depth + 1)
+        if (v) return v
+      }
+      return ''
+    }
+    if (typeof node === 'string') {
+      return /^https?:\/\//i.test(node) && looksVideo(node) ? node : ''
+    }
+    for (const k of VIDEO_KEYS) {
+      if (Object.prototype.hasOwnProperty.call(node, k)) {
+        const v = findVideo(node[k], depth + 1)
+        if (v) return v
+      }
+    }
+    for (const k of Object.keys(node)) {
+      const v = findVideo(node[k], depth + 1)
+      if (v) return v
+    }
+    return ''
+  }
+
+  // ----- Fallback DOM : <video>/<source>, og:video, lien mp4 direct -----
+  function domVideo() {
+    try {
+      const v = document.querySelector('video[src], video source[src], video source[data-src]')
+      if (v) {
+        const s = (v && (v.currentSrc || v.src || v.getAttribute('src') || v.getAttribute('data-src'))) || ''
+        if (/^https?:\/\//i.test(s) && looksVideo(s)) return s
+      }
+    } catch (_) {}
+    for (const sel of ['meta[property="og:video"]', 'meta[itemprop="contentUrl"]', 'link[rel="preload"][as="video"]']) {
+      try {
+        const el = document.querySelector(sel)
+        const c = (el && (el.getAttribute('content') || el.getAttribute('href'))) || ''
+        if (c && looksVideo(c)) return c
+      } catch (_) {}
+    }
+    return ''
+  }
+
   function stripHtml(s) {
     return String(s || '')
       .replace(/<script[\s\S]*?<\/script>/gi, ' ')
@@ -524,6 +573,10 @@
     // ST-020 v2 : attributs, variantes (couleurs/tailles), emballage, moq,
     // expédition, compteurs de ventes — directement depuis le DOM.
     Object.assign(payload, buildExtras())
+
+    // ST-020 v2 : vidéo produit (JSON capturé ou <video>/og:video dans le DOM).
+    const videoUrl = findVideo(raw, 0) || domVideo() || undefined
+    if (videoUrl) payload.videoUrl = videoUrl.slice(0, 2000)
 
     return payload
   }

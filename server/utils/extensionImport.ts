@@ -129,6 +129,8 @@ export interface ExtensionPayload {
   shipFrom?: string
   /** Compteurs de ventes extraits (50+人好评 / 300+人已加购). */
   sales?: { goodReviews?: number; addedToCart?: number }
+  /** URL de la vidéo produit (mp4/webm…), http(s), ≤2000 caractères. */
+  videoUrl?: string
 }
 
 /** Validation STRICTE du body de l'extension. Lève `ExtensionImportError` (400)
@@ -183,6 +185,14 @@ export function parseExtensionPayload(body: any): ExtensionPayload {
       fail('images: chaque entrée doit être une URL http(s) valide.')
     }
     images.push(u)
+  }
+
+  // --- videoUrl (optionnel, URL http(s), bornée) ---
+  let videoUrl: string | undefined
+  if (body.videoUrl != null) {
+    const u = str(body.videoUrl, 2000)
+    if (!u || !isHttpUrl(u)) fail('videoUrl invalide (URL http(s) requise).')
+    videoUrl = u
   }
 
   // --- seller (objet optionnel, champs connus uniquement) ---
@@ -298,6 +308,7 @@ export function parseExtensionPayload(body: any): ExtensionPayload {
     moq,
     shipFrom,
     sales,
+    videoUrl,
   }
 }
 

@@ -99,6 +99,7 @@ export default defineEventHandler(async (event) => {
   if (payload.moq) draft.moq = payload.moq
   if (payload.shipFrom) draft.shipFrom = payload.shipFrom
   if (payload.sales) draft.salesInfo = payload.sales
+  if (payload.videoUrl) draft.videoUrl = payload.videoUrl
 
   // ST-020 : persistance du draft pour la page Import (« Imports via
   // extension »). Best-effort : ne bloque jamais l'import.
