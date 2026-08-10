@@ -162,7 +162,9 @@ async function translateExtDraft(entry: any) {
   const title = hasCjkText(d.title) ? String(d.title).trim() : ''
   const description = hasCjkText(d.description) ? String(d.description).trim() : ''
   const attributes = Array.isArray(d.attributes) && d.attributes.length ? d.attributes : undefined
-  if (!title && !description && !attributes) return
+  const colors = Array.isArray(d.colors) && d.colors.length ? d.colors : undefined
+  const pkgUnit = d.packaging?.unit ? { unit: d.packaging.unit } : undefined
+  if (!title && !description && !attributes && !colors && !pkgUnit) return
   extTranslateCache.add(id)
   extTranslateBusy.value = true
   extTranslateMsg.value = ''
@@ -172,7 +174,7 @@ async function translateExtDraft(entry: any) {
     const res: any = await $fetch('/api/admin/import/translate-draft', {
       method: 'POST',
       headers: authHeaders(),
-      body: { draftId: id, title: title || undefined, description: description || undefined, attributes },
+      body: { draftId: id, title: title || undefined, description: description || undefined, attributes, colors, packaging: pkgUnit },
     })
     if (res?.translated) {
       if (res.title) {
@@ -185,6 +187,12 @@ async function translateExtDraft(entry: any) {
       }
       if (Array.isArray(res.attributes) && res.attributes.length && draft.value) {
         draft.value.attributesTranslated = res.attributes
+      }
+      if (Array.isArray(res.colorsTranslated) && res.colorsTranslated.length && draft.value) {
+        draft.value.colorsTranslated = res.colorsTranslated
+      }
+      if (res.pkgUnitTranslated && draft.value) {
+        draft.value.packaging = { ...(draft.value.packaging || {}), unitTranslated: res.pkgUnitTranslated }
       }
       if ((res.title || res.description) && draft.value) draft.value.translationStatus = 'translated'
       extTranslateMsg.value = 'Traduction IA ✓'
@@ -1152,7 +1160,9 @@ onMounted(() => {
             <div v-if="draft.colors?.length || draft.sizes?.length" class="flex flex-wrap items-center gap-3">
               <span v-if="draft.colors?.length" class="flex flex-wrap gap-1 items-center">
                 <span class="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">Couleurs</span>
-                <span v-for="c in draft.colors" :key="c" class="px-1.5 py-0.5 rounded border border-zinc-800 text-[10px] font-mono text-zinc-300">{{ c }}</span>
+                <span v-for="(c, ci) in draft.colors" :key="c" class="px-1.5 py-0.5 rounded border border-zinc-800 text-[10px] font-mono text-zinc-300">
+                  <span v-if="draft.colorsTranslated?.[ci]">{{ draft.colorsTranslated[ci] }}</span><template v-if="draft.colorsTranslated?.[ci]"> </template><span v-if="draft.colorsTranslated?.[ci] && c !== draft.colorsTranslated[ci]" class="text-zinc-600">〔{{ c }}〕</span><template v-if="!draft.colorsTranslated?.[ci]">{{ c }}</template>
+                </span>
               </span>
               <span v-if="draft.sizes?.length" class="flex flex-wrap gap-1 items-center">
                 <span class="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">Tailles</span>
@@ -1160,7 +1170,7 @@ onMounted(() => {
               </span>
             </div>
             <p v-if="draft.packaging" class="text-[10px] font-mono text-zinc-400">
-              📐 Emballage : <span class="text-zinc-200">{{ draft.packaging.unit || 'colis' }}</span>
+              📐 Emballage : <span class="text-zinc-200">{{ draft.packaging.unitTranslated || draft.packaging.unit || 'colis' }}</span><template v-if="draft.packaging.unitTranslated && draft.packaging.unit && draft.packaging.unit !== draft.packaging.unitTranslated"> <span class="text-zinc-600">〔{{ draft.packaging.unit }}〕</span></template>
               <template v-if="draft.packaging.lengthCm || draft.packaging.widthCm || draft.packaging.heightCm">
                 · {{ draft.packaging.lengthCm }}×{{ draft.packaging.widthCm }}×{{ draft.packaging.heightCm }} cm
               </template>

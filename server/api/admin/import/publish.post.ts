@@ -5,7 +5,7 @@ import { loadProducts, saveProducts, upsertSupplierFromProduct } from '~~/server
 import { sanitizeProduct } from '~~/server/utils/product'
 import { publishSiteUpdate } from '~~/server/utils/realtime'
 import { getAI, geminiModel, geminiFallbackModel, generateContentWithRetry } from '~~/server/utils/ai'
-import { hasCjk } from '~~/server/utils/draftBuilder'
+import { hasCjk, translateTextsGoogle } from '~~/server/utils/draftBuilder'
 import { priceToXof, type JoPlatform } from '~~/server/utils/justone'
 
 // Admin import pipeline (ST-017) — publish step.
@@ -138,6 +138,15 @@ export default defineEventHandler(async (event) => {
           note: String(scRaw.note || '').trim() || undefined,
         }
       : undefined
+
+  // ST-020 v2/v3 : couleurs + unité d'emballage souvent en CHINOIS brut →
+  // traduites gratuitement (gtx, sans clé) à la publication si le draft n'a
+  // pas déjà été traduit (body.colorsTranslated / packaging.unitTranslated).
+  // Dégradé : valeurs source conservées en cas d'échec.
+  const colorsOut = colors?.length ? (await translateTextsGoogle(colors)) || colors : undefined
+  const pkgUnitOut = packaging?.unit
+    ? (await translateTextsGoogle([packaging.unit]))?.[0] || packaging.unit
+    : undefined
 
   if (!sourceId || !title) throw createError({ statusCode: 400, statusMessage: 'Identifiant source et titre requis.' })
   if (!imageUrl && gallery.length === 0) {
@@ -296,9 +305,11 @@ Réponds strictement en JSON au schéma demandé.
     seller,
     // ST-020 v3 : attributs traduits en FR (repli : source chinoise).
     attributes: transAttrs?.length ? transAttrs : undefined,
-    colors: colors?.length ? colors : undefined,
+    colors: colorsOut?.length ? colorsOut : undefined,
     sizes: sizes?.length ? sizes : undefined,
-    packaging: packaging && Object.values(packaging).some(Boolean) ? packaging : undefined,
+    packaging: packaging && Object.values(packaging).some(Boolean)
+      ? { ...packaging, unit: pkgUnitOut || packaging.unit }
+      : undefined,
     shipFrom: shipFrom || undefined,
     createdAt: new Date().toISOString(),
   })

@@ -219,15 +219,21 @@ async function refine(field: 'title' | 'description' | 'technical') {
   }
 }
 
-// ST-020 v3 : injecte les attributs capturés dans le container « Fiche
-// technique » (originalDescription) afin que l'IA puisse les traiter, sans
-// doublon si la section existe déjà (produit republié ou relu).
+// ST-020 v3 : injecte les infos riches capturées (attributs + couleurs +
+// tailles + emballage + MOQ) dans le container « Fiche technique »
+// (originalDescription) afin que l'IA puisse tout traiter, sans doublon si la
+// section existe déjà (produit republié ou relu).
 function ensureAttributesInFiche() {
-  if (!draft.attributes?.length) return
+  if (!draft.attributes?.length && !draft.colors?.length && !draft.sizes?.length && !draft.moq) return
   if (/fiche technique/i.test(String(draft.originalDescription || ''))) return
-  const block = `<h3>Fiche technique</h3><ul>${draft.attributes
-    .map((a: any) => `<li><b>${String(a?.name || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</b> : ${String(a?.value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</li>`)
-    .join('')}</ul>`
+  const esc = (s: any) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const lines = (draft.attributes || []).map((a: any) => `<li><b>${esc(a?.name)}</b> : ${esc(a?.value)}</li>`)
+  if (draft.colors?.length) lines.push(`<li><b>Couleurs</b> : ${esc(draft.colors.join(', '))}</li>`)
+  if (draft.sizes?.length) lines.push(`<li><b>Tailles</b> : ${esc(draft.sizes.join(', '))}</li>`)
+  if (packText.value) lines.push(`<li><b>Emballage</b> : ${esc(packText.value)}</li>`)
+  if (draft.moq) lines.push(`<li><b>MOQ</b> : ${esc(draft.moq)} pièce(s)</li>`)
+  if (!lines.length) return
+  const block = `<h3>Fiche technique</h3><ul>${lines.join('')}</ul>`
   draft.originalDescription = draft.originalDescription
     ? `${String(draft.originalDescription).replace(/<p>\s*<\/p>$/i, '')}\n\n${block}`
     : block

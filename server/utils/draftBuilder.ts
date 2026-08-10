@@ -350,6 +350,28 @@ export async function translateAttributesGoogle(
 }
 
 /**
+ * Traduit un tableau de textes courts (couleurs, libellés…) via Google `gtx`.
+ * gtx tronque les gros lots → on découpe par CHUNKS de 12 jetons (1 requête
+ * chacun) puis on concatène. Renvoie null si l'alignement échoue (source
+ * conservée). Dégradé : jamais d'erreur.
+ */
+export async function translateTextsGoogle(texts: string[]): Promise<string[] | null> {
+  const list = (texts || []).map((t) => String(t ?? '').trim()).filter(Boolean)
+  if (!list.length) return null
+  const CHUNK = 12
+  const result: string[] = []
+  for (let i = 0; i < list.length; i += CHUNK) {
+    const chunk = list.slice(i, i + CHUNK)
+    const out = await googleGtxTranslate(chunk.join('|||'))
+    if (!out) return null
+    const parts = out.split(/\s*\|\|+\s*/).map((s) => s.trim())
+    if (parts.length !== chunk.length) return null
+    result.push(...parts)
+  }
+  return result.length === list.length ? result : null
+}
+
+/**
  * ST-020 v3 : traduit les attributs techniques capturés par l'extension
  * (chinois bruts) en français. Appelée À L'IMPORT pour que l'aperçu admin et le
  * popup affichent DÉJÀ la traduction avant l'envoi vers le catalogue.

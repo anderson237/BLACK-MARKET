@@ -15,7 +15,7 @@
 import { Type } from '@google/genai'
 import { requireAuth } from '~~/server/utils/auth'
 import { getAI, geminiModel, geminiFallbackModel, generateContentWithRetry } from '~~/server/utils/ai'
-import { translateAttributes, googleGtxTranslate } from '~~/server/utils/draftBuilder'
+import { translateAttributes, googleGtxTranslate, translateTextsGoogle } from '~~/server/utils/draftBuilder'
 import { loadExtensionDrafts, saveExtensionDrafts } from '~~/server/utils/storage'
 
 export default defineEventHandler(async (event) => {
@@ -35,8 +35,14 @@ export default defineEventHandler(async (event) => {
         }))
         .filter((a: any) => a.name && a.value)
     : undefined
+  // ST-020 v2 : couleurs + unité d'emballage (chinois bruts) → traduites aussi
+  // pour que la fiche produit n'affiche pas de chinois brut.
+  const rawColors = Array.isArray(body?.colors)
+    ? body.colors.map((c: any) => String(c).trim().slice(0, 60)).filter(Boolean).slice(0, 60)
+    : undefined
+  const rawPkgUnit = typeof body?.packaging === 'object' && body.packaging ? String(body.packaging.unit || '').trim().slice(0, 30) : undefined
 
-  if (!rawTitle && !rawDescription && !rawAttributes?.length) {
+  if (!rawTitle && !rawDescription && !rawAttributes?.length && !rawColors?.length && !rawPkgUnit) {
     throw createError({ statusCode: 400, statusMessage: 'Rien à traduire.' })
   }
 
@@ -106,7 +112,18 @@ Réponds strictement en JSON au schéma demandé.
     }
   }
 
-  const hasResult = Boolean(title) || Boolean(description) || Boolean(attributes?.length)
+  // --- 3/3 Couleurs + unité d'emballage : gtx (gratuit, batch en 1 requête) ---
+  let colorsTranslated: string[] | undefined
+  if (rawColors?.length) {
+    colorsTranslated = (await translateTextsGoogle(rawColors)) || undefined
+  }
+  let pkgUnitTranslated: string | undefined
+  if (rawPkgUnit) {
+    const t = await translateTextsGoogle([rawPkgUnit])
+    if (t?.[0]) pkgUnitTranslated = t[0].slice(0, 30)
+  }
+
+  const hasResult = Boolean(title) || Boolean(description) || Boolean(attributes?.length) || Boolean(colorsTranslated?.length) || Boolean(pkgUnitTranslated)
   if (!hasResult) {
     return { translated: false, reason: 'Traduction indisponible (échec IA).' }
   }
@@ -120,6 +137,10 @@ Réponds strictement en JSON au schéma demandé.
         if (title) drafts[idx].draft.title = title
         if (description) drafts[idx].draft.description = description
         if (attributes?.length) drafts[idx].draft.attributesTranslated = attributes
+        if (colorsTranslated?.length) drafts[idx].draft.colorsTranslated = colorsTranslated
+        if (pkgUnitTranslated) {
+          drafts[idx].draft.packaging = { ...(drafts[idx].draft.packaging || {}), unitTranslated: pkgUnitTranslated }
+        }
         if (title || description) drafts[idx].draft.translationStatus = 'translated'
         await saveExtensionDrafts(drafts)
       }
@@ -128,5 +149,5 @@ Réponds strictement en JSON au schéma demandé.
     }
   }
 
-  return { translated: true, title, description, attributes }
+  return { translated: true, title, description, attributes, colorsTranslated, pkgUnitTranslated }
 })
