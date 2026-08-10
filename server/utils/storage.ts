@@ -1370,6 +1370,19 @@ export async function loadExtensionDrafts(): Promise<ExtensionDraftEntry[]> {
   return loadExtensionDraftsFile()
 }
 
+/** Remplace la liste complète des drafts extension (ordre préservé). */
+export async function saveExtensionDrafts(list: ExtensionDraftEntry[]): Promise<void> {
+  if (isNetlifyRuntime()) {
+    try {
+      await blobSet('bm-extension-drafts', 'drafts.json', JSON.stringify(list))
+    } catch (err) {
+      console.error('[BLOBS] extension drafts save failed:', err)
+    }
+    return
+  }
+  await writeJSON(EXT_DRAFTS_FILE, list)
+}
+
 /** Ajoute (ou remplace) un draft extension, le plus récent en tête (cap FIFO). */
 export async function upsertExtensionDraft(entry: ExtensionDraftEntry): Promise<ExtensionDraftEntry[]> {
   return mutateGeneric('bm-extension-drafts', 'drafts.json', EXT_DRAFTS_FILE, (list: ExtensionDraftEntry[]) => {

@@ -148,6 +148,56 @@ const extDrafts = ref<any[]>([])
 const extDraftLoading = ref(false)
 const currentExtDraftId = ref('')
 
+// ST-020 v3 : traduction FR à la demande des drafts extension capturés sans clé
+// IA (titre/description/attributs chinois). Cache par draft → une seule requête.
+const extTranslateBusy = ref(false)
+const extTranslateMsg = ref('')
+const extTranslateCache = new Set<string>()
+const hasCjkText = (s: any) => /[\u3000-\u9FFF\u3400-\u4DBF\u3040-\u30FF\uF900-\uFAFF]/.test(String(s || ''))
+
+async function translateExtDraft(entry: any) {
+  const id = entry?.id || ''
+  if (!id || extTranslateCache.has(id)) return
+  const d = entry?.draft || entry
+  const title = hasCjkText(d.title) ? String(d.title).trim() : ''
+  const description = hasCjkText(d.description) ? String(d.description).trim() : ''
+  const attributes = Array.isArray(d.attributes) && d.attributes.length ? d.attributes : undefined
+  if (!title && !description && !attributes) return
+  extTranslateCache.add(id)
+  extTranslateBusy.value = true
+  extTranslateMsg.value = ''
+  const origTitle = publishTitle.value
+  const origDesc = publishDesc.value
+  try {
+    const res: any = await $fetch('/api/admin/import/translate-draft', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: { draftId: id, title: title || undefined, description: description || undefined, attributes },
+    })
+    if (res?.translated) {
+      if (res.title) {
+        if (publishTitle.value === origTitle) publishTitle.value = res.title
+        if (draft.value && draft.value.title === d.title) draft.value.title = res.title
+      }
+      if (res.description) {
+        if (publishDesc.value === origDesc) publishDesc.value = res.description
+        if (draft.value && draft.value.description === d.description) draft.value.description = res.description
+      }
+      if (Array.isArray(res.attributes) && res.attributes.length && draft.value) {
+        draft.value.attributesTranslated = res.attributes
+      }
+      if ((res.title || res.description) && draft.value) draft.value.translationStatus = 'translated'
+      extTranslateMsg.value = 'Traduction IA ✓'
+    } else {
+      extTranslateMsg.value = res?.reason || 'Traduction indisponible'
+    }
+  } catch (e: any) {
+    extTranslateMsg.value = e?.data?.statusMessage || 'Erreur de traduction'
+  } finally {
+    extTranslateBusy.value = false
+  }
+}
+
 // Paste-a-link flow: same draft pipeline as a search-result click, but the
 // platform + source id are detected from a product URL.
 const productUrl = ref('')
@@ -424,6 +474,8 @@ function openExtDraft(entry: any) {
   supplierContact.value = d.supplierContact || { sellerName: '', country: '', wechat: '', email: '', whatsapp: '', phone: '', website: '', note: '' }
   supplierSaved.value = false
   currentExtDraftId.value = entry?.id || ''
+  // ST-020 v3 : backfill traduction FR à la demande (drafts capturés sans clé IA).
+  translateExtDraft(entry)
   // Nettoie le deep link : l'aperçu est ouvert, le lien n'est plus « frais ».
   if (route.query.ext) window.history.replaceState(null, '', window.location.pathname)
 }
@@ -1083,9 +1135,14 @@ onMounted(() => {
           <!-- ST-020 v2 : infos riches capturées par l'extension (1688…) :
                attributs, variantes, emballage, moq, expédition, ventes -->
           <div v-if="draft.attributes?.length || draft.colors?.length || draft.sizes?.length || draft.packaging || draft.moq || draft.shipFrom || draft.salesInfo" class="border border-zinc-800 rounded-xl p-3 space-y-2 bg-[#08080c]">
-            <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center justify-between gap-2 flex-wrap">
               <p class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Infos produit capturées (extension)</p>
-              <span v-if="draft.shipFrom" class="text-[10px] font-mono text-zinc-400">📍 Expédition : {{ draft.shipFrom }}</span>
+              <div class="flex items-center gap-2">
+                <span v-if="extTranslateBusy" class="text-[10px] font-mono text-sky-400">Traduction IA…</span>
+                <span v-else-if="extTranslateMsg" class="text-[10px] font-mono text-emerald-400">{{ extTranslateMsg }}</span>
+                <button v-if="currentExtDraftId && draft.attributes?.length && !draft.attributesTranslated" @click="translateExtDraft({ id: currentExtDraftId, draft })" :disabled="extTranslateBusy" class="text-[10px] font-mono text-sky-400 hover:text-sky-300 disabled:opacity-50">✨ Traduire (IA)</button>
+                <span v-if="draft.shipFrom" class="text-[10px] font-mono text-zinc-400">📍 Expédition : {{ draft.shipFrom }}</span>
+              </div>
             </div>
             <div class="flex flex-wrap gap-2 text-[10px] font-mono">
               <span v-if="draft.moq" class="text-sky-400">📦 MOQ : {{ draft.moq }} pièce(s)</span>
